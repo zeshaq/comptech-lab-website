@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 
 interface Post {
   title: string;
@@ -46,6 +47,7 @@ const fmt = (d: Date | null) =>
   description="Technical writing by our principals on OpenShift, AI/ML, DevSecOps, identity, and integration."
 >
   <section class="hero">
+    <HeroBackground variant="default" />
     <div class="container">
       <span class="hero-eyebrow">Insights</span>
       <h1 class="hero-title">Technical writing from our practice.</h1>

@@ -2,7 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
 import DotGrid from "../components/DotGrid.astro";
-import HeroVisual from "../components/HeroVisual.astro";
+import HeroBackground from "../components/HeroBackground.astro";
 import { getCollection } from "astro:content";
 import { SERVICE_ICONS, INDUSTRY_ICONS, PHASE_ICONS } from "../utils/icons";
 
@@ -28,8 +28,9 @@ const phases = [
 ---
 
 <Layout>
-  <section class="hero-bleed">
-    <div class="hero-bleed-content">
+  <section class="hero">
+    <HeroBackground variant="default" />
+    <div class="container">
       <span class="hero-eyebrow">Systems integration for regulated industries</span>
       <h1 class="hero-title">Cloud platforms, security, AI, and data &mdash; engineered to ship.</h1>
       <p class="hero-lede">
@@ -41,9 +42,6 @@ const phases = [
         <a href="/services/" class="btn btn-primary">Our services</a>
         <a href="/case-studies/" class="btn btn-secondary">Engagement profiles</a>
       </div>
-    </div>
-    <div class="hero-bleed-panel">
-      <HeroVisual variant="network" />
     </div>
   </section>
 

@@ -1,0 +1,97 @@
+---
+/**
+ * Full-width dark hero background composition in IBM-style:
+ *   - Gray-100 base
+ *   - Soft radial gradient (blue + purple) for depth
+ *   - Dot-grid pattern overlay
+ *   - Concentric arcs (orbits) on the right
+ *   - Highlighted accent dots
+ *   - Carbon "plate" 2×2 squares in the bottom-left
+ *
+ * Variants tilt the accent positions and gradient colors so different
+ * pages feel related but not identical.
+ */
+interface Props {
+  variant?: "default" | "blue" | "purple" | "teal";
+}
+
+const { variant = "default" } = Astro.props;
+
+const accents: Record<string, { c1: string; c2: string; orbit: string }> = {
+  default: { c1: "#0f62fe", c2: "#8a3ffc", orbit: "#0f62fe" },
+  blue:    { c1: "#0f62fe", c2: "#0043ce", orbit: "#0f62fe" },
+  purple:  { c1: "#8a3ffc", c2: "#a56eff", orbit: "#a56eff" },
+  teal:    { c1: "#08bdba", c2: "#0f62fe", orbit: "#08bdba" },
+};
+const { c1, c2, orbit } = accents[variant] ?? accents.default;
+
+// dot grid covers full SVG; sized for 1600×540 viewBox
+const cols = 60;
+const rows = 22;
+const stepX = 1600 / (cols - 1);
+const stepY = 540 / (rows - 1);
+---
+
+<div class="hero-bg" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 540" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id={`hero-bg-g1-${variant}`} cx="0.82" cy="0.35" r="0.55">
+        <stop offset="0" stop-color={c1} stop-opacity="0.28" />
+        <stop offset="1" stop-color={c1} stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id={`hero-bg-g2-${variant}`} cx="0.15" cy="0.85" r="0.5">
+        <stop offset="0" stop-color={c2} stop-opacity="0.18" />
+        <stop offset="1" stop-color={c2} stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id={`hero-bg-g3-${variant}`} cx="0.5" cy="0.5" r="0.6">
+        <stop offset="0" stop-color="#161616" stop-opacity="0" />
+        <stop offset="1" stop-color="#000000" stop-opacity="0.35" />
+      </radialGradient>
+    </defs>
+
+    {/* gradients */}
+    <rect width="1600" height="540" fill={`url(#hero-bg-g1-${variant})`} />
+    <rect width="1600" height="540" fill={`url(#hero-bg-g2-${variant})`} />
+
+    {/* dot grid */}
+    <g fill="rgba(255,255,255,0.06)">
+      {Array.from({ length: rows }).map((_, r) =>
+        Array.from({ length: cols }).map((_, c) => (
+          <circle cx={c * stepX} cy={r * stepY} r="1.1" />
+        ))
+      ).flat()}
+    </g>
+
+    {/* concentric arcs (orbit pattern) on the right */}
+    <g fill="none" stroke={orbit} stroke-width="1">
+      <circle cx="1480" cy="270" r="180" opacity="0.5" />
+      <circle cx="1480" cy="270" r="260" opacity="0.35" />
+      <circle cx="1480" cy="270" r="340" opacity="0.22" />
+      <circle cx="1480" cy="270" r="420" opacity="0.14" />
+      <circle cx="1480" cy="270" r="500" opacity="0.08" />
+    </g>
+
+    {/* highlighted accent dots along orbits */}
+    <g>
+      <circle cx="1660" cy="270" r="6" fill={orbit} />
+      <circle cx="1480" cy="90" r="5" fill={orbit} />
+      <circle cx="1300" cy="270" r="4" fill={orbit} opacity="0.7" />
+      <circle cx="1480" cy="450" r="4" fill={orbit} opacity="0.7" />
+      <circle cx="1220" cy="270" r="3" fill="#ffffff" opacity="0.6" />
+    </g>
+
+    {/* outer vignette */}
+    <rect width="1600" height="540" fill={`url(#hero-bg-g3-${variant})`} />
+
+    {/* Carbon plate — 2×2 squares, bottom-left */}
+    <g transform="translate(64 440)">
+      <rect width="22" height="22" fill={orbit} />
+      <rect x="24" y="0" width="22" height="22" fill="rgba(255,255,255,0.08)" />
+      <rect x="0" y="24" width="22" height="22" fill="rgba(255,255,255,0.08)" />
+      <rect x="24" y="24" width="22" height="22" fill={orbit} opacity="0.5" />
+    </g>
+
+    {/* thin top-left horizontal stripe accent */}
+    <rect x="0" y="0" width="80" height="3" fill={orbit} />
+  </svg>
+</div>

@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 import { getCollection } from "astro:content";
 
 const cases = (await getCollection("case-studies", ({ data }) => !data.draft)).sort(
@@ -12,6 +13,7 @@ const cases = (await getCollection("case-studies", ({ data }) => !data.draft)).s
   description="Representative engagement profiles from our practice — banking, insurance, telecom, public sector. Anonymised for client confidentiality."
 >
   <section class="hero">
+    <HeroBackground variant="default" />
     <div class="container">
       <span class="hero-eyebrow">Engagement profiles</span>
       <h1 class="hero-title">Representative engagements from our practice.</h1>

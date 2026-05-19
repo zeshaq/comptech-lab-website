@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import DotGrid from "../../components/DotGrid.astro";
-import HeroVisual from "../../components/HeroVisual.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 import { PHASE_ICONS } from "../../utils/icons";
 
 const phases = [
@@ -118,8 +118,9 @@ const phases = [
   title="Methodology — CompTech Lab"
   description="A five-phase delivery discipline: Assess, Design, Deploy, Operate, Hand over. The detailed view of how we run engagements."
 >
-  <section class="hero-bleed">
-    <div class="hero-bleed-content">
+  <section class="hero">
+    <HeroBackground variant="default" />
+    <div class="container">
       <span class="hero-eyebrow">Methodology</span>
       <h1 class="hero-title">Five phases. One delivery discipline.</h1>
       <p class="hero-lede">
@@ -131,9 +132,6 @@ const phases = [
         <a href="/contact/" class="btn btn-primary">Discuss an engagement</a>
         <a href="/services/" class="btn btn-secondary">All services</a>
       </div>
-    </div>
-    <div class="hero-bleed-panel">
-      <HeroVisual variant="workflow" />
     </div>
   </section>
 

@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 import { getCollection, render } from "astro:content";
 
 export async function getStaticPaths() {
@@ -26,6 +27,7 @@ const otherServices = allServices.filter((s) => s.id !== entry.id);
 
 <Layout title={`${entry.data.title} — CompTech Lab`} description={entry.data.description}>
   <section class="hero">
+    <HeroBackground variant="default" />
     <div class="container">
       <span class="hero-eyebrow">{entry.data.eyebrow ?? "Service"}</span>
       <h1 class="hero-title">{entry.data.title}</h1>

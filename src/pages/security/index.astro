@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import DotGrid from "../../components/DotGrid.astro";
-import HeroVisual from "../../components/HeroVisual.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 
 const tabs = [
   { id: "overview",   eyebrow: "01", label: "Overview" },
@@ -19,8 +19,9 @@ const tabs = [
   title="Security practice — CompTech Lab"
   description="A detailed look at the seven aspects of our security practice: SOC and detection engineering, VAPT and vulnerability management, network security and segmentation, identity and access, AppSec and DevSecOps, and compliance and audit."
 >
-  <section class="hero-bleed">
-    <div class="hero-bleed-content">
+  <section class="hero">
+    <HeroBackground variant="blue" />
+    <div class="container">
       <span class="hero-eyebrow">Security practice</span>
       <h1 class="hero-title">A specialist security practice for regulated workloads.</h1>
       <p class="hero-lede">
@@ -32,9 +33,6 @@ const tabs = [
         <a href="/contact/" class="btn btn-primary">Discuss a security engagement</a>
         <a href="#soc" class="btn btn-secondary">Explore the practice</a>
       </div>
-    </div>
-    <div class="hero-bleed-panel">
-      <HeroVisual variant="security" />
     </div>
   </section>
 

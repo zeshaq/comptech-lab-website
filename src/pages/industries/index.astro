@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import DotGrid from "../../components/DotGrid.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
 import { getCollection } from "astro:content";
 import { INDUSTRY_ICONS } from "../../utils/icons";
 
@@ -15,9 +16,7 @@ const industries = (await getCollection("industries", ({ data }) => !data.draft)
   description="Banking & financial services, insurance, telecom, public sector — regulated industries where platform discipline matters."
 >
   <section class="hero">
-    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
-      <DotGrid cols={12} rows={6} spacing={16} />
-    </div>
+    <HeroBackground variant="default" />
     <div class="container">
       <span class="hero-eyebrow">Industries</span>
       <h1 class="hero-title">Built for regulated industries.</h1>
