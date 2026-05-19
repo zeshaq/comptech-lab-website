@@ -1,14 +1,22 @@
-# CLAUDE.md — operating manual for `zeshaq/zahid`
+# CLAUDE.md — operating manual for the blog inside the `comptech-lab` monorepo
 
-This file is for the **next AI agent** working on this repository. It captures the conventions, structure, and load-bearing decisions that aren't obvious from the code alone. Read this first; the per-session memory files under `~/.claude/projects/.../memory/` cover user preferences (which are also referenced from here).
+This file is for the **next AI agent** working on the blog. It captures the conventions, structure, and load-bearing decisions that aren't obvious from the code alone. Read this first; the per-session memory files under `~/.claude/projects/.../memory/` cover user preferences (which are also referenced from here).
+
+> **You are inside a monorepo.** This file lives at `apps/blog/CLAUDE.md` in `zeshaq/comptech-lab`. The monorepo also holds the consulting site at `apps/website/` (live at `www.comptech-lab.com`). All paths in this manual are **relative to `apps/blog/`** unless explicitly noted. To work on the blog with the right context loaded, start Claude Code from `apps/blog/`:
+>
+> ```bash
+> cd /Users/ze/Documents/comptech-lab/apps/blog && claude
+> ```
+>
+> For monorepo-wide work (CI, infra, cross-app), start it from the monorepo root.
 
 ---
 
-## 1. What this repo is
+## 1. What this app is
 
-- **Public blog + docs + learning tracks** at `https://zeshaq.pages.dev`.
-- Built with **Astro 5**, **MDX**, **React islands** (`@xyflow/react` for diagrams), **Tailwind v4**, hosted on **Cloudflare Pages** via a GitHub Actions workflow.
-- The author is **Zahid** (`zeshaq@gmail.com`, GH handle `zeshaq`). The CF project is named `zeshaq` because `zahid.pages.dev` was globally taken at the time of creation — see [Blog ADR 0001](src/content/docs/openshift-platform/06-architecture-decisions/12-blog/01-adr-0001-multi-collection-content-model.mdx) and the `project_zahid_blog.md` memory.
+- **Public blog + docs + learning tracks** at `https://blog.comptech-lab.com`. (Previously hosted at `zeshaq.pages.dev` — the old URL still works while the old Cloudflare Pages project remains live.)
+- Built with **Astro 5**, **MDX**, **React islands** (`@xyflow/react` for diagrams), **Tailwind v4**, hosted on **Cloudflare Pages** via a GitHub Actions workflow at the monorepo root.
+- The author is **Zahid** (`zeshaq@gmail.com`, GH handle `zeshaq`). The Cloudflare Pages project is named `comptech-lab-blog`. The historical project name was `zeshaq` because `zahid.pages.dev` was globally taken at the time of creation — see [Blog ADR 0001](src/content/docs/openshift-platform/06-architecture-decisions/12-blog/01-adr-0001-multi-collection-content-model.mdx) and the `project_zahid_blog.md` memory.
 - The site has three audiences, served by three content collections:
   - **Blog posts** (`/blog/*`) — opinionated technical writing for the public.
   - **Docs** (`/docs/*`) — long-form documentation, organised into **modules**. Today: `openshift-platform`, `brac-poc`, `greenfield-ocp-deployment`, `security-lab`. Each module has its own landing page, scoped sidebar, breadcrumb, and TOC.
@@ -17,20 +25,24 @@ This file is for the **next AI agent** working on this repository. It captures t
 
 ## 2. Deploy + push workflow
 
-- `main` is the deployable branch. Every push triggers `.github/workflows/deploy.yml`, which builds with Astro and pushes the `dist/` to Cloudflare Pages via `cloudflare/wrangler-action@v3`.
-- **Always commit and push after writing or expanding content.** This is enforced by user preference (`feedback_always_push_posts.md`). Don't ask "should I push?" — just push.
-- The push sequence I use:
-  1. `npm run build` to catch parse errors locally.
-  2. `git fetch origin && git rebase origin/main` — the user often makes parallel edits; rebase is mandatory or pushes get rejected.
+- `main` is the deployable branch in the `zeshaq/comptech-lab` monorepo.
+- The deploy workflow lives at **`.github/workflows/deploy-blog.yml` at the monorepo root** (not inside `apps/blog/`). It uses a `paths: ['apps/blog/**']` filter, so it only runs when blog files change; the website's separate workflow (`deploy-website.yml`) handles `apps/website/**`.
+- The workflow runs `npm ci` and `npm run build` inside `apps/blog/`, then deploys `apps/blog/dist` to Cloudflare Pages via `cloudflare/wrangler-action@v3` to the `comptech-lab-blog` project.
+- **Always commit and push after writing or expanding content.** This is enforced by user preference (`agent-memory/feedback_always_push_posts.md`). Don't ask "should I push?" — just push.
+- The push sequence I use (run from anywhere in the monorepo; `cd apps/blog` for the build):
+  1. `cd apps/blog && npm run build` to catch parse errors locally.
+  2. `cd .. && git fetch origin && git rebase origin/main` — the user often makes parallel edits; rebase is mandatory or pushes get rejected.
   3. `git add -A && git commit -m "..."` (use heredoc for multi-paragraph messages).
   4. `git push`.
-  5. `gh run watch <id>` to confirm deploy.
+  5. `gh run list --repo zeshaq/comptech-lab --limit 3` to find the run id, then `gh run watch <id> --repo zeshaq/comptech-lab --exit-status` to confirm deploy.
 - Don't bypass hooks. Don't `--force-push`. Don't change git config.
 
-## 3. Repository layout
+## 3. Layout (inside `apps/blog/`)
+
+The structure below is **inside `apps/blog/`** in the monorepo. The monorepo root holds `.github/workflows/`, the root `README.md`, and the sibling `apps/website/`.
 
 ```
-.
+apps/blog/
 ├── CLAUDE.md                            ← you are here
 ├── README.md
 ├── astro.config.mjs                     ← sitemap, MDX, React, Tailwind v4
@@ -81,8 +93,20 @@ This file is for the **next AI agent** working on this repository. It captures t
 │       ├── navTree.ts                   ← buildTree, buildDocsTree, buildModuleTree, buildLearnTree, buildCategoryTree
 │       ├── docModules.ts                ← MODULE_TITLES + MODULE_TAGLINES + parseDocsPath (source of truth for docs modules)
 │       └── tracks.ts                    ← TRACK_TITLES + TRACK_TAGLINES + parseLearnPath
-├── .github/workflows/deploy.yml
-└── memory/                              ← (lives outside repo, in ~/.claude/...)
+└── agent-memory/                        ← in-repo notes for AI agents (now a plain folder, see §8)
+```
+
+At the monorepo root (one level up):
+
+```
+comptech-lab/
+├── .github/workflows/
+│   ├── deploy-website.yml               ← path filter: apps/website/**
+│   └── deploy-blog.yml                  ← path filter: apps/blog/**
+├── README.md                            ← monorepo overview
+└── apps/
+    ├── website/                         ← www.comptech-lab.com (separate app)
+    └── blog/                            ← you are here
 ```
 
 ## 4. Content collections
@@ -335,7 +359,15 @@ For radial diagrams, copy the `mkBranch()` helper used in many posts (see `src/c
 
 ## 8. Memory rules — quick reference
 
-The full memory is **git-tracked in this repo** at `agent-memory/`. The original Claude Code path `~/.claude/projects/-Users-ze-Documents-zeshaq-pages-dev/memory/` is a **symlink** to `agent-memory/` so Claude Code reads/writes it transparently. Changes to memory show up in `git status` like any other file. Summary of the standing rules:
+The agent-side memory is **git-tracked at `apps/blog/agent-memory/`** in the monorepo. The previous symlink convention (linking `~/.claude/projects/-Users-ze-Documents-zeshaq-pages-dev/memory/` → `agent-memory/`) was broken by the monorepo move; the rsync copy made `agent-memory/` a plain folder. To restore the auto-commit-to-git behaviour for sessions started from `apps/blog/`, recreate the symlink on each contributor's machine:
+
+```bash
+mkdir -p ~/.claude/projects/-Users-ze-Documents-comptech-lab-apps-blog
+ln -s "$PWD/apps/blog/agent-memory" \
+      ~/.claude/projects/-Users-ze-Documents-comptech-lab-apps-blog/memory
+```
+
+(Adjust the source path to match your local checkout. The symlink is a local-machine convenience; the underlying memory files live in git.) Changes to memory then show up in `git status` like any other file. Summary of the standing rules:
 
 | Memory | TL;DR |
 | --- | --- |

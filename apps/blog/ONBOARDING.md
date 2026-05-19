@@ -1,6 +1,8 @@
 # Onboarding & Operations Manual
 
-Welcome. This repo is the source of **https://zeshaq.pages.dev** — a personal blog plus platform docs, learning tracks, and an interactive whiteboard. This document is the entry point for anyone (human or AI agent) about to contribute.
+Welcome. This is the **blog** inside the `zeshaq/comptech-lab` monorepo — a personal blog plus platform docs, learning tracks, and an interactive whiteboard, live at **https://blog.comptech-lab.com**. This document is the entry point for anyone (human or AI agent) about to contribute.
+
+> **You are inside a monorepo.** The blog lives at `apps/blog/` in `zeshaq/comptech-lab`. The monorepo also holds the consulting site at `apps/website/` (live at `www.comptech-lab.com`). Throughout this document, **paths under `src/`, `public/`, etc. are relative to `apps/blog/`** unless explicitly noted. To work on the blog, `cd apps/blog/` after cloning.
 
 Read this once end-to-end, then keep it open as a reference. When you finish a contribution, if you noticed something missing or wrong here, fix it in the same PR.
 
@@ -29,11 +31,11 @@ Read this once end-to-end, then keep it open as a reference. When you finish a c
 
 ## 1. What this site is
 
-- **Live URL:** https://zeshaq.pages.dev
-- **GitHub repo:** https://github.com/zeshaq/zeshaq-pages-dev (renamed from `zahid` on 2026-05-13)
-- **Hosting:** Cloudflare Pages, project name `zeshaq`
+- **Live URL:** https://blog.comptech-lab.com (the legacy URL `zeshaq.pages.dev` still serves while the old deployment remains live)
+- **GitHub repo:** https://github.com/zeshaq/comptech-lab (the monorepo) — blog source under `apps/blog/`
+- **Hosting:** Cloudflare Pages, project name **`comptech-lab-blog`**
 - **Stack:** Astro 5 + MDX, React islands (`@xyflow/react` for diagrams), Tailwind v4
-- **Deploy:** GitHub Actions → Wrangler → Cloudflare Pages, on every push to `main`
+- **Deploy:** GitHub Actions → Wrangler → Cloudflare Pages, on every push to `main` that touches `apps/blog/**` (the workflow's path filter)
 
 The site has four public surfaces:
 
@@ -61,7 +63,7 @@ Roles are not enforced by GitHub permissions alone — they're a social conventi
 
 ## 3. Getting access
 
-1. **GitHub access.** Ask the owner (`@zeshaq`) to add you as a collaborator on `zeshaq/zeshaq-pages-dev`. Specify whether you need **Write** (for normal contributors) or **Admin** (rarely needed).
+1. **GitHub access.** Ask the owner (`@zeshaq`) to add you as a collaborator on `zeshaq/comptech-lab` (the monorepo). Specify whether you need **Write** (for normal contributors) or **Admin** (rarely needed).
 2. **Cloudflare access.** You do **not** need Cloudflare access to author content. The GitHub Actions workflow already has the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets it needs to deploy. Only ask for Cloudflare access if you're going to change DNS, Pages settings, or rotate tokens.
 3. **AI agents.** Agents authenticate via the owner's `gh` CLI (already logged in on their machine). If you're spinning up an agent on a new machine, install `gh` and `gh auth login` first.
 
@@ -74,13 +76,13 @@ There is no internal Slack / chat for this project. Conversation happens in PR r
 Prerequisites: **Node 22** (the Actions workflow uses it; older versions may build but won't match CI), **git**, and `gh` (optional, but the deploy verification commands assume it).
 
 ```bash
-git clone https://github.com/zeshaq/zeshaq-pages-dev.git
-cd zeshaq-pages-dev
+git clone https://github.com/zeshaq/comptech-lab.git
+cd comptech-lab/apps/blog
 npm install
 npm run dev
 ```
 
-This serves the site at **http://localhost:4321**. Edits hot-reload.
+This serves the blog at **http://localhost:4321**. Edits hot-reload. The website lives in a sibling directory (`apps/website/`) — its `npm install` and `npm run dev` happen there with its own `node_modules`, fully independent of the blog.
 
 Other scripts:
 
@@ -96,8 +98,10 @@ Other scripts:
 
 ## 5. Repo tour
 
+The blog itself, inside `apps/blog/` in the monorepo:
+
 ```
-.
+apps/blog/
 ├── ONBOARDING.md                        ← you are here
 ├── CLAUDE.md                            ← AI-agent-specific operating manual (deeper conventions)
 ├── README.md                            ← short pointer
@@ -114,6 +118,8 @@ Other scripts:
 │   │   ├── blog/*.mdx                   ← flat list, category in frontmatter
 │   │   ├── docs/openshift-platform/...  ← numbered NN-prefix sections
 │   │   ├── docs/brac-poc/...            ← customer POC docs
+│   │   ├── docs/greenfield-ocp-deployment/...
+│   │   ├── docs/security-lab/...
 │   │   └── learn/<track>/NN-*.mdx       ← numbered modules per track
 │   ├── components/                      ← Astro + React components (Whiteboard, sidebars, search…)
 │   ├── layouts/                         ← Layout / DocsLayout / LearnLayout / BareLayout
@@ -129,8 +135,20 @@ Other scripts:
 │   └── utils/
 │       ├── navTree.ts                   ← sidebar tree builders
 │       └── tracks.ts                    ← learn track titles + taglines
-├── agent-memory/                        ← in-repo notes for AI agents (writing voice, MDX gotchas)
-└── .github/workflows/deploy.yml         ← GitHub Actions → Wrangler → Cloudflare Pages
+└── agent-memory/                        ← in-repo notes for AI agents (writing voice, MDX gotchas)
+```
+
+The monorepo root (one level up):
+
+```
+comptech-lab/
+├── README.md                            ← monorepo overview
+├── .github/workflows/
+│   ├── deploy-website.yml               ← only runs on apps/website/** changes
+│   └── deploy-blog.yml                  ← only runs on apps/blog/** changes
+└── apps/
+    ├── website/                         ← www.comptech-lab.com (independent Astro project)
+    └── blog/                            ← blog.comptech-lab.com (this app)
 ```
 
 For a deeper architectural tour and rationale (why ReactFlow over Mermaid, why the docs/brac-poc folding, etc.), read **CLAUDE.md** — it's the canonical conventions doc.
@@ -359,27 +377,27 @@ If you're making a non-trivial structural change to the blog (new collection, ne
 ## 12. Deploy pipeline and verification
 
 ```
-push to main
-  → .github/workflows/deploy.yml
-    → npm ci
-    → npm run build (Astro + pagefind)
-    → cloudflare/wrangler-action@v3 pages deploy dist --project-name=zeshaq --branch=main
-      → Cloudflare Pages publishes to zeshaq.pages.dev
+push to main (with apps/blog/** changes)
+  → .github/workflows/deploy-blog.yml      (at monorepo root)
+    → npm ci                                (working-directory: apps/blog)
+    → npm run build                         (Astro + pagefind, in apps/blog)
+    → cloudflare/wrangler-action@v3 pages deploy apps/blog/dist --project-name=comptech-lab-blog --branch=main
+      → Cloudflare Pages publishes to blog.comptech-lab.com
 ```
 
-The whole pipeline runs in ~1–2 minutes.
+The whole pipeline runs in ~1–2 minutes. Pushes that don't touch `apps/blog/**` don't trigger the blog deploy at all (the sibling workflow handles the website).
 
 **Verification commands after a merge:**
 
 ```bash
-gh run list --repo zeshaq/zeshaq-pages-dev --branch main --limit 3
-gh run watch <run-id> --repo zeshaq/zeshaq-pages-dev --exit-status
-curl -I https://zeshaq.pages.dev/blog/<your-slug>/
+gh run list --repo zeshaq/comptech-lab --branch main --limit 3
+gh run watch <run-id> --repo zeshaq/comptech-lab --exit-status
+curl -I https://blog.comptech-lab.com/blog/<your-slug>/
 ```
 
 Expect `HTTP/2 200`. Cloudflare's edge cache propagates within ~30s of the Action completing.
 
-**Deploy secrets** (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) live on the repo, not on individual workflows. They survive repo renames. You don't need to touch them unless they're being rotated.
+**Deploy secrets** (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) live as GitHub Actions secrets on the `zeshaq/comptech-lab` repo. Both deploy workflows (blog and website) read the same two secrets. They survive repo renames. You don't need to touch them unless they're being rotated.
 
 ---
 
@@ -403,7 +421,7 @@ Do **not** try to fix forward by stacking patches on a broken `main`. Revert fir
 
 - Check the wrangler-action step's log. Most common cause: `CLOUDFLARE_API_TOKEN` expired. Get a new one via the Cloudflare dashboard (token needs `Cloudflare Pages: Edit` permission on the account) and update the GitHub repo secret.
 
-**Old Cloudflare deployments stay viewable** in the Pages dashboard under the `zeshaq` project. You can also "promote" a previous deployment back to production from there if reverting via git is too slow.
+**Old Cloudflare deployments stay viewable** in the Pages dashboard under the `comptech-lab-blog` project. You can also "promote" a previous deployment back to production from there if reverting via git is too slow.
 
 ---
 
@@ -434,8 +452,8 @@ Notes specific to agents:
 ## 16. Ownership and where to ask
 
 - **Repo owner:** Zahid (`@zeshaq`, zeshaq@gmail.com).
-- **Questions or proposals:** open a GitHub Issue on `zeshaq/zeshaq-pages-dev`. PR review conversation works for change-specific questions.
-- **Live site status:** Cloudflare Pages dashboard → `zeshaq` project.
-- **Build status:** GitHub Actions tab on the repo.
+- **Questions or proposals:** open a GitHub Issue on `zeshaq/comptech-lab` (label it `area: blog` so it routes correctly). PR review conversation works for change-specific questions.
+- **Live site status:** Cloudflare Pages dashboard → `comptech-lab-blog` project.
+- **Build status:** GitHub Actions tab on `zeshaq/comptech-lab` — look for "Deploy blog" runs.
 
 If you find this manual unclear, contradictory, or out of date — fix it in your next PR. This file is canonical; out-of-date instructions cost everyone time.
