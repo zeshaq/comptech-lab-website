@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import DotGrid from "../../components/DotGrid.astro";
+import HeroVisual from "../../components/HeroVisual.astro";
 import { PARTNER_CATEGORY_ICONS } from "../../utils/icons";
 
 interface Partner {
@@ -102,11 +103,8 @@ const grouped = partners.reduce<Record<string, Partner[]>>((acc, p) => {
   title="Partnerships &amp; alliances — CompTech Lab"
   description="The technology partnerships that anchor our practice — Red Hat, NVIDIA, Cisco, HashiCorp, WSO2, Ping, Microsoft, AWS, Google Cloud, and more."
 >
-  <section class="hero">
-    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
-      <DotGrid cols={14} rows={8} spacing={16} />
-    </div>
-    <div class="container">
+  <section class="hero-bleed">
+    <div class="hero-bleed-content">
       <span class="hero-eyebrow">Partnerships</span>
       <h1 class="hero-title">The technology ecosystem we deliver against.</h1>
       <p class="hero-lede">
@@ -114,6 +112,9 @@ const grouped = partners.reduce<Record<string, Partner[]>>((acc, p) => {
         is the list of partners whose technologies appear in our reference architectures and
         production deployments.
       </p>
+    </div>
+    <div class="hero-bleed-panel">
+      <HeroVisual variant="ecosystem" />
     </div>
   </section>
 

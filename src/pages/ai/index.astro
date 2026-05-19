@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import DotGrid from "../../components/DotGrid.astro";
+import HeroVisual from "../../components/HeroVisual.astro";
 
 const tabs = [
   { id: "overview",   eyebrow: "01", label: "Overview" },
@@ -18,11 +19,8 @@ const tabs = [
   title="AI practice — CompTech Lab"
   description="A detailed look at the seven aspects of our AI practice: strategy, AI platforms (OpenShift AI, NVIDIA AI Enterprise, Kubeflow), LLM inference, RAG and agentic AI, MLOps, and AI security and governance."
 >
-  <section class="hero">
-    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
-      <DotGrid cols={14} rows={8} spacing={16} />
-    </div>
-    <div class="container">
+  <section class="hero-bleed">
+    <div class="hero-bleed-content">
       <span class="hero-eyebrow">AI practice</span>
       <h1 class="hero-title">A specialist AI practice for regulated workloads.</h1>
       <p class="hero-lede">
@@ -35,6 +33,9 @@ const tabs = [
         <a href="/contact/" class="btn btn-primary">Discuss an AI engagement</a>
         <a href="#strategy" class="btn btn-secondary">Explore the practice</a>
       </div>
+    </div>
+    <div class="hero-bleed-panel">
+      <HeroVisual variant="ai" />
     </div>
   </section>
 

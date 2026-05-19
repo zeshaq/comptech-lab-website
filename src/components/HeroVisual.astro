@@ -1,0 +1,283 @@
+---
+/**
+ * Rich SVG hero-panel visuals in IBM-product-page style.
+ * Variants:
+ *   network    — connected-nodes pattern (home, general)
+ *   security   — shield silhouette with grid overlay
+ *   ai         — neural network with radiating nodes
+ *   data       — stacked translucent layers (lakehouse)
+ *   workflow   — connected workflow nodes (methodology)
+ *   ecosystem  — hub-and-spoke (partnerships)
+ *   dots       — minimal dot grid only
+ */
+interface Props {
+  variant?: "network" | "security" | "ai" | "data" | "workflow" | "ecosystem" | "dots";
+}
+
+const { variant = "network" } = Astro.props;
+---
+
+{variant === "network" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hv-bg-net" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f4" />
+        <stop offset="1" stop-color="#e0e0e0" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-net)" />
+    {/* dotted grid background */}
+    {Array.from({ length: 16 }).map((_, r) =>
+      Array.from({ length: 20 }).map((_, c) => (
+        <circle cx={32 + c * 30} cy={32 + r * 30} r="1.5" fill="#c6c6c6" />
+      ))
+    ).flat()}
+    {/* connecting lines */}
+    <g stroke="#0f62fe" stroke-width="1.5" fill="none" opacity="0.7">
+      <line x1="120" y1="180" x2="280" y2="120" />
+      <line x1="280" y1="120" x2="420" y2="220" />
+      <line x1="420" y1="220" x2="540" y2="160" />
+      <line x1="120" y1="180" x2="240" y2="300" />
+      <line x1="240" y1="300" x2="380" y2="380" />
+      <line x1="380" y1="380" x2="520" y2="340" />
+      <line x1="420" y1="220" x2="380" y2="380" />
+      <line x1="280" y1="120" x2="240" y2="300" />
+    </g>
+    {/* highlighted nodes */}
+    <g>
+      <circle cx="120" cy="180" r="8" fill="#161616" />
+      <circle cx="280" cy="120" r="12" fill="#0f62fe" />
+      <circle cx="420" cy="220" r="10" fill="#0f62fe" />
+      <circle cx="540" cy="160" r="6" fill="#161616" />
+      <circle cx="240" cy="300" r="8" fill="#161616" />
+      <circle cx="380" cy="380" r="14" fill="#0f62fe" />
+      <circle cx="520" cy="340" r="6" fill="#161616" />
+    </g>
+    {/* outer rings on highlighted */}
+    <g fill="none" stroke="#0f62fe" stroke-width="1">
+      <circle cx="280" cy="120" r="22" opacity="0.4" />
+      <circle cx="380" cy="380" r="26" opacity="0.4" />
+      <circle cx="420" cy="220" r="20" opacity="0.4" />
+    </g>
+    {/* corner accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "security" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hv-bg-sec" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f4" />
+        <stop offset="1" stop-color="#d0e2ff" />
+      </linearGradient>
+      <pattern id="hv-grid-sec" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M24 0H0v24" fill="none" stroke="#c6c6c6" stroke-width="0.5" />
+      </pattern>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-sec)" />
+    <rect width="640" height="540" fill="url(#hv-grid-sec)" opacity="0.6" />
+    {/* central shield */}
+    <g transform="translate(320 270)">
+      <path d="M0 -160 L120 -120 L120 0 C120 70 60 130 0 150 C-60 130 -120 70 -120 0 L-120 -120 Z"
+            fill="#0f62fe" opacity="0.12" stroke="#0f62fe" stroke-width="2" />
+      <path d="M0 -120 L90 -90 L90 0 C90 55 45 100 0 115 C-45 100 -90 55 -90 0 L-90 -90 Z"
+            fill="#0f62fe" opacity="0.2" stroke="#0f62fe" stroke-width="1.5" />
+      <path d="M-30 10 L-10 30 L40 -25" fill="none" stroke="#0f62fe" stroke-width="6" stroke-linecap="square" />
+    </g>
+    {/* corner dots */}
+    {[20, 60, 100, 140].map((y) => (
+      <circle cx="40" cy={y} r="2" fill="#0f62fe" />
+    ))}
+    {[400, 440, 480, 520].map((y) => (
+      <circle cx="600" cy={y} r="2" fill="#161616" opacity="0.6" />
+    ))}
+    {/* accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "ai" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <radialGradient id="hv-bg-ai" cx="0.5" cy="0.5" r="0.7">
+        <stop offset="0" stop-color="#d0e2ff" />
+        <stop offset="1" stop-color="#f4f4f4" />
+      </radialGradient>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-ai)" />
+    {/* radiating lines from center */}
+    <g stroke="#0f62fe" stroke-width="1" fill="none" opacity="0.5">
+      {Array.from({ length: 8 }).map((_, i) => {
+        const angle = (i * Math.PI * 2) / 8;
+        const x2 = 320 + Math.cos(angle) * 220;
+        const y2 = 270 + Math.sin(angle) * 220;
+        return <line x1="320" y1="270" x2={x2} y2={y2} />;
+      })}
+    </g>
+    {/* outer nodes */}
+    {Array.from({ length: 8 }).map((_, i) => {
+      const angle = (i * Math.PI * 2) / 8;
+      const x = 320 + Math.cos(angle) * 220;
+      const y = 270 + Math.sin(angle) * 220;
+      return <circle cx={x} cy={y} r="10" fill="#161616" />;
+    })}
+    {/* mid ring */}
+    {Array.from({ length: 8 }).map((_, i) => {
+      const angle = (i * Math.PI * 2) / 8 + Math.PI / 8;
+      const x = 320 + Math.cos(angle) * 130;
+      const y = 270 + Math.sin(angle) * 130;
+      return <circle cx={x} cy={y} r="6" fill="#0f62fe" />;
+    })}
+    {/* center node */}
+    <circle cx="320" cy="270" r="36" fill="#0f62fe" />
+    <circle cx="320" cy="270" r="48" fill="none" stroke="#0f62fe" stroke-width="1.5" opacity="0.5" />
+    <circle cx="320" cy="270" r="64" fill="none" stroke="#0f62fe" stroke-width="1" opacity="0.3" />
+    {/* accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "data" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hv-bg-dt" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f4" />
+        <stop offset="1" stop-color="#d0e2ff" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-dt)" />
+    {/* dotted grid */}
+    {Array.from({ length: 14 }).map((_, r) =>
+      Array.from({ length: 18 }).map((_, c) => (
+        <circle cx={20 + c * 36} cy={20 + r * 36} r="1.2" fill="#c6c6c6" />
+      ))
+    ).flat()}
+    {/* layered "tiles" */}
+    <g>
+      <rect x="120" y="380" width="400" height="80" fill="#161616" opacity="0.85" />
+      <rect x="100" y="290" width="400" height="80" fill="#0043ce" opacity="0.85" />
+      <rect x="80" y="200" width="400" height="80" fill="#0f62fe" opacity="0.85" />
+      <rect x="60" y="110" width="400" height="80" fill="#78a9ff" opacity="0.85" />
+    </g>
+    {/* tile labels — mono numbers */}
+    <g font-family="IBM Plex Mono, monospace" font-size="14" fill="#ffffff" opacity="0.9">
+      <text x="80" y="150">01 / ingestion</text>
+      <text x="100" y="240">02 / lakehouse</text>
+      <text x="120" y="330">03 / governance</text>
+      <text x="140" y="420">04 / consumption</text>
+    </g>
+    {/* connecting lines */}
+    <g stroke="#0f62fe" stroke-width="1.5" fill="none">
+      <line x1="540" y1="150" x2="600" y2="150" />
+      <line x1="540" y1="240" x2="600" y2="240" />
+      <line x1="540" y1="330" x2="600" y2="330" />
+      <line x1="540" y1="420" x2="600" y2="420" />
+      <circle cx="600" cy="150" r="4" fill="#0f62fe" />
+      <circle cx="600" cy="240" r="4" fill="#0f62fe" />
+      <circle cx="600" cy="330" r="4" fill="#0f62fe" />
+      <circle cx="600" cy="420" r="4" fill="#0f62fe" />
+    </g>
+    {/* accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "workflow" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hv-bg-wf" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f4" />
+        <stop offset="1" stop-color="#e0e0e0" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-wf)" />
+    {/* dotted background */}
+    {Array.from({ length: 12 }).map((_, r) =>
+      Array.from({ length: 16 }).map((_, c) => (
+        <circle cx={32 + c * 38} cy={32 + r * 38} r="1.2" fill="#c6c6c6" />
+      ))
+    ).flat()}
+    {/* phase nodes */}
+    {[60, 175, 290, 405, 520].map((x, i) => (
+      <g>
+        <line x1={x} y1="270" x2={x + 95} y2="270" stroke="#0f62fe" stroke-width="2" opacity={i === 4 ? 0 : 0.6} />
+        <rect x={x - 30} y="240" width="60" height="60" fill={i === 2 ? "#0f62fe" : "#161616"} />
+        <text x={x} y="276" font-family="IBM Plex Mono, monospace" font-size="18" font-weight="500" fill="#ffffff" text-anchor="middle">{`0${i + 1}`}</text>
+      </g>
+    ))}
+    {/* phase labels */}
+    <g font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#525252">
+      <text x="60" y="335" text-anchor="middle">Assess</text>
+      <text x="175" y="335" text-anchor="middle">Design</text>
+      <text x="290" y="335" text-anchor="middle" fill="#0f62fe" font-weight="600">Deploy</text>
+      <text x="405" y="335" text-anchor="middle">Operate</text>
+      <text x="520" y="335" text-anchor="middle">Hand over</text>
+    </g>
+    {/* accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "ecosystem" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hv-bg-eco" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f4" />
+        <stop offset="1" stop-color="#d0e2ff" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="540" fill="url(#hv-bg-eco)" />
+    {/* dotted background */}
+    {Array.from({ length: 14 }).map((_, r) =>
+      Array.from({ length: 18 }).map((_, c) => (
+        <circle cx={20 + c * 36} cy={20 + r * 36} r="1.2" fill="#c6c6c6" />
+      ))
+    ).flat()}
+    {/* outer satellites with labels */}
+    {[
+      { angle: -Math.PI / 2,        label: "Red Hat" },
+      { angle: -Math.PI / 2 + 0.9,  label: "NVIDIA" },
+      { angle: -Math.PI / 2 + 1.8,  label: "Cisco" },
+      { angle: -Math.PI / 2 + 2.7,  label: "AWS" },
+      { angle: -Math.PI / 2 + 3.6,  label: "WSO2" },
+      { angle: -Math.PI / 2 + 4.5,  label: "Azure" },
+      { angle: -Math.PI / 2 + 5.4,  label: "Datadog" },
+    ].map((s) => {
+      const cx = 320 + Math.cos(s.angle) * 180;
+      const cy = 270 + Math.sin(s.angle) * 180;
+      return (
+        <g>
+          <line x1="320" y1="270" x2={cx} y2={cy} stroke="#0f62fe" stroke-width="1" opacity="0.4" />
+          <circle cx={cx} cy={cy} r="32" fill="#ffffff" stroke="#161616" stroke-width="1.5" />
+          <text x={cx} y={cy + 4} font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#161616" text-anchor="middle">{s.label}</text>
+        </g>
+      );
+    })}
+    {/* center hub */}
+    <circle cx="320" cy="270" r="44" fill="#0f62fe" />
+    <text x="320" y="266" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#ffffff" text-anchor="middle" font-weight="600">CompTech</text>
+    <text x="320" y="282" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#ffffff" text-anchor="middle" font-weight="600">Lab</text>
+    {/* accent stripe */}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
+
+{variant === "dots" && (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="640" height="540" fill="#f4f4f4" />
+    {Array.from({ length: 20 }).map((_, r) =>
+      Array.from({ length: 24 }).map((_, c) => (
+        <circle cx={20 + c * 26} cy={20 + r * 26} r="1.5" fill="#c6c6c6" />
+      ))
+    ).flat()}
+    {/* random highlighted dots */}
+    {[
+      [120, 100], [340, 180], [500, 120], [220, 280],
+      [440, 340], [580, 260], [180, 420], [380, 460],
+    ].map(([x, y]) => (
+      <circle cx={x} cy={y} r="4" fill="#0f62fe" />
+    ))}
+    <rect x="0" y="0" width="6" height="540" fill="#0f62fe" />
+  </svg>
+)}
