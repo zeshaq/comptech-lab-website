@@ -41,7 +41,7 @@ Implementation:
 | **JSON-LD** | Per-blog-post `BlogPosting` schema injected into the post page's `<head>` via a slot. Fields: headline, description, datePublished, author, publisher, url, image, articleSection. |
 | **Canonical URLs** | `<link rel="canonical" href={canonicalURL}>` on every layout. Computed from `Astro.site` + path. |
 | **robots.txt** | `public/robots.txt` allows all + references sitemap. |
-| **OG image** | `public/og-default.svg` — dark green background, "Zahid's Blog" branding, 1200x630 dimensions. SVG; not perfect cross-platform (X may not render SVG OG) but acceptable for LinkedIn / Slack / Discord which dominate sharing. |
+| **OG image** | `public/og-default.svg` — dark green background, "CompTech Engineering Notes" branding, 1200x630 dimensions. SVG; not perfect cross-platform (X may not render SVG OG) but acceptable for LinkedIn / Slack / Discord which dominate sharing. |
 
 The OG / Twitter meta layer accepts per-page overrides — blog post pages provide their own title/description/published date; the OpenGraph image stays default (no per-post hero image).
 

@@ -5,7 +5,7 @@ export async function GET(context) {
   const posts = await getCollection("blog", ({ data }) => !data.draft);
 
   return rss({
-    title: "Zahid's Blog",
+    title: "CompTech Engineering Notes",
     description:
       "Notes on OpenShift, observability, identity, integration, security, AI, and the infrastructure underneath modern platforms.",
     site: context.site,

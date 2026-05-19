@@ -13,7 +13,7 @@ interface Props {
 }
 
 const {
-  title = "Zahid's Blog",
+  title = "CompTech Engineering Notes",
   description = "Notes on OpenShift, observability, identity, integration, security, AI, and the infrastructure underneath modern platforms.",
   image = "/og-default.svg",
   type = "website",
@@ -34,7 +34,7 @@ const ogImage = new URL(image, Astro.site).toString();
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate" type="application/rss+xml" title="Zahid's Blog" href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title="CompTech Engineering Notes" href="/rss.xml" />
     <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
 
     <title>{title}</title>
@@ -46,7 +46,7 @@ const ogImage = new URL(image, Astro.site).toString();
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="Zahid's Blog" />
+    <meta property="og:site_name" content="CompTech Engineering Notes" />
     {published && <meta property="article:published_time" content={published.toISOString()} />}
     {category && <meta property="article:section" content={category} />}
 

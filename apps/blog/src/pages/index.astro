@@ -9,11 +9,11 @@ const posts = (await getCollection("blog", ({ data }) => !data.draft)).sort(
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
 ---
 
-<Layout title="Zahid's Blog">
+<Layout title="CompTech Engineering Notes">
   <section class="mb-12">
-    <h1 class="text-2xl font-semibold mb-2">hi, i'm zahid</h1>
+    <h1 class="text-2xl font-semibold mb-2">CompTech engineering notes</h1>
     <p class="text-[var(--color-muted)]">
-      Notes and diagrams. Open the <a href="/whiteboard" target="_blank" rel="noopener" class="underline">whiteboard ↗</a> for an interactive board.
+      Long-form technical writing from our practice — OpenShift, AI/ML, identity, integration, security. Companion to <a href="https://www.comptech-lab.com" rel="noopener" class="underline">www.comptech-lab.com</a>. Open the <a href="/whiteboard" target="_blank" rel="noopener" class="underline">whiteboard ↗</a> for an interactive board.
     </p>
   </section>
 
