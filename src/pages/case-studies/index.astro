@@ -1,0 +1,49 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCollection } from "astro:content";
+
+const cases = (await getCollection("case-studies", ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<Layout
+  title="Case studies — CompTech Lab"
+  description="Selected engagements: the CompTech OpenShift fleet, BRAC banking POC, greenfield disconnected install manual, insurance agentic demo."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Case studies</span>
+      <h1 class="hero-title">Real engagements. Documented end-to-end.</h1>
+      <p class="hero-lede">
+        Each case study links to the underlying architecture, install path, or running demo.
+        We don't ship abstractions of outcomes — the artifacts are on the page.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="card-grid">
+        {cases.map((c) => (
+          <a href={`/case-studies/${c.id}/`} class="card">
+            <p class="card-eyebrow">{c.data.sector ?? c.data.customer}</p>
+            <h2 class="card-title">{c.data.title}</h2>
+            <p class="card-desc">{c.data.summary}</p>
+            {c.data.outcome && <p class="card-meta">→ {c.data.outcome}</p>}
+            {c.data.technologies.length > 0 && (
+              <div class="pill-row" style="margin-top: 1rem;">
+                {c.data.technologies.slice(0, 5).map((t) => (
+                  <span class="pill">{t}</span>
+                ))}
+                {c.data.technologies.length > 5 && (
+                  <span class="pill" style="opacity: 0.6;">+{c.data.technologies.length - 5}</span>
+                )}
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Layout>

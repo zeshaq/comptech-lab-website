@@ -1,0 +1,48 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCollection } from "astro:content";
+
+const services = (await getCollection("services", ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<Layout
+  title="Services — CompTech Lab"
+  description="OpenShift platform engineering, AI/ML enablement, DevSecOps & identity, integration & data."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Services</span>
+      <h1 class="hero-title">Four pillars. One lab. Documented outcomes.</h1>
+      <p class="hero-lede">
+        We pick engagements where our running reference saves your team months of figure-it-out
+        time. Each service maps to systems we already operate.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="card-grid">
+        {services.map((s) => (
+          <a href={`/services/${s.id}/`} class="card">
+            <p class="card-eyebrow">{s.data.eyebrow ?? "Service"}</p>
+            <h2 class="card-title">{s.data.title}</h2>
+            <p class="card-desc">{s.data.tagline}</p>
+            {s.data.technologies.length > 0 && (
+              <div class="pill-row" style="margin-top: 1rem;">
+                {s.data.technologies.slice(0, 6).map((t) => (
+                  <span class="pill">{t}</span>
+                ))}
+                {s.data.technologies.length > 6 && (
+                  <span class="pill" style="opacity: 0.6;">+{s.data.technologies.length - 6} more</span>
+                )}
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,49 @@
+---
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+
+const links = [
+  { href: "/services/", label: "Services" },
+  { href: "/case-studies/", label: "Case studies" },
+  { href: "/capabilities/", label: "Capabilities" },
+  { href: "/lab/", label: "Lab" },
+  { href: "/insights/", label: "Insights" },
+  { href: "/about/", label: "About" },
+];
+
+const isActive = (href: string) =>
+  href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+---
+
+<nav class="topnav">
+  <div class="container topnav-inner">
+    <a href="/" class="topnav-brand">
+      <span class="topnav-brand-mark">c</span>
+      <span>comptech lab</span>
+    </a>
+
+    <ul class="topnav-links">
+      {links.map((l) => (
+        <li>
+          <a href={l.href} class={`topnav-link ${isActive(l.href) ? "active" : ""}`}>{l.label}</a>
+        </li>
+      ))}
+      <li>
+        <a href="/contact/" class="topnav-cta">Contact</a>
+      </li>
+    </ul>
+
+    <details class="topnav-mobile">
+      <summary class="topnav-mobile-summary">menu</summary>
+      <div class="topnav-mobile-panel">
+        {links.map((l) => (
+          <a href={l.href} class={`topnav-link ${isActive(l.href) ? "active" : ""}`}>{l.label}</a>
+        ))}
+        <a href="/contact/" class="topnav-link">Contact</a>
+      </div>
+    </details>
+  </div>
+</nav>

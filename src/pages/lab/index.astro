@@ -1,0 +1,101 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+interface Demo {
+  url: string;
+  name: string;
+  cluster: string;
+  description: string;
+}
+
+const demos: Demo[] = [
+  {
+    url: "https://aci-sim.v7.comptech-lab.com/",
+    name: "Cisco APIC simulator",
+    cluster: "v7 datacenter",
+    description: "APIC controller simulator for ACI fabric design and policy development without burning real hardware.",
+  },
+  {
+    url: "https://hpe-vme.v7.comptech-lab.com/",
+    name: "HPE VME manager",
+    cluster: "v7 datacenter",
+    description: "HPE Virtualization Management Environment for VM-level orchestration adjacent to OpenShift.",
+  },
+  {
+    url: "https://is.insurance-app.comptech-lab.com/",
+    name: "WSO2 Identity Server",
+    cluster: "insurance-app demo",
+    description: "Identity provider for the insurance demo — OAuth2/OIDC, SCIM provisioning, MFA flows.",
+  },
+  {
+    url: "https://search.insurance-app.comptech-lab.com/",
+    name: "OpenSearch Dashboards",
+    cluster: "insurance-app demo",
+    description: "Search UI for policies and claims data in the insurance demo.",
+  },
+  {
+    url: "https://redis.insurance-app.comptech-lab.com/",
+    name: "RedisInsight",
+    cluster: "insurance-app demo",
+    description: "Visual UI on the Redis state store backing the insurance demo.",
+  },
+  {
+    url: "https://mail.insurance-app.comptech-lab.com/",
+    name: "Mail capture",
+    cluster: "insurance-app demo",
+    description: "Browser-inspectable dev SMTP — every outbound email from the demo lands here for review.",
+  },
+  {
+    url: "https://agent.insurance-app.comptech-lab.com/",
+    name: "Insurance agent",
+    cluster: "insurance-app demo",
+    description: "The agentic application behind WSO2 IS auth — same identity boundary as a human user.",
+  },
+];
+
+const byCluster = demos.reduce<Record<string, Demo[]>>((acc, d) => {
+  (acc[d.cluster] ??= []).push(d);
+  return acc;
+}, {});
+---
+
+<Layout
+  title="Lab — CompTech Lab"
+  description="Live demos of the systems we operate. Identity, search, agentic AI, simulators — all on our running fleet."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Lab</span>
+      <h1 class="hero-title">Live demos. The systems we operate.</h1>
+      <p class="hero-lede">
+        Every subdomain below is a running piece of the lab. Some are behind auth; others are
+        open. If a link 404s, the demo is being rebuilt — that happens. Email us and we'll
+        tell you when it's back.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      {Object.entries(byCluster).map(([cluster, items]) => (
+        <div style="margin-bottom: 3rem;">
+          <h2 class="section-title" style="font-size: 1.4rem; margin-bottom: 1.25rem;">{cluster}</h2>
+          <div class="card-grid">
+            {items.map((d) => (
+              <a href={d.url} target="_blank" rel="noopener" class="card">
+                <p class="card-eyebrow">↗ Live</p>
+                <h3 class="card-title">{d.name}</h3>
+                <p class="card-desc">{d.description}</p>
+                <p class="card-meta">{d.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</p>
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <p style="margin-top: 2rem; color: var(--color-muted); font-size: 0.9rem;">
+        Want a guided walkthrough of any of these? <a href="/contact/" style="color: var(--color-accent);">Get in touch</a>.
+      </p>
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,114 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getCollection } from "astro:content";
+
+const services = (await getCollection("services", ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+
+const featured = (await getCollection("case-studies", ({ data }) => !data.draft && data.featured)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<Layout>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">CompTech Lab</span>
+      <h1 class="hero-title">The running lab behind regulated-platform engineering.</h1>
+      <p class="hero-lede">
+        We design and operate the platforms that ship — disconnected OpenShift fleets, AI/ML
+        enablement, identity and DevSecOps, integration and data. Proof by working artifact,
+        not by deck.
+      </p>
+      <div class="hero-actions">
+        <a href="/services/" class="btn btn-primary">See services</a>
+        <a href="/case-studies/" class="btn btn-secondary">Case studies</a>
+        <a href="/contact/" class="btn btn-dark">Start a project</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-eyebrow">What we do</span>
+        <h2 class="section-title">Four pillars. One lab.</h2>
+        <p class="section-lede">
+          Every engagement ships against a running reference — hub+spoke OpenShift, federated
+          GitLab, Vault, RHACS, OpenShift AI, WSO2 identity, the lot — already wired together
+          in our lab. We start from working systems, not blank PowerPoints.
+        </p>
+      </div>
+
+      <div class="card-grid card-grid-4">
+        {services.map((s) => (
+          <a href={`/services/${s.id}/`} class="card">
+            <p class="card-eyebrow">{s.data.eyebrow ?? "Service"}</p>
+            <h3 class="card-title">{s.data.title}</h3>
+            <p class="card-desc">{s.data.tagline}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border);">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-eyebrow">Selected work</span>
+        <h2 class="section-title">Real engagements. Documented end-to-end.</h2>
+        <p class="section-lede">
+          Each case study links to the underlying architecture, install manual, or running demo.
+          No abstracted-away outcomes — the artifacts are on the page.
+        </p>
+      </div>
+
+      <div class="card-grid card-grid-3">
+        {featured.map((c) => (
+          <a href={`/case-studies/${c.id}/`} class="card">
+            <p class="card-eyebrow">{c.data.sector ?? c.data.customer}</p>
+            <h3 class="card-title">{c.data.title}</h3>
+            <p class="card-desc">{c.data.summary}</p>
+            {c.data.outcome && <p class="card-meta">→ {c.data.outcome}</p>}
+          </a>
+        ))}
+      </div>
+
+      <p style="margin-top: 2rem;">
+        <a href="/case-studies/" class="btn btn-secondary">All case studies →</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-eyebrow">Capabilities map</span>
+        <h2 class="section-title">Every component, in one diagram.</h2>
+        <p class="section-lede">
+          An interactive map of the technologies we operate — foundation models and inference,
+          GitOps and ACM, Vault and ESO, WSO2 and Ping, Spark and lakehouses. Pan, zoom, click.
+        </p>
+      </div>
+      <p>
+        <a href="/capabilities/" class="btn btn-primary">Open the map</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
+    <div class="container" style="text-align: center;">
+      <span class="section-eyebrow" style="color: var(--color-accent);">Engagements</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have a regulated platform to ship?</h2>
+      <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
+        Tell us what you're building. We'll write back with a concrete scope —
+        what we'd do in the first two weeks and what success looks like at the end of the engagement.
+      </p>
+      <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+        <a href="/contact/" class="btn btn-primary">Start a project</a>
+        <a href="/about/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">About us</a>
+      </div>
+    </div>
+  </section>
+</Layout>

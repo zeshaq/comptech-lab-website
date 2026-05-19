@@ -1,0 +1,83 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="About — CompTech Lab" description="Who we are, how we work, what we don't do.">
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">About</span>
+      <h1 class="hero-title">A small lab that ships regulated platforms.</h1>
+      <p class="hero-lede">
+        CompTech Lab is a specialist engineering practice for regulated platforms — OpenShift,
+        AI/ML, DevSecOps, integration. We operate the systems we recommend.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <article class="prose">
+        <h2>What we do</h2>
+        <p>
+          We design, deploy, and operate the platforms that ship critical workloads under
+          regulatory constraint — banking, insurance, telco, public sector. The work spans the
+          stack from bare-metal OpenShift up through identity, integration, and AI/ML enablement.
+        </p>
+
+        <h2>How we work</h2>
+        <ul>
+          <li>
+            <strong>Reference-first.</strong> Every engagement starts from a running lab.
+            We don't draft architecture in PowerPoint; we hand you a working system and a
+            documented path from your environment to it.
+          </li>
+          <li>
+            <strong>Disconnected by default.</strong> Our reference fleet runs disconnected
+            (image mirroring, internal CAs, internal registries, internal GitLab). Connected
+            environments are an easier subset.
+          </li>
+          <li>
+            <strong>GitOps-shaped.</strong> ACM hub+spoke, OpenShift GitOps in pull-mode,
+            Vault as the credential root, ESO to bridge Kubernetes secrets, OADP for backups.
+            Application teams ship through GitLab + dual-CI.
+          </li>
+          <li>
+            <strong>Writeup is the deliverable.</strong> Architecture decisions, runbooks,
+            install manuals, replay logs. The diff between us and what you operate after we
+            leave is documented.
+          </li>
+        </ul>
+
+        <h2>What we don't do</h2>
+        <ul>
+          <li>Net-new application development end-to-end. We integrate, harden, and platform-host applications, but the product engineering is yours.</li>
+          <li>"Managed services" with permanent oncall. We hand over with runbooks; long-term operations are your team's.</li>
+          <li>Generic cloud migrations. If the workload doesn't have a regulatory, identity, or platform-engineering edge, we're probably not the right firm.</li>
+        </ul>
+
+        <h2>The stack we operate</h2>
+        <p>
+          <strong>Platform:</strong> Red Hat OpenShift (v4.16+), ACM, OpenShift GitOps, RHACS,
+          OADP, OpenShift AI, cert-manager, External Secrets Operator (ESO), LVMS.<br/>
+          <strong>Identity:</strong> WSO2 Identity Server, Ping Identity, Vault, Keycloak.<br/>
+          <strong>Integration:</strong> WSO2 APIM/MI, MuleSoft, Camunda, Temporal, n8n.<br/>
+          <strong>Data &amp; AI:</strong> Apache Spark, MinIO, lakehouse patterns, vLLM, Triton, NVIDIA NIM, Ollama, Kubeflow, NVIDIA AI Enterprise.<br/>
+          <strong>Observability &amp; security:</strong> Datadog, Kiali, distributed tracing, RHACS, Acunetix, Invicti, SBOMs, supply-chain signing.<br/>
+          <strong>Operations:</strong> GitLab Enterprise, Quay, Nexus, MinIO, PDNS, HAProxy, NetBox, oc-mirror, Ansible.
+        </p>
+
+        <h2>Where to find more</h2>
+        <p>
+          Engineering notes and reference architectures live at
+          <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener">zeshaq.pages.dev</a>.
+          Selected case studies are in <a href="/case-studies/">case studies</a>. A pan-and-zoom
+          view of every technology we operate is on the <a href="/capabilities/">capabilities map</a>.
+        </p>
+      </article>
+
+      <div style="margin-top: 3rem;">
+        <a href="/contact/" class="btn btn-primary">Start a conversation →</a>
+      </div>
+    </div>
+  </section>
+</Layout>

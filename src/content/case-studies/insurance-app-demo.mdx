@@ -1,0 +1,67 @@
+---
+title: "Insurance App — agentic demo on regulated platform"
+customer: "Internal reference + insurance engagements"
+sector: "Insurance (BFSI)"
+summary: "A working insurance application: WSO2 IS for identity, OpenSearch for search, Redis for state, mail capture, and an agent — all on the lab fleet."
+year: "2026"
+featured: true
+order: 4
+technologies:
+  - WSO2 Identity Server
+  - OpenSearch + Dashboards
+  - Redis (RedisInsight)
+  - HAProxy
+  - SCIM provisioning
+  - OAuth2 / OIDC
+  - Agentic AI
+  - Mail capture (dev SMTP)
+services:
+  - ai-ml-enablement
+  - devsecops-identity
+  - integration-data
+outcome: "Multi-component insurance demo running on the disconnected lab fleet, ready as the basis for customer engagements."
+---
+
+## What's running
+
+A multi-component insurance demo, all on the disconnected lab fleet at
+`*.insurance-app.comptech-lab.com`:
+
+- **`is.insurance-app.comptech-lab.com`** — WSO2 Identity Server, the demo's identity
+  provider. OAuth2 + OIDC flows, MFA-ready, SCIM provisioning from a user-directory source.
+- **`search.insurance-app.comptech-lab.com`** — OpenSearch Dashboards for policy and claims
+  search.
+- **`redis.insurance-app.comptech-lab.com`** — RedisInsight against the demo's Redis instance.
+- **`mail.insurance-app.comptech-lab.com`** — a dev SMTP capture so every outbound email is
+  inspectable in a browser. Critical for honest demos of password reset, claim acknowledgement,
+  agent escalation.
+- **`agent.insurance-app.comptech-lab.com`** — the agentic application, behind the same WSO2
+  IS session.
+
+All sit behind HAProxy with DNS records on PowerDNS, identity flows go through WSO2 IS, and
+secrets are managed via ESO + Vault — the same posture as the rest of the lab fleet.
+
+## What it demonstrates
+
+- **Identity-fronted everything.** No service is reachable without going through WSO2 IS;
+  SCIM provisioning means user lifecycle is centrally controlled.
+- **Agentic AI inside a regulated boundary.** The agent has identity-bound tool access; it
+  can't reach search or Redis without going through the same OIDC flow as a human user.
+- **Inspectable side-effects.** Mail capture means every email the app sends is visible to
+  reviewers — critical for compliance walkthroughs.
+- **Observable storage.** RedisInsight makes the state store inspectable rather than a black
+  box.
+
+## Why it matters
+
+Insurance engagements ask for the same things every time: identity that auditors will sign
+off on, search that scales, agentic features that don't open compliance holes, and demos
+where stakeholders can see what happened. This stack is **our running answer** to those
+asks — modify it for the customer's specifics, hand it over, document the diff.
+
+## Cross-cutting
+
+- **Identity, demo credentials, and SCIM provisioning** are written up in the
+  [WSO2 IS blog post](https://zeshaq.pages.dev/blog/wso2-identity-server/) — including the
+  WSO2-admin-vs-portal-user split and the Carbon-internal-role gotcha.
+- **Agentic patterns** are covered in the agentic AI track on the engineering notes site.

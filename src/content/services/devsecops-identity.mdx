@@ -1,0 +1,63 @@
+---
+title: "DevSecOps & Identity"
+tagline: "Shift-left and shift-right done as engineering work, not as a quarterly slide."
+description: "Shift-left and shift-right security strategy, RHACS, Acunetix, Invicti, Ping Identity, WSO2 Identity Server, Vault, policy and compliance."
+eyebrow: "Security"
+order: 3
+technologies:
+  - RHACS (StackRox)
+  - Acunetix
+  - Invicti
+  - HashiCorp Vault
+  - External Secrets Operator
+  - WSO2 Identity Server
+  - Ping Identity
+  - Keycloak
+  - cert-manager
+  - SBOMs (Syft, Trivy)
+  - cosign / sigstore
+  - Open Policy Agent
+capabilities:
+  - Shift-left pipeline security
+  - Shift-right runtime security with RHACS
+  - DAST programs (Acunetix, Invicti)
+  - Identity federation (WSO2 IS, Ping)
+  - SCIM provisioning, OAuth2/OIDC
+  - Credential custody with Vault
+  - Supply-chain signing and SBOMs
+related_case_studies:
+  - insurance-app-demo
+  - comptech-openshift-fleet
+---
+
+Security on a regulated platform is two halves of the same engineering practice: **shift-left**
+in the pipeline (SAST, SCA, SBOMs, signed images, policy) and **shift-right** at runtime (RHACS,
+DAST, identity boundary controls). We do both as platform work, not as audit theatre.
+
+## What we deliver
+
+- **Shift-left.** Pipeline-integrated SAST/SCA, SBOM generation (Syft), image signing (cosign),
+  policy gates (OPA/conftest), Trivy in the CI path, signed manifests in GitOps repos.
+- **Shift-right.** RHACS deploy and tune — admission policies, network baselines, runtime
+  detection, image-risk gates. Integrated with your incident-response workflow.
+- **DAST.** Acunetix or Invicti programs against the deployed app — full crawl, authenticated
+  scan, integration with the engineering team's bug queue (not a wall-of-PDFs).
+- **Identity.** WSO2 Identity Server or Ping Identity — federation, SCIM provisioning, OIDC
+  flows, MFA posture, fine-grained authorization with XACML/Rego where it earns its weight.
+  Keycloak when self-hosted lightweight is the right answer.
+- **Credential custody.** Vault as the root of trust, ESO bridging Kubernetes Secrets,
+  short-lived credentials, dynamic database secrets, transit encryption, audit log shipped to
+  your SIEM.
+
+## Engagement shape
+
+DevSecOps engagements typically run alongside a platform engagement, but we also do
+**focused identity bring-up** (WSO2 IS or Ping) in 4–6 weeks, and **standalone RHACS tune-up**
+work for teams already on OpenShift.
+
+## Where this lives in our lab
+
+The [insurance app demo](/case-studies/insurance-app-demo/) runs WSO2 IS as its identity
+provider with SCIM provisioning and OIDC flows. The fleet itself is hardened to the BFSI
+production checklist on the [CompTech OpenShift fleet](/case-studies/comptech-openshift-fleet/)
+case study.

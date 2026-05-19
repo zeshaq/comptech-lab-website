@@ -1,0 +1,77 @@
+---
+title: "CompTech Disconnected OpenShift Fleet (v6)"
+customer: "Internal reference platform"
+sector: "Reference platform"
+summary: "A continuously-running, fully-disconnected hub+spoke OpenShift fleet — the reference our customer engagements ship against."
+year: "2025–2026"
+featured: true
+order: 1
+technologies:
+  - OpenShift v4.16+
+  - ACM / MCE
+  - OpenShift GitOps (pull-mode)
+  - HashiCorp Vault
+  - External Secrets Operator
+  - RHACS
+  - OADP
+  - cert-manager
+  - LVMS
+  - Federated GitLab Enterprise
+  - Quay
+  - Nexus
+services:
+  - openshift-platform
+  - devsecops-identity
+outcome: "Working fleet, documented install path, dual-CI delivery, replay drills passing."
+---
+
+## Why it exists
+
+Most of our customer engagements ship into **regulated, disconnected environments**. To
+keep our advice grounded — and to make engagements faster — we operate a continuously running
+reference fleet of our own. It's the system we hand customers a *diff against*, not a
+slide deck.
+
+## The fleet
+
+Two clusters, both fully disconnected:
+
+- **`hub-dc-v6`** — the management hub. Runs ACM/MCE, hub-level GitOps, Vault auth integration,
+  RHACS Central, cert-manager with internal CA, External Secrets for credential bridging,
+  LVMS for storage.
+- **`spoke-dc-v6`** — a managed cluster placed via ACM. Inherits its operator install,
+  network policy, secret material, and runtime security posture from hub-driven GitOps.
+
+Around the clusters sit the **lab infrastructure** — every VM and service that supports the
+fleet without running inside it: MinIO (object storage), PowerDNS, HAProxy edge, GitLab
+Enterprise, Vault servers (VM-hosted, not in-cluster), NetBox (host inventory), Quay
+(image registry), Nexus (artifact repository), and the oc-mirror workflow that ferries
+operator catalogs into the disconnected world.
+
+## Operating model
+
+- **GitOps in pull-mode.** Hub Argo CD reconciles spoke state via ACM-managed ApplicationSets;
+  spokes pull manifests directly from internal GitLab over internal networks.
+- **Vault as the credential root.** Application workloads receive secrets via ESO; admins
+  authenticate against Vault using short-lived dynamic credentials.
+- **RHACS for runtime security.** Admission policies, baseline detection, image-risk gates,
+  network observability. Integrated with our incident-response loop.
+- **OADP for backup.** Routine namespace and PVC backups to MinIO; tested restore drills.
+- **Federated GitLab + dual-CI.** Application teams ship through their own GitLab group; the
+  platform team operates the two CI build paths — one for application code, one for platform
+  manifests — so build pipelines never have ambient platform credentials.
+
+## What's documented
+
+- Architecture decisions (ADRs) for every non-obvious choice
+- A complete install manual — see [Greenfield OCP Deployment](/case-studies/greenfield-ocp-deployment/)
+- Runbooks per failure mode (lost hub etcd, expired internal CA, drift between fleet and Git,
+  OADP restore drill, RHACS scanner upgrade)
+- A **history-and-replay log** — what was tried, what failed, why we ended up where we are
+- A **site-replication plan** so the fleet can be re-stood-up at a new site in days, not months
+
+## Why it matters for our customers
+
+When you engage CompTech Lab, your platform is built **against** this reference. You get
+the install path, the runbooks, the ADRs, and the operating model — minus the things that
+don't apply to your environment, plus the things that are specific to it.

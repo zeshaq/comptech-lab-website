@@ -1,0 +1,80 @@
+---
+title: "Greenfield Disconnected OpenShift — full install manual"
+customer: "Internal reference + customer engagements"
+sector: "Platform engineering"
+summary: "A complete, step-by-step manual for standing up a disconnected OpenShift fleet from bare-metal — bootstrap to GitOps."
+year: "2025–2026"
+featured: true
+order: 3
+technologies:
+  - MinIO
+  - PowerDNS
+  - HAProxy
+  - GitLab Enterprise
+  - HashiCorp Vault
+  - NetBox
+  - Quay
+  - oc-mirror
+  - Nexus
+  - OpenShift
+  - ACM / MCE
+  - OpenShift GitOps
+  - RHACS
+  - cert-manager
+  - LVMS
+  - External Secrets Operator
+services:
+  - openshift-platform
+outcome: "Working disconnected fleet, full installation manual, replay-tested install path."
+---
+
+## The reference install
+
+Most "how to install OpenShift" material assumes a connected lab. **Real customer environments
+are disconnected** — image mirroring, internal DNS, internal CAs, internal Git, internal
+registries, internal artifact repositories. The hard parts aren't in the OpenShift installer;
+they're in the supporting infrastructure that has to exist before you can install OpenShift.
+
+We've documented the whole thing.
+
+## What the manual covers
+
+The install path is sequenced so each layer is fully ready before the next depends on it:
+
+1. **Object storage** — MinIO as the S3-compatible store for backups, registry, and artifacts.
+2. **DNS** — PowerDNS as authoritative resolver for cluster, lab, and customer-facing domains.
+3. **Edge** — HAProxy for cluster API + ingress, with TLS terminated at the edge.
+4. **Source control** — GitLab Enterprise as the internal source-of-truth for manifests, with
+   federation patterns for application teams.
+5. **Secret custody** — HashiCorp Vault as the root of credential trust, VM-hosted for blast
+   radius isolation from in-cluster workloads.
+6. **Host inventory** — NetBox to keep host, network, and IPAM state in one place.
+7. **Image registry** — Quay for OpenShift images and customer workloads.
+8. **Image supply** — oc-mirror as the disciplined path for mirroring operator catalogs and
+   release images into the disconnected world.
+9. **Artifact repository** — Nexus for non-image artifacts (Maven, npm, RPM mirrors).
+10. **Bootstrap artifacts** — the install configs, ignition files, and pull secrets prepared
+    before standing up any cluster.
+11. **Bootstrap VM** — the temporary install host with its inputs validated end-to-end.
+12. **Hub cluster** — OpenShift install proper, with disconnected mirror in place.
+13. **Hub GitOps** — Argo CD installed and seeded to manage everything that follows.
+14. **Hub LVMS** — local storage with LVM-backed provisioner.
+15. **Hub cert-manager** — internal-CA integration so cluster certs renew automatically.
+16. **Hub External Secrets + Vault auth** — ESO with Vault as the backing secret store.
+17. **Hub ACM / MCE** — multi-cluster management for spoke clusters.
+18. **Hub RHACS** — runtime security across the fleet from the start.
+
+Each chapter is a leaf page with the exact commands, configs, and verification steps. No
+hand-waving, no "and then configure your registry."
+
+## Why we wrote it as a manual
+
+A customer engagement that ships against a written, tested install path is faster, more
+honest, and recovers faster from mistakes. The manual is the artifact we keep referring back
+to — and that customers keep after we leave.
+
+## Internal reference
+
+The full manual lives in our internal docs under
+`/docs/greenfield-ocp-deployment/installation-manual/*`, with each chapter linked from
+the [overview page](https://zeshaq.pages.dev/docs/greenfield-ocp-deployment/).

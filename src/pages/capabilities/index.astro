@@ -1,0 +1,198 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import InteractiveDiagram from "../../components/InteractiveDiagram";
+
+const tool = {
+  background: "#ffffff",
+  border: "1.5px solid #9ca3af",
+  borderRadius: 6,
+  padding: 8,
+  color: "#1f2937",
+  width: 150,
+  textAlign: "center" as const,
+  fontSize: 12,
+};
+
+const header = {
+  background: "#0c1812",
+  border: "1.5px solid #15803d",
+  borderRadius: 8,
+  padding: 12,
+  color: "#ffffff",
+  width: 240,
+  textAlign: "center" as const,
+  fontWeight: 700,
+  fontSize: 13,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase" as const,
+};
+
+const hub = {
+  ...header,
+  background: "#15803d",
+  border: "2px solid #166534",
+  width: 220,
+  fontSize: 14,
+};
+
+const slug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+function cluster(label: string, baseX: number, baseY: number, tools: string[]) {
+  const headerId = slug(label);
+  const nodes: any[] = [
+    { id: headerId, position: { x: baseX, y: baseY }, data: { label }, style: header },
+  ];
+  const edges: any[] = [];
+  tools.forEach((t, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const id = `${headerId}__${slug(t)}`;
+    nodes.push({
+      id,
+      position: { x: baseX + (col === 0 ? -90 : 90), y: baseY + 80 + row * 48 },
+      data: { label: t },
+      style: tool,
+    });
+    edges.push({
+      id: `${headerId}-${id}`,
+      source: headerId,
+      target: id,
+      animated: false,
+      style: { stroke: "#9ca3af", strokeWidth: 1 },
+    });
+  });
+  return { nodes, edges };
+}
+
+const platform = cluster("Platform", 200, 100, [
+  "OpenShift",
+  "ACM",
+  "OpenShift GitOps",
+  "Vault",
+  "ESO",
+  "RHACS",
+  "OADP",
+  "cert-manager",
+  "LVMS",
+  "oc-mirror",
+  "Quay",
+  "MinIO",
+]);
+
+const aiml = cluster("AI / ML", 900, 100, [
+  "OpenShift AI",
+  "vLLM",
+  "Triton",
+  "NVIDIA NIM",
+  "TGI",
+  "Ollama",
+  "Kubeflow",
+  "PyTorch",
+  "LangChain",
+  "MCP",
+]);
+
+const devsec = cluster("DevSecOps & Identity", 200, 800, [
+  "WSO2 IS",
+  "Ping Identity",
+  "Keycloak",
+  "RHACS",
+  "Vault",
+  "Acunetix",
+  "Invicti",
+  "cosign",
+  "SBOMs",
+  "OPA",
+]);
+
+const integ = cluster("Integration & Data", 900, 800, [
+  "WSO2 APIM",
+  "WSO2 MI",
+  "MuleSoft",
+  "Camunda",
+  "Temporal",
+  "Apache Kafka",
+  "Apache Spark",
+  "Iceberg",
+  "Datadog",
+  "Kiali",
+  "OpenTelemetry",
+  "n8n",
+]);
+
+const hubNode = {
+  id: "comptech_lab",
+  position: { x: 550, y: 470 },
+  data: { label: "CompTech Lab Platform" },
+  style: hub,
+};
+
+const hubEdges = [
+  { id: "h-p", source: "comptech_lab", target: "platform", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-a", source: "comptech_lab", target: "ai___ml", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-d", source: "comptech_lab", target: "devsecops___identity", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-i", source: "comptech_lab", target: "integration___data", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+];
+
+const nodes = [
+  hubNode,
+  ...platform.nodes,
+  ...aiml.nodes,
+  ...devsec.nodes,
+  ...integ.nodes,
+];
+
+const edges = [
+  ...hubEdges,
+  ...platform.edges,
+  ...aiml.edges,
+  ...devsec.edges,
+  ...integ.edges,
+];
+---
+
+<Layout
+  title="Capabilities map — CompTech Lab"
+  description="An interactive pan-and-zoom map of every technology we operate — across OpenShift platform, AI/ML, DevSecOps, integration."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Capabilities map</span>
+      <h1 class="hero-title">Every component we operate, on one canvas.</h1>
+      <p class="hero-lede">
+        Drag to rearrange. Click a node to invert. Use the fullscreen button (⛶) to expand
+        the canvas. Each cluster maps to a service pillar.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <InteractiveDiagram client:load nodes={nodes} edges={edges} height={720} />
+
+      <div class="card-grid card-grid-4" style="margin-top: 2.5rem;">
+        <a href="/services/openshift-platform/" class="card">
+          <p class="card-eyebrow">Platform</p>
+          <h3 class="card-title">OpenShift fleet</h3>
+          <p class="card-desc">12 components — install, fleet ops, supply chain.</p>
+        </a>
+        <a href="/services/ai-ml-enablement/" class="card">
+          <p class="card-eyebrow">AI / ML</p>
+          <h3 class="card-title">Inference & agentic</h3>
+          <p class="card-desc">10 components — OpenShift AI, inference, MCP.</p>
+        </a>
+        <a href="/services/devsecops-identity/" class="card">
+          <p class="card-eyebrow">DevSecOps</p>
+          <h3 class="card-title">Security & identity</h3>
+          <p class="card-desc">10 components — WSO2 IS, Ping, Vault, RHACS.</p>
+        </a>
+        <a href="/services/integration-data/" class="card">
+          <p class="card-eyebrow">Integration</p>
+          <h3 class="card-title">APIs, workflows, data</h3>
+          <p class="card-desc">12 components — WSO2, Camunda, Spark, observability.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

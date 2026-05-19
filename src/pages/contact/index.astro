@@ -1,0 +1,163 @@
+---
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout
+  title="Contact — CompTech Lab"
+  description="Tell us what you're building. We'll write back with a concrete scope and a path to ship."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Contact</span>
+      <h1 class="hero-title">Tell us what you're building.</h1>
+      <p class="hero-lede">
+        We reply to every message. Real ones get back to you with a concrete first-two-weeks
+        scope and a definition of done for the engagement.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width: 720px;">
+      <form id="contact-form" class="contact-form" method="POST" action="/api/contact">
+        <div class="form-row">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" required autocomplete="name" />
+        </div>
+
+        <div class="form-row">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required autocomplete="email" />
+        </div>
+
+        <div class="form-row">
+          <label for="company">Company</label>
+          <input id="company" name="company" type="text" autocomplete="organization" />
+        </div>
+
+        <div class="form-row">
+          <label for="service">What you need help with</label>
+          <select id="service" name="service">
+            <option value="">— select —</option>
+            <option value="openshift-platform">OpenShift platform engineering</option>
+            <option value="ai-ml-enablement">AI/ML enablement</option>
+            <option value="devsecops-identity">DevSecOps & identity</option>
+            <option value="integration-data">Integration & data</option>
+            <option value="other">Something else / not sure</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="message">Tell us about the project</label>
+          <textarea id="message" name="message" rows="6" required></textarea>
+        </div>
+
+        <input type="text" name="company_url" tabindex="-1" autocomplete="off" style="position: absolute; left: -9999px;" aria-hidden="true" />
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Send</button>
+          <span id="form-status" class="form-status" aria-live="polite"></span>
+        </div>
+
+        <p class="form-fineprint">
+          Or email <a href="mailto:hello@comptech-lab.com" style="color: var(--color-accent);">hello@comptech-lab.com</a> directly.
+        </p>
+      </form>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .contact-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .form-row label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .form-row input,
+  .form-row select,
+  .form-row textarea {
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.4rem;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+  }
+
+  .form-row input:focus,
+  .form-row select:focus,
+  .form-row textarea:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -1px;
+    border-color: var(--color-accent);
+  }
+
+  .form-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .form-status {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+
+  .form-status[data-state="ok"] { color: var(--color-accent); }
+  .form-status[data-state="err"] { color: #b91c1c; }
+
+  .form-fineprint {
+    font-size: 0.85rem;
+    color: var(--color-muted);
+    margin: 0.5rem 0 0;
+  }
+</style>
+
+<script is:inline>
+  const form = document.getElementById("contact-form");
+  const status = document.getElementById("form-status");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      status.textContent = "Sending…";
+      status.removeAttribute("data-state");
+
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        const res = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          status.textContent = "Sent. We'll get back to you shortly.";
+          status.setAttribute("data-state", "ok");
+          form.reset();
+        } else {
+          const body = await res.json().catch(() => ({}));
+          status.textContent = body.error || "Could not send. Please email hello@comptech-lab.com.";
+          status.setAttribute("data-state", "err");
+        }
+      } catch (err) {
+        status.textContent = "Could not send. Please email hello@comptech-lab.com.";
+        status.setAttribute("data-state", "err");
+      }
+    });
+  }
+</script>
