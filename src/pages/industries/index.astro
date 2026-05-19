@@ -1,6 +1,9 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
 import { getCollection } from "astro:content";
+import { INDUSTRY_ICONS } from "../../utils/icons";
 
 const industries = (await getCollection("industries", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.order - b.data.order
@@ -12,22 +15,26 @@ const industries = (await getCollection("industries", ({ data }) => !data.draft)
   description="Banking & financial services, insurance, telecom, public sector — regulated industries where platform discipline matters."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={12} rows={6} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">Industries</span>
       <h1 class="hero-title">Built for regulated industries.</h1>
       <p class="hero-lede">
         We engage where platform discipline, security posture, and audit-grade engineering are
-        non-negotiable — banking, insurance, telecom, and public sector. Each industry shapes
-        the platforms we build for it.
+        non-negotiable &mdash; banking, insurance, telecom, defense, and public sector. Each
+        industry shapes the platforms we build for it.
       </p>
     </div>
   </section>
 
   <section class="section">
     <div class="container">
-      <div class="card-grid">
+      <div class="card-grid card-grid-2">
         {industries.map((i) => (
           <a href={`/industries/${i.id}/`} class="card">
+            <div class="card-icon"><Icon name={INDUSTRY_ICONS[i.id] ?? "globe"} size={32} /></div>
             <p class="card-eyebrow">{i.data.eyebrow ?? "Sector"}</p>
             <h2 class="card-title">{i.data.title}</h2>
             <p class="card-desc">{i.data.tagline}</p>

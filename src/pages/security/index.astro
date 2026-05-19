@@ -1,5 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
 
 const tabs = [
   { id: "overview",   eyebrow: "01", label: "Overview" },
@@ -17,6 +19,9 @@ const tabs = [
   description="A detailed look at the seven aspects of our security practice: SOC and detection engineering, VAPT and vulnerability management, network security and segmentation, identity and access, AppSec and DevSecOps, and compliance and audit."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={14} rows={8} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">Security practice</span>
       <h1 class="hero-title">A specialist security practice for regulated workloads.</h1>
@@ -75,26 +80,32 @@ const tabs = [
 
           <div class="tab-grid tab-grid-3">
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="observability" size={28} /></div>
               <p class="tab-callout-title">SOC &amp; detection</p>
               <p>SIEM/XDR build-out, detection-as-code, SOAR workflows, threat hunting, incident response runbooks.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="magnifier" size={28} /></div>
               <p class="tab-callout-title">VAPT &amp; vuln mgmt</p>
               <p>Web/network/cloud penetration testing, continuous scanning programmes, purple-team loops, remediation tracking.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="network" size={28} /></div>
               <p class="tab-callout-title">Network security</p>
               <p>Cisco Nexus EVPN/VXLAN, multi-tenant segmentation, next-gen firewalls, NAC, micro-segmentation.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="identity" size={28} /></div>
               <p class="tab-callout-title">Identity &amp; access</p>
               <p>Federated identity, SCIM, OIDC/SAML, MFA, ZTNA, privileged access, workload identity.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="security" size={28} /></div>
               <p class="tab-callout-title">AppSec &amp; DevSecOps</p>
               <p>SAST, SCA, SBOMs, image signing, container runtime security (RHACS), DAST programmes.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="compliance" size={28} /></div>
               <p class="tab-callout-title">Compliance &amp; audit</p>
               <p>Control-framework mapping (PCI, ISO, NIST), continuous compliance, evidence at source.</p>
             </div>

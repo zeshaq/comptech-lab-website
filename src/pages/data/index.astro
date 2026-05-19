@@ -1,5 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
 
 const tabs = [
   { id: "overview",   eyebrow: "01", label: "Overview" },
@@ -17,6 +19,9 @@ const tabs = [
   description="A detailed look at the seven aspects of our data practice: strategy and architecture, data platforms (lakehouse), streaming and real-time, governance and quality, analytics and BI, and data-for-AI."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={14} rows={8} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">Data &amp; Analytics practice</span>
       <h1 class="hero-title">A specialist data practice for regulated workloads.</h1>
@@ -75,26 +80,32 @@ const tabs = [
 
           <div class="tab-grid tab-grid-3">
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="design" size={28} /></div>
               <p class="tab-callout-title">Strategy &amp; architecture</p>
               <p>Reference architectures (centralised, federated, data-mesh), data-product thinking, build-vs-buy.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="database" size={28} /></div>
               <p class="tab-callout-title">Data platforms</p>
               <p>Lakehouse (Iceberg/Delta), warehouses (Snowflake/BigQuery/Redshift), lakes (S3/MinIO), Spark, query engines.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="workflow" size={28} /></div>
               <p class="tab-callout-title">Streaming &amp; real-time</p>
               <p>Apache Kafka, Flink, Spark Streaming, change-data-capture, event-driven architectures.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="compliance" size={28} /></div>
               <p class="tab-callout-title">Governance &amp; quality</p>
               <p>Catalog, lineage, MDM, data contracts, data-quality testing, privacy controls.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="observability" size={28} /></div>
               <p class="tab-callout-title">Analytics &amp; BI</p>
               <p>Semantic layer (dbt, Cube), BI tooling (Looker, Power BI, Tableau, Superset), self-service governance.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="ai-model" size={28} /></div>
               <p class="tab-callout-title">Data for AI</p>
               <p>Feature stores, training pipelines, ML-ready data, retrieval grounding, audit-grade lineage.</p>
             </div>

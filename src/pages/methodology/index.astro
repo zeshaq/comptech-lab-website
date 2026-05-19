@@ -1,5 +1,8 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
+import { PHASE_ICONS } from "../../utils/icons";
 
 const phases = [
   {
@@ -115,6 +118,9 @@ const phases = [
   description="A five-phase delivery discipline: Assess, Design, Deploy, Operate, Hand over. The detailed view of how we run engagements."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={14} rows={8} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">Methodology</span>
       <h1 class="hero-title">Five phases. One delivery discipline.</h1>
@@ -164,8 +170,11 @@ const phases = [
   {phases.map((p, i) => (
     <section class="section" style={i % 2 === 0 ? "background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border);" : ""}>
       <div class="container" style="max-width: 980px;">
-        <div style="display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
-          <span style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 2.5rem; font-weight: 700; color: var(--color-accent); line-height: 1; letter-spacing: -0.03em;">{p.n}</span>
+        <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: var(--color-accent); color: #ffffff; flex-shrink: 0;">
+            <Icon name={PHASE_ICONS[p.n] ?? "magnifier"} size={28} />
+          </div>
+          <span style="font-family: var(--font-mono); font-size: 2.5rem; font-weight: 400; color: var(--color-accent); line-height: 1; letter-spacing: -0.02em;">{p.n}</span>
           <div>
             <span class="section-eyebrow">Phase {p.n}</span>
             <h2 class="section-title" style="margin: 0;">{p.name}</h2>

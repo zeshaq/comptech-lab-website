@@ -1,5 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
 
 const tabs = [
   { id: "overview",   eyebrow: "01", label: "Overview" },
@@ -17,6 +19,9 @@ const tabs = [
   description="A detailed look at the seven aspects of our AI practice: strategy, AI platforms (OpenShift AI, NVIDIA AI Enterprise, Kubeflow), LLM inference, RAG and agentic AI, MLOps, and AI security and governance."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={14} rows={8} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">AI practice</span>
       <h1 class="hero-title">A specialist AI practice for regulated workloads.</h1>
@@ -75,26 +80,32 @@ const tabs = [
 
           <div class="tab-grid tab-grid-3">
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="design" size={28} /></div>
               <p class="tab-callout-title">Strategy &amp; readiness</p>
               <p>Use-case discovery, build-vs-buy, ROI modelling, AI governance setup, pilot design.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="cloud" size={28} /></div>
               <p class="tab-callout-title">AI platforms</p>
               <p>OpenShift AI, NVIDIA AI Enterprise, Kubeflow, GPU operator, multi-tenancy, model registry.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="chip" size={28} /></div>
               <p class="tab-callout-title">LLM inference</p>
               <p>vLLM, Triton, NVIDIA NIM, TGI, Ollama. Quantisation, batching, KV-cache, sizing.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="ai-model" size={28} /></div>
               <p class="tab-callout-title">RAG &amp; agentic AI</p>
               <p>Vector stores, retrieval evaluation, MCP, multi-agent patterns, guardrails.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="workflow" size={28} /></div>
               <p class="tab-callout-title">MLOps &amp; lifecycle</p>
               <p>Feature stores, training pipelines, model registry, continuous evaluation, drift.</p>
             </div>
             <div class="tab-callout">
+              <div class="callout-icon"><Icon name="compliance" size={28} /></div>
               <p class="tab-callout-title">Security &amp; governance</p>
               <p>Model-risk management, identity-bound AI, audit trails, regulator readiness, AI red teaming.</p>
             </div>

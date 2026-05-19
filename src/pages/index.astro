@@ -1,6 +1,9 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import DotGrid from "../components/DotGrid.astro";
 import { getCollection } from "astro:content";
+import { SERVICE_ICONS, INDUSTRY_ICONS, PHASE_ICONS } from "../utils/icons";
 
 const services = (await getCollection("services", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.order - b.data.order
@@ -13,22 +16,44 @@ const industries = (await getCollection("industries", ({ data }) => !data.draft)
 const featured = (await getCollection("case-studies", ({ data }) => !data.draft && data.featured)).sort(
   (a, b) => a.data.order - b.data.order
 );
+
+const phases = [
+  { n: "01", name: "Assess", desc: "Current-state discovery, gap analysis, regulatory mapping, technical-debt profile." },
+  { n: "02", name: "Design", desc: "Reference architecture, operating model, runbook structure, control mapping." },
+  { n: "03", name: "Deploy", desc: "Platform build, application onboarding, security posture, observability." },
+  { n: "04", name: "Operate", desc: "Day-2 bring-up: SRE practice, alert hygiene, incident response, capacity and cost." },
+  { n: "05", name: "Hand over", desc: "Structured knowledge transfer, runbook walkthroughs, residual-risk register." },
+];
 ---
 
 <Layout>
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={14} rows={8} spacing={16} />
+    </div>
     <div class="container">
-      <span class="hero-eyebrow">Systems integration for regulated industries</span>
-      <h1 class="hero-title">Cloud platforms, security, modernization, and operations &mdash; engineered to ship.</h1>
-      <p class="hero-lede">
-        CompTech Lab designs, deploys, and hands over the cloud and container platforms that
-        anchor regulated workloads in banking, insurance, telecom, defense, and public
-        sector. We deliver against documented outcomes, not against open-ended retainers.
-      </p>
-      <div class="hero-actions">
-        <a href="/services/" class="btn btn-primary">Our services</a>
-        <a href="/case-studies/" class="btn btn-secondary">Engagement profiles</a>
-        <a href="/contact/" class="btn btn-dark">Start a conversation</a>
+      <div class="hero-grid">
+        <div>
+          <span class="hero-eyebrow">Systems integration for regulated industries</span>
+          <h1 class="hero-title">Cloud platforms, security, AI, and data &mdash; engineered to ship.</h1>
+          <p class="hero-lede">
+            CompTech Lab designs, deploys, and hands over the cloud and container platforms that
+            anchor regulated workloads in banking, insurance, telecom, defense, and public
+            sector. We deliver against documented outcomes, not against open-ended retainers.
+          </p>
+          <div class="hero-actions">
+            <a href="/services/" class="btn btn-primary">Our services</a>
+            <a href="/case-studies/" class="btn btn-secondary">Engagement profiles</a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-visual-frame">
+            <div class="hero-visual-stripe"></div>
+            <div class="hero-visual-mark">
+              <Icon name="network" size={160} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -47,6 +72,7 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
       <div class="card-grid card-grid-4">
         {services.map((s) => (
           <a href={`/services/${s.id}/`} class="card">
+            <div class="card-icon"><Icon name={SERVICE_ICONS[s.id] ?? "cloud"} size={32} /></div>
             <p class="card-eyebrow">{s.data.eyebrow ?? "Service"}</p>
             <h3 class="card-title">{s.data.title}</h3>
             <p class="card-desc">{s.data.tagline}</p>
@@ -63,14 +89,15 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
         <h2 class="section-title">Regulated sectors where platform discipline matters.</h2>
         <p class="section-lede">
           We engage where the combination of regulatory pressure, operational expectation,
-          and audit-grade engineering rules out generic answers — and rewards specialists who
-          have done the work before.
+          and audit-grade engineering rules out generic answers &mdash; and rewards
+          specialists who have done the work before.
         </p>
       </div>
 
       <div class="card-grid card-grid-4">
         {industries.map((i) => (
           <a href={`/industries/${i.id}/`} class="card">
+            <div class="card-icon"><Icon name={INDUSTRY_ICONS[i.id] ?? "globe"} size={32} /></div>
             <p class="card-eyebrow">{i.data.eyebrow ?? "Sector"}</p>
             <h3 class="card-title">{i.data.title}</h3>
             <p class="card-desc">{i.data.tagline}</p>
@@ -103,7 +130,7 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
       </div>
 
       <p style="margin-top: 2rem;">
-        <a href="/case-studies/" class="btn btn-secondary">All engagement profiles →</a>
+        <a href="/case-studies/" class="btn btn-secondary">All engagement profiles</a>
       </p>
     </div>
   </section>
@@ -114,76 +141,48 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
         <span class="section-eyebrow">How we deliver</span>
         <h2 class="section-title">Assess. Design. Deploy. Operate. Hand over.</h2>
         <p class="section-lede">
-          Every engagement runs through the same five-phase discipline — sized to scope, but
-          never skipped. The endpoint is a platform your team owns, documented well enough to
-          outlast staff turnover.
+          Every engagement runs through the same five-phase discipline &mdash; sized to scope,
+          but never skipped. The endpoint is a platform your team owns, documented well enough
+          to outlast staff turnover.
         </p>
       </div>
 
       <div class="card-grid card-grid-3">
-        <div class="card" style="cursor: default;">
-          <p class="card-eyebrow">Phase 1</p>
-          <h3 class="card-title">Assess</h3>
-          <p class="card-desc">
-            Current-state discovery, gap analysis, regulatory mapping, technical-debt profile.
-            A short, sharp engagement that produces the case for the work.
+        {phases.map((p) => (
+          <div class="card" style="cursor: default;">
+            <div class="card-icon"><Icon name={PHASE_ICONS[p.n] ?? "magnifier"} size={32} /></div>
+            <p class="card-eyebrow">Phase {p.n}</p>
+            <h3 class="card-title">{p.name}</h3>
+            <p class="card-desc">{p.desc}</p>
+          </div>
+        ))}
+        <a href="/methodology/" class="card" style="background: var(--color-ink); color: #ffffff;">
+          <div class="card-icon" style="color: var(--color-accent-soft);"><Icon name="arrow-right" size={32} /></div>
+          <p class="card-eyebrow" style="color: var(--color-accent-soft);">Read more</p>
+          <h3 class="card-title" style="color: #ffffff;">Full methodology</h3>
+          <p class="card-desc" style="color: rgba(255,255,255,0.7);">
+            The detailed view of activities, deliverables, team shape, and contracting model
+            for each of the five phases.
           </p>
-        </div>
-        <div class="card" style="cursor: default;">
-          <p class="card-eyebrow">Phase 2</p>
-          <h3 class="card-title">Design</h3>
-          <p class="card-desc">
-            Reference architecture, operating model, runbook structure, control mapping.
-            Designed for handover from day one.
-          </p>
-        </div>
-        <div class="card" style="cursor: default;">
-          <p class="card-eyebrow">Phase 3</p>
-          <h3 class="card-title">Deploy</h3>
-          <p class="card-desc">
-            Platform build, application onboarding, security posture, observability — sequenced
-            so each layer is fully ready before the next depends on it.
-          </p>
-        </div>
-        <div class="card" style="cursor: default;">
-          <p class="card-eyebrow">Phase 4</p>
-          <h3 class="card-title">Operate</h3>
-          <p class="card-desc">
-            Day-2 bring-up: SRE practice, alert hygiene, incident response, capacity and cost.
-            Run as a joint practice with your team, not in parallel.
-          </p>
-        </div>
-        <div class="card" style="cursor: default;">
-          <p class="card-eyebrow">Phase 5</p>
-          <h3 class="card-title">Hand over</h3>
-          <p class="card-desc">
-            Structured knowledge transfer, runbook walkthroughs, ADR review, residual-risk
-            register. Your team signs that they own it.
-          </p>
-        </div>
-        <div class="card" style="cursor: default; background: var(--color-dark); color: var(--color-dark-text); border-color: var(--color-dark);">
-          <p class="card-eyebrow" style="color: var(--color-accent);">Optional</p>
-          <h3 class="card-title" style="color: var(--color-dark-text-strong);">Bridge managed services</h3>
-          <p class="card-desc" style="color: var(--color-dark-text);">
-            When your team is not yet ready to take operations long-term, we operate a defined
-            scope as a time-boxed bridge — not as a permanent dependency.
-          </p>
-        </div>
+        </a>
       </div>
     </div>
   </section>
 
-  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
-    <div class="container" style="text-align: center;">
-      <span class="section-eyebrow" style="color: var(--color-accent);">Start a conversation</span>
-      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Tell us what you&rsquo;re building.</h2>
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text); position: relative; overflow: hidden;">
+    <div class="hero-decoration hero-decoration--top-right" style="color: rgba(255,255,255,0.15);">
+      <DotGrid cols={16} rows={10} spacing={16} />
+    </div>
+    <div class="container" style="text-align: center; position: relative; z-index: 1;">
+      <span class="section-eyebrow" style="color: var(--color-accent-soft);">Start a conversation</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong); margin-left: auto; margin-right: auto;">Tell us what you&rsquo;re building.</h2>
       <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
         Send us a short note. We&rsquo;ll write back with a concrete first-two-weeks scope and a
         definition of done for the engagement.
       </p>
-      <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+      <div style="margin-top: 2rem; display: inline-flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
         <a href="/contact/" class="btn btn-primary">Contact us</a>
-        <a href="/about/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">About CompTech Lab</a>
+        <a href="/about/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3); min-width: 11rem;">About CompTech Lab</a>
       </div>
     </div>
   </section>

@@ -1,6 +1,9 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import DotGrid from "../../components/DotGrid.astro";
 import { getCollection } from "astro:content";
+import { SERVICE_ICONS } from "../../utils/icons";
 
 const services = (await getCollection("services", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.order - b.data.order
@@ -12,21 +15,25 @@ const services = (await getCollection("services", ({ data }) => !data.draft)).so
   description="OpenShift platform engineering, AI/ML enablement, DevSecOps & identity, integration & data."
 >
   <section class="hero">
+    <div class="hero-decoration hero-decoration--bottom-right" style="color: var(--color-accent);">
+      <DotGrid cols={12} rows={6} spacing={16} />
+    </div>
     <div class="container">
       <span class="hero-eyebrow">Services</span>
-      <h1 class="hero-title">Four pillars. One lab. Documented outcomes.</h1>
+      <h1 class="hero-title">Four practice areas. One delivery discipline.</h1>
       <p class="hero-lede">
-        We pick engagements where our running reference saves your team months of figure-it-out
-        time. Each service maps to systems we already operate.
+        We engage where engineering depth, audit-grade discipline, and a documented handover
+        matter. Each service is scoped against a documented outcome.
       </p>
     </div>
   </section>
 
   <section class="section">
     <div class="container">
-      <div class="card-grid">
+      <div class="card-grid card-grid-2">
         {services.map((s) => (
           <a href={`/services/${s.id}/`} class="card">
+            <div class="card-icon"><Icon name={SERVICE_ICONS[s.id] ?? "cloud"} size={32} /></div>
             <p class="card-eyebrow">{s.data.eyebrow ?? "Service"}</p>
             <h2 class="card-title">{s.data.title}</h2>
             <p class="card-desc">{s.data.tagline}</p>
