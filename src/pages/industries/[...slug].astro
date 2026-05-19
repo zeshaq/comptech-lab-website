@@ -32,7 +32,7 @@ const otherIndustries = (await getCollection("industries", ({ data }) => !data.d
   description={entry.data.description}
 >
   <section class="hero">
-    <HeroBackground variant="default" />
+    <HeroBackground variant="frames" />
     <div class="container">
       <span class="hero-eyebrow">{entry.data.eyebrow ?? "Sector"}</span>
       <h1 class="hero-title">{entry.data.title}</h1>

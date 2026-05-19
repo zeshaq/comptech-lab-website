@@ -27,7 +27,7 @@ const otherServices = allServices.filter((s) => s.id !== entry.id);
 
 <Layout title={`${entry.data.title} — CompTech Lab`} description={entry.data.description}>
   <section class="hero">
-    <HeroBackground variant="default" />
+    <HeroBackground variant="cubes" />
     <div class="container">
       <span class="hero-eyebrow">{entry.data.eyebrow ?? "Service"}</span>
       <h1 class="hero-title">{entry.data.title}</h1>

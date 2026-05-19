@@ -1,97 +1,361 @@
 ---
 /**
- * Full-width dark hero background composition in IBM-style:
- *   - Gray-100 base
- *   - Soft radial gradient (blue + purple) for depth
- *   - Dot-grid pattern overlay
- *   - Concentric arcs (orbits) on the right
- *   - Highlighted accent dots
- *   - Carbon "plate" 2×2 squares in the bottom-left
+ * Full-width dark hero background compositions in IBM-style.
+ * Each variant is a distinct shape language; common elements (dot grid,
+ * carbon plate in bottom-left, top-left stripe accent) keep them coherent.
  *
- * Variants tilt the accent positions and gradient colors so different
- * pages feel related but not identical.
+ * Variants:
+ *   orbits     — concentric arcs anchored off the right edge
+ *   network    — connected-node mesh
+ *   layers     — stacked translucent horizontal layers
+ *   gridpulse  — fine grid with highlighted cells
+ *   hexagon    — honeycomb tessellation
+ *   waves      — flowing sine curves
+ *   cubes      — isometric cube grid
+ *   frames     — nested concentric rectangles
  */
+type Variant = "orbits" | "network" | "layers" | "gridpulse" | "hexagon" | "waves" | "cubes" | "frames";
+
 interface Props {
-  variant?: "default" | "blue" | "purple" | "teal";
+  variant?: Variant;
 }
 
-const { variant = "default" } = Astro.props;
+const { variant = "orbits" } = Astro.props;
 
-const accents: Record<string, { c1: string; c2: string; orbit: string }> = {
-  default: { c1: "#0f62fe", c2: "#8a3ffc", orbit: "#0f62fe" },
-  blue:    { c1: "#0f62fe", c2: "#0043ce", orbit: "#0f62fe" },
-  purple:  { c1: "#8a3ffc", c2: "#a56eff", orbit: "#a56eff" },
-  teal:    { c1: "#08bdba", c2: "#0f62fe", orbit: "#08bdba" },
+// Per-variant accent color so each shape feels distinct
+const ACCENT: Record<Variant, string> = {
+  orbits: "#0f62fe",     // blue-60
+  network: "#a56eff",    // purple-50
+  layers: "#08bdba",     // teal-40
+  gridpulse: "#4589ff",  // blue-50
+  hexagon: "#42be65",    // green-40
+  waves: "#ff7eb6",      // magenta-30
+  cubes: "#33b1ff",      // cyan-40
+  frames: "#ee5396",     // magenta-50
 };
-const { c1, c2, orbit } = accents[variant] ?? accents.default;
 
-// dot grid covers full SVG; sized for 1600×540 viewBox
-const cols = 60;
-const rows = 22;
-const stepX = 1600 / (cols - 1);
-const stepY = 540 / (rows - 1);
+const accent = ACCENT[variant];
+
+// Common dot-grid for variants that want it
+const DG_COLS = 60;
+const DG_ROWS = 22;
+const DG_STEP_X = 1600 / (DG_COLS - 1);
+const DG_STEP_Y = 540 / (DG_ROWS - 1);
+
+// Hexagon math
+function hexagonPath(cx: number, cy: number, r: number) {
+  const pts: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i - Math.PI / 6;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return `M ${pts.join(" L ")} Z`;
+}
+
+// Wave path
+function wavePath(amp: number, baseY: number, freq: number, phase: number) {
+  const pts: string[] = [];
+  for (let x = 0; x <= 1600; x += 20) {
+    const y = baseY + Math.sin((x / 1600) * Math.PI * freq + phase) * amp;
+    pts.push(`${x},${y.toFixed(1)}`);
+  }
+  return `M ${pts.join(" L ")}`;
+}
+
+// Isometric cube projection
+function isoCube(cx: number, cy: number, size: number, filled: boolean) {
+  const s = size;
+  const h = s * 0.5;
+  const top = `${cx},${cy - s} ${cx + s},${cy - s + h} ${cx},${cy} ${cx - s},${cy - s + h}`;
+  const right = `${cx},${cy} ${cx + s},${cy - s + h} ${cx + s},${cy + h} ${cx},${cy + s}`;
+  const left = `${cx},${cy} ${cx - s},${cy - s + h} ${cx - s},${cy + h} ${cx},${cy + s}`;
+  return { top, right, left, filled };
+}
 ---
 
 <div class="hero-bg" aria-hidden="true">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 540" preserveAspectRatio="xMidYMid slice">
     <defs>
-      <radialGradient id={`hero-bg-g1-${variant}`} cx="0.82" cy="0.35" r="0.55">
-        <stop offset="0" stop-color={c1} stop-opacity="0.28" />
-        <stop offset="1" stop-color={c1} stop-opacity="0" />
+      <radialGradient id={`hb-g1-${variant}`} cx="0.85" cy="0.35" r="0.55">
+        <stop offset="0" stop-color={accent} stop-opacity="0.22" />
+        <stop offset="1" stop-color={accent} stop-opacity="0" />
       </radialGradient>
-      <radialGradient id={`hero-bg-g2-${variant}`} cx="0.15" cy="0.85" r="0.5">
-        <stop offset="0" stop-color={c2} stop-opacity="0.18" />
-        <stop offset="1" stop-color={c2} stop-opacity="0" />
-      </radialGradient>
-      <radialGradient id={`hero-bg-g3-${variant}`} cx="0.5" cy="0.5" r="0.6">
-        <stop offset="0" stop-color="#161616" stop-opacity="0" />
-        <stop offset="1" stop-color="#000000" stop-opacity="0.35" />
+      <radialGradient id={`hb-g2-${variant}`} cx="0.12" cy="0.85" r="0.55">
+        <stop offset="0" stop-color={accent} stop-opacity="0.12" />
+        <stop offset="1" stop-color={accent} stop-opacity="0" />
       </radialGradient>
     </defs>
 
-    {/* gradients */}
-    <rect width="1600" height="540" fill={`url(#hero-bg-g1-${variant})`} />
-    <rect width="1600" height="540" fill={`url(#hero-bg-g2-${variant})`} />
+    {/* base gradients */}
+    <rect width="1600" height="540" fill={`url(#hb-g1-${variant})`} />
+    <rect width="1600" height="540" fill={`url(#hb-g2-${variant})`} />
 
-    {/* dot grid */}
-    <g fill="rgba(255,255,255,0.06)">
-      {Array.from({ length: rows }).map((_, r) =>
-        Array.from({ length: cols }).map((_, c) => (
-          <circle cx={c * stepX} cy={r * stepY} r="1.1" />
-        ))
-      ).flat()}
-    </g>
+    {/* ===== ORBITS ===== */}
+    {variant === "orbits" && (
+      <g>
+        <g fill="rgba(255,255,255,0.06)">
+          {Array.from({ length: DG_ROWS }).map((_, r) =>
+            Array.from({ length: DG_COLS }).map((_, c) => (
+              <circle cx={c * DG_STEP_X} cy={r * DG_STEP_Y} r="1.1" />
+            ))
+          ).flat()}
+        </g>
+        <g fill="none" stroke={accent} stroke-width="1">
+          <circle cx="1480" cy="270" r="180" opacity="0.5" />
+          <circle cx="1480" cy="270" r="260" opacity="0.35" />
+          <circle cx="1480" cy="270" r="340" opacity="0.22" />
+          <circle cx="1480" cy="270" r="420" opacity="0.14" />
+          <circle cx="1480" cy="270" r="500" opacity="0.08" />
+        </g>
+        <circle cx="1660" cy="270" r="6" fill={accent} />
+        <circle cx="1480" cy="90" r="5" fill={accent} />
+        <circle cx="1300" cy="270" r="4" fill={accent} opacity="0.7" />
+        <circle cx="1480" cy="450" r="4" fill={accent} opacity="0.7" />
+        <circle cx="1220" cy="270" r="3" fill="#ffffff" opacity="0.6" />
+      </g>
+    )}
 
-    {/* concentric arcs (orbit pattern) on the right */}
-    <g fill="none" stroke={orbit} stroke-width="1">
-      <circle cx="1480" cy="270" r="180" opacity="0.5" />
-      <circle cx="1480" cy="270" r="260" opacity="0.35" />
-      <circle cx="1480" cy="270" r="340" opacity="0.22" />
-      <circle cx="1480" cy="270" r="420" opacity="0.14" />
-      <circle cx="1480" cy="270" r="500" opacity="0.08" />
-    </g>
+    {/* ===== NETWORK ===== */}
+    {variant === "network" && (
+      <g>
+        {(() => {
+          const nodes = [
+            [220, 120], [380, 80], [540, 160], [720, 100], [900, 200],
+            [1080, 130], [1260, 220], [1420, 160], [1540, 320],
+            [180, 280], [340, 350], [520, 320], [680, 280], [840, 380],
+            [1000, 340], [1180, 420], [1360, 360], [1500, 460],
+            [260, 460], [440, 440], [620, 470], [860, 470], [1040, 230],
+          ];
+          const edges = [
+            [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8],
+            [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], [14, 15], [15, 16], [16, 17],
+            [0, 9], [1, 10], [2, 11], [3, 12], [4, 13], [5, 14], [6, 15], [7, 16],
+            [10, 18], [11, 19], [13, 20], [14, 21], [4, 22], [5, 22],
+          ];
+          const highlight = [1, 5, 12, 14, 17];
+          return (
+            <>
+              <g stroke={accent} stroke-width="1" fill="none" opacity="0.4">
+                {edges.map(([a, b]) => (
+                  <line x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} />
+                ))}
+              </g>
+              <g>
+                {nodes.map((n, i) =>
+                  highlight.includes(i)
+                    ? <circle cx={n[0]} cy={n[1]} r="9" fill={accent} />
+                    : <circle cx={n[0]} cy={n[1]} r="5" fill="rgba(255,255,255,0.7)" />
+                )}
+              </g>
+              <g fill="none" stroke={accent} stroke-width="1" opacity="0.5">
+                {highlight.map((i) => (
+                  <circle cx={nodes[i][0]} cy={nodes[i][1]} r="18" />
+                ))}
+              </g>
+            </>
+          );
+        })()}
+      </g>
+    )}
 
-    {/* highlighted accent dots along orbits */}
-    <g>
-      <circle cx="1660" cy="270" r="6" fill={orbit} />
-      <circle cx="1480" cy="90" r="5" fill={orbit} />
-      <circle cx="1300" cy="270" r="4" fill={orbit} opacity="0.7" />
-      <circle cx="1480" cy="450" r="4" fill={orbit} opacity="0.7" />
-      <circle cx="1220" cy="270" r="3" fill="#ffffff" opacity="0.6" />
-    </g>
+    {/* ===== LAYERS ===== */}
+    {variant === "layers" && (
+      <g>
+        {/* subtle grid */}
+        <g fill="rgba(255,255,255,0.05)">
+          {Array.from({ length: DG_ROWS }).map((_, r) =>
+            Array.from({ length: DG_COLS }).map((_, c) => (
+              <circle cx={c * DG_STEP_X} cy={r * DG_STEP_Y} r="1" />
+            ))
+          ).flat()}
+        </g>
+        {/* stacked layers, staggered */}
+        <g>
+          <rect x="240" y="430" width="1100" height="46" fill="#161616" stroke={accent} stroke-width="1" opacity="0.9" />
+          <rect x="220" y="370" width="1100" height="46" fill={accent} opacity="0.18" stroke={accent} stroke-width="1" />
+          <rect x="200" y="310" width="1100" height="46" fill={accent} opacity="0.35" stroke={accent} stroke-width="1" />
+          <rect x="180" y="250" width="1100" height="46" fill={accent} opacity="0.55" stroke={accent} stroke-width="1" />
+          <rect x="160" y="190" width="1100" height="46" fill={accent} opacity="0.85" stroke={accent} stroke-width="1" />
+          <rect x="140" y="130" width="1100" height="46" fill="#ffffff" opacity="0.05" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
+        </g>
+        {/* right-edge connection nodes */}
+        <g>
+          {[155, 215, 275, 335, 395, 455].map((y, i) => (
+            <g>
+              <line x1={1240 + i * 8} y1={y} x2={1420} y2={y} stroke={accent} stroke-width="1" opacity="0.5" />
+              <circle cx="1420" cy={y} r="4" fill={accent} />
+            </g>
+          ))}
+        </g>
+      </g>
+    )}
 
-    {/* outer vignette */}
-    <rect width="1600" height="540" fill={`url(#hero-bg-g3-${variant})`} />
+    {/* ===== GRIDPULSE ===== */}
+    {variant === "gridpulse" && (
+      <g>
+        {/* vertical lines */}
+        <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+          {Array.from({ length: 33 }).map((_, c) => (
+            <line x1={c * 50} y1="0" x2={c * 50} y2="540" />
+          ))}
+          {Array.from({ length: 12 }).map((_, r) => (
+            <line x1="0" y1={r * 50} x2="1600" y2={r * 50} />
+          ))}
+        </g>
+        {/* highlighted cells */}
+        <g>
+          <rect x="1200" y="100" width="50" height="50" fill={accent} opacity="0.85" />
+          <rect x="1250" y="100" width="50" height="50" fill={accent} opacity="0.4" />
+          <rect x="1300" y="150" width="50" height="50" fill={accent} opacity="0.6" />
+          <rect x="1100" y="200" width="50" height="50" fill={accent} opacity="0.3" />
+          <rect x="1350" y="250" width="50" height="50" fill={accent} opacity="0.9" />
+          <rect x="1400" y="300" width="50" height="50" fill={accent} opacity="0.5" />
+          <rect x="1300" y="350" width="50" height="50" fill={accent} opacity="0.7" />
+          <rect x="1150" y="350" width="50" height="50" fill={accent} opacity="0.25" />
+          <rect x="1450" y="200" width="50" height="50" fill={accent} opacity="0.4" />
+          <rect x="1500" y="350" width="50" height="50" fill={accent} opacity="0.6" />
+        </g>
+        {/* outlined emphasis cells */}
+        <g fill="none" stroke={accent} stroke-width="1.5">
+          <rect x="1200" y="100" width="50" height="50" />
+          <rect x="1350" y="250" width="50" height="50" />
+          <rect x="1300" y="350" width="50" height="50" />
+        </g>
+      </g>
+    )}
 
-    {/* Carbon plate — 2×2 squares, bottom-left */}
+    {/* ===== HEXAGON ===== */}
+    {variant === "hexagon" && (
+      <g>
+        {(() => {
+          const r = 32;
+          const dx = r * Math.sqrt(3);
+          const dy = r * 1.5;
+          const cells: { cx: number; cy: number; key: string }[] = [];
+          for (let row = -1; row < 12; row++) {
+            for (let col = -1; col < 22; col++) {
+              const cx = col * dx + (row % 2 ? dx / 2 : 0);
+              const cy = row * dy;
+              if (cx < -40 || cx > 1640 || cy < -40 || cy > 580) continue;
+              cells.push({ cx, cy, key: `${row}-${col}` });
+            }
+          }
+          const filled = new Set([
+            "2-12", "3-11", "3-12", "4-13", "5-14",
+            "6-12", "7-13", "8-11", "5-9", "6-8",
+          ]);
+          const solid = new Set(["3-12", "5-14", "7-13"]);
+          return (
+            <>
+              <g fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.8">
+                {cells.map((c) => (
+                  <path d={hexagonPath(c.cx, c.cy, r)} />
+                ))}
+              </g>
+              <g>
+                {cells.filter((c) => filled.has(c.key)).map((c) => (
+                  <path d={hexagonPath(c.cx, c.cy, r)} fill={accent} opacity={solid.has(c.key) ? 0.85 : 0.3} stroke={accent} stroke-width="1" />
+                ))}
+              </g>
+            </>
+          );
+        })()}
+      </g>
+    )}
+
+    {/* ===== WAVES ===== */}
+    {variant === "waves" && (
+      <g>
+        <g fill="rgba(255,255,255,0.04)">
+          {Array.from({ length: 12 }).map((_, r) =>
+            Array.from({ length: 30 }).map((_, c) => (
+              <circle cx={26 + c * 54} cy={26 + r * 50} r="1" />
+            ))
+          ).flat()}
+        </g>
+        <g fill="none" stroke={accent} stroke-width="1.5">
+          <path d={wavePath(40, 130, 2, 0)} opacity="0.9" />
+          <path d={wavePath(50, 220, 2, 0.5)} opacity="0.65" />
+          <path d={wavePath(45, 310, 2, 1)} opacity="0.45" />
+          <path d={wavePath(35, 400, 2, 1.5)} opacity="0.3" />
+          <path d={wavePath(30, 470, 2, 2)} opacity="0.18" />
+        </g>
+        {/* highlight dots along the top wave */}
+        <g>
+          {[300, 600, 900, 1200, 1500].map((x, i) => {
+            const y = 130 + Math.sin((x / 1600) * Math.PI * 2) * 40;
+            return <circle cx={x} cy={y} r={i === 2 ? 6 : 4} fill={accent} />;
+          })}
+        </g>
+      </g>
+    )}
+
+    {/* ===== CUBES ===== */}
+    {variant === "cubes" && (
+      <g>
+        {(() => {
+          const size = 28;
+          const cubes: { cx: number; cy: number; filled: boolean }[] = [];
+          for (let row = 0; row < 6; row++) {
+            for (let col = 0; col < 10; col++) {
+              const cx = 200 + col * 110 + (row % 2 ? 55 : 0);
+              const cy = 100 + row * 70;
+              if (cx > 1600 - 60) continue;
+              const filled = [(row + col) % 4 === 0, row === 2 && col === 5, row === 4 && col === 3].some(Boolean);
+              cubes.push({ cx, cy, filled });
+            }
+          }
+          return cubes.map((c) => {
+            const cube = isoCube(c.cx, c.cy, size, c.filled);
+            return (
+              <g>
+                <polygon points={cube.top}   fill={c.filled ? accent : "none"} fill-opacity={c.filled ? 0.9 : 0} stroke={c.filled ? accent : "rgba(255,255,255,0.18)"} stroke-width="1" />
+                <polygon points={cube.right} fill={c.filled ? accent : "none"} fill-opacity={c.filled ? 0.55 : 0} stroke={c.filled ? accent : "rgba(255,255,255,0.18)"} stroke-width="1" />
+                <polygon points={cube.left}  fill={c.filled ? accent : "none"} fill-opacity={c.filled ? 0.35 : 0} stroke={c.filled ? accent : "rgba(255,255,255,0.18)"} stroke-width="1" />
+              </g>
+            );
+          });
+        })()}
+      </g>
+    )}
+
+    {/* ===== FRAMES ===== */}
+    {variant === "frames" && (
+      <g>
+        <g fill="rgba(255,255,255,0.05)">
+          {Array.from({ length: DG_ROWS }).map((_, r) =>
+            Array.from({ length: DG_COLS }).map((_, c) => (
+              <circle cx={c * DG_STEP_X} cy={r * DG_STEP_Y} r="1" />
+            ))
+          ).flat()}
+        </g>
+        {/* nested rectangles, off-center top-right */}
+        <g fill="none" stroke={accent} stroke-width="1.5">
+          <rect x="1100" y="40" width="460" height="460" opacity="0.18" />
+          <rect x="1140" y="80" width="380" height="380" opacity="0.3" />
+          <rect x="1180" y="120" width="300" height="300" opacity="0.45" />
+          <rect x="1220" y="160" width="220" height="220" opacity="0.65" />
+          <rect x="1260" y="200" width="140" height="140" opacity="0.9" />
+        </g>
+        <rect x="1290" y="230" width="80" height="80" fill={accent} opacity="0.85" />
+        {/* secondary nested group, bottom-left mid */}
+        <g fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="1">
+          <rect x="220" y="280" width="240" height="240" />
+          <rect x="260" y="320" width="160" height="160" />
+          <rect x="300" y="360" width="80" height="80" />
+        </g>
+      </g>
+    )}
+
+    {/* ===== Common chrome on all variants ===== */}
+    {/* Carbon plate — bottom-left */}
     <g transform="translate(64 440)">
-      <rect width="22" height="22" fill={orbit} />
+      <rect width="22" height="22" fill={accent} />
       <rect x="24" y="0" width="22" height="22" fill="rgba(255,255,255,0.08)" />
       <rect x="0" y="24" width="22" height="22" fill="rgba(255,255,255,0.08)" />
-      <rect x="24" y="24" width="22" height="22" fill={orbit} opacity="0.5" />
+      <rect x="24" y="24" width="22" height="22" fill={accent} opacity="0.5" />
     </g>
-
-    {/* thin top-left horizontal stripe accent */}
-    <rect x="0" y="0" width="80" height="3" fill={orbit} />
+    {/* top-left stripe */}
+    <rect x="0" y="0" width="80" height="3" fill={accent} />
   </svg>
 </div>
