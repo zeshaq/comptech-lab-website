@@ -1,0 +1,157 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+interface Partner {
+  name: string;
+  category: string;
+  description: string;
+  capabilities: string[];
+  status?: string;
+}
+
+const partners: Partner[] = [
+  {
+    name: "Red Hat",
+    category: "Platform",
+    description: "OpenShift Container Platform, Advanced Cluster Management, OpenShift GitOps, RHACS, OpenShift AI, OADP, OpenShift Service Mesh — the anchor stack for most of our regulated-platform engagements.",
+    capabilities: ["OpenShift", "ACM / MCE", "OpenShift GitOps", "RHACS", "OpenShift AI", "OADP", "OpenShift Pipelines"],
+    status: "Operating partner",
+  },
+  {
+    name: "NVIDIA",
+    category: "AI / GPU",
+    description: "NVIDIA AI Enterprise, NIM inference catalog, GPU Operator, Triton Inference Server, AI Workbench — the foundation of our LLM inference and GPU operations practice.",
+    capabilities: ["AI Enterprise", "NIM", "Triton", "GPU Operator", "TensorRT-LLM", "AI Workbench"],
+    status: "Operating partner",
+  },
+  {
+    name: "Cisco",
+    category: "Networking / Security",
+    description: "Nexus 9000 data-centre fabrics, ACI, Catalyst SD-WAN, ISE, Secure Firewall, Cisco XDR, Secure Endpoint, Duo, Secure Access (SSE), Splunk — the network and security backbone of most BFSI and telecom engagements.",
+    capabilities: ["Nexus 9000 / NX-OS", "ACI / APIC", "Catalyst SD-WAN", "ISE", "Secure Firewall (FTDv/FMC)", "Cisco XDR", "Duo", "Splunk"],
+    status: "Operating partner",
+  },
+  {
+    name: "HashiCorp",
+    category: "Platform / Security",
+    description: "Vault for credential custody, Terraform for infrastructure as code, Consul where service discovery is needed — Vault sits at the credential-root of every platform we deploy.",
+    capabilities: ["Vault", "Terraform", "Consul"],
+    status: "Operating partner",
+  },
+  {
+    name: "WSO2",
+    category: "Identity / Integration",
+    description: "Identity Server (IS), API Manager (APIM), Micro Integrator (MI) — our default open-source-anchored stack for federated identity and enterprise integration in regulated environments.",
+    capabilities: ["Identity Server", "API Manager", "Micro Integrator", "Choreo"],
+    status: "Operating partner",
+  },
+  {
+    name: "Ping Identity",
+    category: "Identity",
+    description: "PingFederate, PingAccess, PingOne, PingDirectory — preferred enterprise identity stack when WSO2 is not the right answer, especially in environments with existing Ping investment.",
+    capabilities: ["PingFederate", "PingAccess", "PingOne", "Identity Intelligence"],
+  },
+  {
+    name: "Microsoft",
+    category: "Cloud",
+    description: "Azure infrastructure and platform services, Entra ID for identity, Microsoft 365 integration, Azure OpenAI for managed AI workloads where data-sovereignty allows.",
+    capabilities: ["Azure", "Entra ID", "Azure OpenAI", "Azure AI Foundry", "Sentinel"],
+  },
+  {
+    name: "Amazon Web Services",
+    category: "Cloud",
+    description: "AWS landing zones, EKS, Bedrock, SageMaker, Route 53, IAM Identity Center — where hyperscaler-anchored deployments are appropriate.",
+    capabilities: ["EKS", "Bedrock", "SageMaker", "Landing Zone", "Identity Center"],
+  },
+  {
+    name: "Google Cloud",
+    category: "Cloud",
+    description: "GCP landing zones, GKE, Vertex AI, BigQuery, Cloud Identity — selected for AI workloads and data-analytics estates where Google's stack fits.",
+    capabilities: ["GKE", "Vertex AI", "BigQuery", "Anthos", "Cloud Identity"],
+  },
+  {
+    name: "Datadog",
+    category: "Observability",
+    description: "End-to-end observability across the platforms we operate — APM, infrastructure, logs, RUM, security — wired through GitOps the way the rest of the stack is.",
+    capabilities: ["APM", "Infrastructure", "Logs", "RUM", "Cloud SIEM"],
+  },
+  {
+    name: "MuleSoft",
+    category: "Integration",
+    description: "Anypoint Platform for integration and API management in customer environments with existing MuleSoft investment.",
+    capabilities: ["Anypoint Platform", "API Manager", "DataWeave", "Flex Gateway"],
+  },
+  {
+    name: "Camunda &amp; Temporal",
+    category: "Workflow",
+    description: "Camunda for human-in-the-loop BPM and decision modelling; Temporal for durable workflow engines in code. Used together where the workflow profile is mixed.",
+    capabilities: ["Camunda Platform 8", "Temporal Cloud / self-hosted"],
+  },
+];
+
+const grouped = partners.reduce<Record<string, Partner[]>>((acc, p) => {
+  (acc[p.category] ??= []).push(p);
+  return acc;
+}, {});
+---
+
+<Layout
+  title="Partnerships &amp; alliances — CompTech Lab"
+  description="The technology partnerships that anchor our practice — Red Hat, NVIDIA, Cisco, HashiCorp, WSO2, Ping, Microsoft, AWS, Google Cloud, and more."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Partnerships</span>
+      <h1 class="hero-title">The technology ecosystem we deliver against.</h1>
+      <p class="hero-lede">
+        Our engagements anchor on a small set of vendor stacks that we operate at depth. Below
+        is the list of partners whose technologies appear in our reference architectures and
+        production deployments.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <p style="background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: 0.4rem; padding: 1rem 1.25rem; font-size: 0.92rem; color: var(--color-muted); margin: 0 0 2.5rem;">
+        <strong style="color: var(--color-ink);">Note:</strong> formal partner-tier badges
+        (Premier, Gold, Advanced) are added here as certifications complete. Until then,
+        each entry describes the operational depth we work at.
+      </p>
+
+      {Object.entries(grouped).map(([category, items]) => (
+        <div style="margin-bottom: 3rem;">
+          <h2 class="section-title" style="font-size: 1.4rem; margin-bottom: 1.25rem;">{category}</h2>
+          <div class="card-grid card-grid-2">
+            {items.map((p) => (
+              <div class="card" style="cursor: default;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+                  <h3 class="card-title" style="margin: 0;">{p.name}</h3>
+                  {p.status && <span class="pill pill-accent" style="font-size: 0.7rem;">{p.status}</span>}
+                </div>
+                <p class="card-desc" style="margin-top: 0.65rem;">{p.description}</p>
+                <div class="pill-row" style="margin-top: 1rem;">
+                  {p.capabilities.map((c) => <span class="pill">{c}</span>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div style="margin-top: 3rem; padding: 2rem; background: var(--color-dark); color: var(--color-dark-text); border-radius: 0.6rem;">
+        <p class="section-eyebrow" style="color: var(--color-accent);">Working with us</p>
+        <h2 class="section-title" style="color: var(--color-dark-text-strong); margin: 0 0 1rem; font-size: 1.5rem;">Vendor procurement &amp; sub-contracting</h2>
+        <p style="color: var(--color-dark-text); line-height: 1.6;">
+          We can engage as a direct services supplier or as a sub-contractor under an
+          existing partner's master services agreement. Common patterns include sub-contracting
+          under a Red Hat consulting SOW, a Cisco systems-integrator engagement, or a
+          customer's preferred SI prime contract.
+        </p>
+        <p style="margin-top: 1.5rem;">
+          <a href="/contact/" class="btn btn-primary">Discuss a partnership</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</Layout>

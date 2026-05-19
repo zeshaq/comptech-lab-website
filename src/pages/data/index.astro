@@ -1,0 +1,790 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const tabs = [
+  { id: "overview",   eyebrow: "01", label: "Overview" },
+  { id: "strategy",   eyebrow: "02", label: "Strategy & Architecture" },
+  { id: "platforms",  eyebrow: "03", label: "Data Platforms" },
+  { id: "streaming",  eyebrow: "04", label: "Streaming & Real-Time" },
+  { id: "governance", eyebrow: "05", label: "Governance & Quality" },
+  { id: "analytics",  eyebrow: "06", label: "Analytics & BI" },
+  { id: "aidata",     eyebrow: "07", label: "Data for AI" },
+];
+---
+
+<Layout
+  title="Data &amp; Analytics practice — CompTech Lab"
+  description="A detailed look at the seven aspects of our data practice: strategy and architecture, data platforms (lakehouse), streaming and real-time, governance and quality, analytics and BI, and data-for-AI."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Data &amp; Analytics practice</span>
+      <h1 class="hero-title">A specialist data practice for regulated workloads.</h1>
+      <p class="hero-lede">
+        Seven aspects, one operating discipline. From data strategy and architecture through
+        lakehouse platforms, real-time streaming, governance and quality, analytics and BI,
+        and data-for-AI &mdash; built on the same fleet, same identity, and same audit
+        posture as the rest of your platform.
+      </p>
+      <div class="hero-actions">
+        <a href="/contact/" class="btn btn-primary">Discuss a data engagement</a>
+        <a href="#strategy" class="btn btn-secondary">Explore the practice</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top: 1.5rem;">
+    <div class="container">
+      <div class="tabs" data-tabs>
+        <div class="tab-bar" role="tablist" aria-label="Data practice aspects">
+          {tabs.map((t, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              class="tab-button"
+              aria-controls={`panel-${t.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? "0" : "-1"}
+              data-tab-target={t.id}
+            >
+              <span class="tab-button-eyebrow">{t.eyebrow}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <!-- ===== 01 Overview ===== -->
+        <div
+          class="tab-panel is-active"
+          id="panel-overview"
+          role="tabpanel"
+          aria-labelledby="tab-overview"
+          tabindex="0"
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">01 — Overview</span>
+          </div>
+          <h2 class="tab-section-title">Data as a platform &mdash; not as a project.</h2>
+          <p class="tab-section-lede">
+            Most data programmes deliver dashboards. The interesting work happens earlier &mdash;
+            in the architecture that lets every team get the data it needs without re-platforming,
+            in the governance that survives the next regulator visit, and in the operational
+            discipline that keeps quality from quietly decaying. We engineer that work.
+          </p>
+
+          <div class="tab-grid tab-grid-3">
+            <div class="tab-callout">
+              <p class="tab-callout-title">Strategy &amp; architecture</p>
+              <p>Reference architectures (centralised, federated, data-mesh), data-product thinking, build-vs-buy.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Data platforms</p>
+              <p>Lakehouse (Iceberg/Delta), warehouses (Snowflake/BigQuery/Redshift), lakes (S3/MinIO), Spark, query engines.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Streaming &amp; real-time</p>
+              <p>Apache Kafka, Flink, Spark Streaming, change-data-capture, event-driven architectures.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Governance &amp; quality</p>
+              <p>Catalog, lineage, MDM, data contracts, data-quality testing, privacy controls.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Analytics &amp; BI</p>
+              <p>Semantic layer (dbt, Cube), BI tooling (Looker, Power BI, Tableau, Superset), self-service governance.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Data for AI</p>
+              <p>Feature stores, training pipelines, ML-ready data, retrieval grounding, audit-grade lineage.</p>
+            </div>
+          </div>
+
+          <h3 class="tab-h3">Engagement archetypes</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Engagement type</th>
+                <th>Typical scope</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Data strategy &amp; architecture</strong></td>
+                <td>Current-state assessment, target architecture, build-vs-buy, data-product backlog, roadmap</td>
+                <td>4&ndash;8 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Lakehouse platform stand-up</strong></td>
+                <td>Object storage, table format (Iceberg/Delta), query engine, Spark, identity, governance, GitOps delivery</td>
+                <td>10&ndash;16 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Streaming platform stand-up</strong></td>
+                <td>Kafka cluster (or managed), schema registry, streaming jobs, CDC integration, dead-letter handling, observability</td>
+                <td>8&ndash;14 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Data governance bring-up</strong></td>
+                <td>Catalog, lineage, ownership model, data contracts, quality testing, privacy controls, audit evidence</td>
+                <td>8&ndash;12 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Analytics &amp; BI modernization</strong></td>
+                <td>Semantic layer via dbt, BI rollout, self-service governance, deprecation of legacy reports</td>
+                <td>10&ndash;16 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Data-for-AI engagement</strong></td>
+                <td>Feature store, training pipelines, retrieval/embedding pipelines, lineage for AI workloads</td>
+                <td>8&ndash;14 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Master Data Management (MDM)</strong></td>
+                <td>Golden-record design, matching/merging, source-system reconciliation, stewardship workflow</td>
+                <td>12&ndash;20 weeks</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">What makes us different</h3>
+          <ul class="tab-list">
+            <li><strong>Platform-anchored data.</strong> Data platforms run on the same OpenShift fleets as the rest of your regulated workloads, with the same identity boundary, security posture, and observability stack.</li>
+            <li><strong>Data products, not data swamps.</strong> Every dataset has an owner, a contract, an SLA, and a documented lineage. Untyped, undocumented, unowned pipelines are a defect.</li>
+            <li><strong>Audit posture by default.</strong> Schema changes, data movement, access events, and quality results all captured as evidence at the source &mdash; not reconstructed for the next audit.</li>
+            <li><strong>AI-ready by design.</strong> The data layer is built so that AI workloads ride on the same governed surface as analytics &mdash; not on shadow pipelines built by ML engineers in haste.</li>
+          </ul>
+        </div>
+
+        <!-- ===== 02 Strategy & Architecture ===== -->
+        <div
+          class="tab-panel"
+          id="panel-strategy"
+          role="tabpanel"
+          aria-labelledby="tab-strategy"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">02 — Data Strategy &amp; Architecture</span>
+          </div>
+          <h2 class="tab-section-title">Decide the shape of the data estate before you platform it.</h2>
+          <p class="tab-section-lede">
+            Most "data platform" projects fail because the architecture was decided implicitly,
+            in the gap between business strategy and engineering capacity. We make that
+            architecture explicit, debated, and decided &mdash; before any platform engineering
+            starts.
+          </p>
+
+          <h3 class="tab-h3">Architecture patterns we use</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Pattern</th>
+                <th>Strengths</th>
+                <th>When we choose it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Centralised lakehouse</strong></td>
+                <td>Single source of truth, simple governance, lower operating overhead</td>
+                <td>Small-to-medium estates, organisations with a central data team, regulated environments where governance simplicity matters</td>
+              </tr>
+              <tr>
+                <td><strong>Hub-and-spoke (federated)</strong></td>
+                <td>Central governance and shared dimensions; domain teams own their data products</td>
+                <td>Mid-sized organisations with multiple business units and strong-ish central platform team</td>
+              </tr>
+              <tr>
+                <td><strong>Data mesh</strong></td>
+                <td>Domain teams fully own data products; central platform team provides the substrate; governance is federated</td>
+                <td>Large, multi-domain organisations where centralising the data team becomes the bottleneck</td>
+              </tr>
+              <tr>
+                <td><strong>Operational data store (ODS) layer</strong></td>
+                <td>Cleaned, integrated operational data near the source systems</td>
+                <td>Mainframe-heavy estates, banks, insurance carriers with critical batch cycles</td>
+              </tr>
+              <tr>
+                <td><strong>Hybrid</strong></td>
+                <td>Different patterns for different domains in the same enterprise</td>
+                <td>Most realistic large-enterprise deployments</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Data-product thinking</h3>
+          <p>
+            We treat every analytical dataset as a <strong>data product</strong> &mdash; with
+            an owner, a contract, an SLA, and a lifecycle:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Owner.</strong> A named team (not a person) accountable for the dataset's accuracy, freshness, and availability.</li>
+            <li><strong>Contract.</strong> Schema, semantics, allowed values, freshness expectation, breaking-change policy &mdash; defined and reviewed before consumers depend on it.</li>
+            <li><strong>SLA.</strong> Documented freshness, availability, and quality targets.</li>
+            <li><strong>Discoverability.</strong> Surfaced in the catalog with description, lineage, and example queries.</li>
+            <li><strong>Versioning.</strong> Breaking changes go through a deprecation path; consumers get notice.</li>
+            <li><strong>Deprecation.</strong> Datasets that no consumer reads are deprecated, archived, deleted &mdash; on a schedule, not a whim.</li>
+          </ul>
+
+          <h3 class="tab-h3">Build vs buy</h3>
+          <p>
+            We make explicit decisions about which capabilities to self-host, which to take
+            as managed services, and which to consume as SaaS:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Self-host</strong> where data-sovereignty requires it, or where operating-cost dynamics favour it at scale.</li>
+            <li><strong>Managed cloud services</strong> (BigQuery, Snowflake, Redshift, Databricks, Synapse) where the data-residency posture and operating overhead trade-offs work out.</li>
+            <li><strong>Specialist SaaS</strong> (Fivetran, dbt Cloud, Hightouch, Atlan, Monte Carlo) for capability areas where building or self-hosting is not where the engineering team should spend its time.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a strategy &amp; architecture engagement</h4>
+            <ul>
+              <li>A current-state diagnostic of the data estate with named gaps and concrete impact</li>
+              <li>A target reference architecture matched to your organisation's size, structure, and regulatory profile</li>
+              <li>A data-product backlog with owner, contract, and SLA defined for the first cohort</li>
+              <li>Build-vs-buy decisions justified per capability area</li>
+              <li>A phased roadmap with explicit Phase 01 next-step for execution</li>
+              <li>An ADR set capturing the non-obvious choices</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 03 Data Platforms ===== -->
+        <div
+          class="tab-panel"
+          id="panel-platforms"
+          role="tabpanel"
+          aria-labelledby="tab-platforms"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">03 — Data Platforms</span>
+          </div>
+          <h2 class="tab-section-title">Lakehouse-first. Self-hosted where it earns its keep.</h2>
+          <p class="tab-section-lede">
+            Our default data platform is a <strong>lakehouse</strong> &mdash; open table formats
+            on object storage, with Spark and SQL query engines on top, running on the same
+            OpenShift fleet as the rest of the platform. Managed cloud warehouses are
+            absolutely on the table where they fit; we don't insist on self-hosting for its
+            own sake.
+          </p>
+
+          <h3 class="tab-h3">Lakehouse stack</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Technologies we operate</th>
+                <th>What we deliver</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Object storage</strong></td>
+                <td>MinIO (self-hosted), AWS S3, Azure ADLS Gen2, GCS</td>
+                <td>Bucket design, encryption, lifecycle policies, replication topology, IAM integration</td>
+              </tr>
+              <tr>
+                <td><strong>Table format</strong></td>
+                <td>Apache Iceberg, Delta Lake, Apache Hudi</td>
+                <td>Format selection by workload (write pattern, read pattern, ecosystem fit), partitioning strategy, schema evolution policy</td>
+              </tr>
+              <tr>
+                <td><strong>Compute &amp; query engines</strong></td>
+                <td>Apache Spark, Trino, Presto, Dremio, DuckDB (for federated and small-scale)</td>
+                <td>Cluster sizing, query routing, workload isolation, cost-attribution per tenant</td>
+              </tr>
+              <tr>
+                <td><strong>Orchestration</strong></td>
+                <td>Apache Airflow, Argo Workflows, Prefect, Dagster</td>
+                <td>DAG patterns, retry semantics, alerting, lineage capture, GitOps deployment</td>
+              </tr>
+              <tr>
+                <td><strong>Transformation</strong></td>
+                <td>dbt (Core or Cloud), Spark SQL, SQLMesh</td>
+                <td>Modelling patterns (staging / intermediate / marts), tests, documentation, lineage</td>
+              </tr>
+              <tr>
+                <td><strong>Ingestion</strong></td>
+                <td>Airbyte, Fivetran, Spark, custom connectors</td>
+                <td>Source onboarding, CDC integration, incremental patterns, full-refresh recovery</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Managed cloud warehouses</h3>
+          <p>
+            When sovereignty, scale, or operating overhead points to a managed warehouse,
+            we deliver the same engineering discipline on top:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Snowflake.</strong> Account / role architecture, RBAC patterns, virtual-warehouse sizing, cost attribution, masking and row-access policies.</li>
+            <li><strong>Google BigQuery.</strong> Dataset and project layout, slot reservations, column-level security, BigQuery-ML integration where it fits.</li>
+            <li><strong>Amazon Redshift / RA3.</strong> Managed storage, workload management, materialised views, integration with AWS Lake Formation.</li>
+            <li><strong>Databricks.</strong> Workspace design, Unity Catalog, photon engine tuning, ML and analytics on the same surface.</li>
+            <li><strong>Azure Synapse / Fabric.</strong> Dedicated vs serverless pools, integration with Azure data services, Fabric workloads.</li>
+          </ul>
+
+          <h3 class="tab-h3">Why we lean lakehouse for regulated workloads</h3>
+          <ul class="tab-list">
+            <li><strong>Open formats.</strong> Iceberg and Delta on object storage means data is portable. You are not contractually locked into a single vendor's query engine.</li>
+            <li><strong>Cost decoupling.</strong> Storage cost decouples from compute cost; query engines can be scaled or replaced independently.</li>
+            <li><strong>Co-location with platform.</strong> Running on the same OpenShift fleet as your other workloads simplifies identity, networking, security posture, and observability.</li>
+            <li><strong>Disconnected-friendly.</strong> Self-hosted lakehouse stacks run cleanly in disconnected and air-gapped environments where managed cloud is not an option.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a data platform engagement</h4>
+            <ul>
+              <li>A working lakehouse (or managed-warehouse) platform deployed to your environment</li>
+              <li>Table-format and partitioning strategy justified against your workload</li>
+              <li>Query-engine and orchestration layer in place with GitOps delivery</li>
+              <li>First data products onboarded end-to-end through the new platform</li>
+              <li>Cost-attribution and observability tied to your FinOps and ops stack</li>
+              <li>Runbooks for the failure modes that matter: storage partition, schema drift, query-engine restart, replication lag</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 04 Streaming ===== -->
+        <div
+          class="tab-panel"
+          id="panel-streaming"
+          role="tabpanel"
+          aria-labelledby="tab-streaming"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">04 — Streaming &amp; Real-Time</span>
+          </div>
+          <h2 class="tab-section-title">Events as the spine of regulated systems.</h2>
+          <p class="tab-section-lede">
+            For regulated workloads &mdash; payment authorisation, fraud detection, claims
+            intake, network telemetry &mdash; "real-time" is not a nice-to-have. We design and
+            operate the streaming spine that those workloads ride on, with explicit guarantees
+            about ordering, durability, and delivery semantics.
+          </p>
+
+          <h3 class="tab-h3">Streaming platforms</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Strengths</th>
+                <th>Typical fit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Apache Kafka</strong></td>
+                <td>Industry-standard distributed log, durable, scalable, mature ecosystem</td>
+                <td>Default for general event streaming, system-of-record events, integration spine</td>
+              </tr>
+              <tr>
+                <td><strong>Confluent Platform / Cloud</strong></td>
+                <td>Kafka-compatible with managed-service simplicity, schema registry, ksqlDB, control plane</td>
+                <td>Customers willing to consume Kafka as a managed service</td>
+              </tr>
+              <tr>
+                <td><strong>Red Hat AMQ Streams (Strimzi)</strong></td>
+                <td>Operator-driven Kafka on OpenShift, fully GitOps-managed, vendor-supported</td>
+                <td>OpenShift-anchored environments wanting self-hosted Kafka</td>
+              </tr>
+              <tr>
+                <td><strong>Apache Pulsar</strong></td>
+                <td>Multi-tenant, geo-replication-native, BookKeeper-backed storage</td>
+                <td>Multi-tenant SaaS-style platforms, geo-replication-heavy workloads</td>
+              </tr>
+              <tr>
+                <td><strong>NATS / JetStream</strong></td>
+                <td>Lightweight, low-latency, good for service-to-service messaging</td>
+                <td>Internal microservice messaging, edge and IoT scenarios</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Stream processing</h3>
+          <ul class="tab-list">
+            <li><strong>Apache Flink.</strong> Stateful stream processing with strong exactly-once guarantees, event-time windowing, large-state support. Default for stateful streaming jobs.</li>
+            <li><strong>Spark Structured Streaming.</strong> Where the team already operates Spark and the streaming workload fits the micro-batch model.</li>
+            <li><strong>Kafka Streams &amp; ksqlDB.</strong> For Kafka-native, simpler stream transformations.</li>
+            <li><strong>Debezium for CDC.</strong> Change-data-capture from operational databases into the streaming spine, with snapshot and incremental modes.</li>
+          </ul>
+
+          <h3 class="tab-h3">Schema, contracts, and evolution</h3>
+          <p>
+            A streaming platform without schema discipline becomes a swamp very quickly. We
+            design schema management into the platform from day one:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Schema registry.</strong> Confluent Schema Registry, Apicurio, or equivalent &mdash; with required schemas per topic and a compatibility policy.</li>
+            <li><strong>Schema formats.</strong> Avro for compact wire format with backward-compatible evolution; Protobuf where ecosystem fit demands it; JSON Schema for human-readable contracts.</li>
+            <li><strong>Compatibility policy.</strong> Explicit backward / forward / full compatibility per topic, with breaking-change deprecation paths.</li>
+            <li><strong>Topic contracts.</strong> Owner, semantics, retention, partitioning, expected throughput, allowed consumers &mdash; documented in the catalog.</li>
+          </ul>
+
+          <h3 class="tab-h3">Operational discipline</h3>
+          <ul class="tab-list">
+            <li><strong>Dead-letter handling.</strong> Every consumer has a DLQ pattern with documented retry, alerting, and reprocessing path. Silent loss is treated as a defect.</li>
+            <li><strong>Delivery semantics.</strong> Each topic and consumer documents its at-most-once / at-least-once / exactly-once posture and the trade-offs that justify it.</li>
+            <li><strong>Observability.</strong> Lag per consumer group, throughput per topic, schema-violation rate, DLQ depth &mdash; all in the same dashboards as the rest of the platform.</li>
+            <li><strong>Disaster recovery.</strong> Multi-region replication topology (MirrorMaker 2, Confluent Replicator, or equivalent), documented RPO/RTO, regularly drilled.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a streaming engagement</h4>
+            <ul>
+              <li>A production-shaped Kafka (or equivalent) cluster on OpenShift or your chosen cloud</li>
+              <li>Schema registry, schema patterns, and per-topic contracts</li>
+              <li>Stream-processing jobs onboarded with documented delivery semantics</li>
+              <li>CDC integration from operational databases into the streaming spine</li>
+              <li>Observability and DLQ handling tied to your incident-response loop</li>
+              <li>DR drill evidence with documented RPO/RTO</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 05 Governance & Quality ===== -->
+        <div
+          class="tab-panel"
+          id="panel-governance"
+          role="tabpanel"
+          aria-labelledby="tab-governance"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">05 — Data Governance &amp; Quality</span>
+          </div>
+          <h2 class="tab-section-title">Governance as engineering &mdash; not as a committee.</h2>
+          <p class="tab-section-lede">
+            Data governance fails when it is run as a slide deck overseen by a steering
+            committee. We embed governance into the same engineering surface as the rest of
+            the platform &mdash; the catalog updates automatically, the lineage is captured
+            at the source, the data contracts run as CI checks, and the audit evidence is a
+            side effect of normal operation.
+          </p>
+
+          <h3 class="tab-h3">Catalog &amp; discoverability</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Strengths</th>
+                <th>When we choose it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Open-source: DataHub, OpenMetadata, Apache Atlas</strong></td>
+                <td>Self-hosted, customisable, integrates broadly across the data stack</td>
+                <td>On-prem and disconnected environments, organisations preferring an open-source-anchored stack</td>
+              </tr>
+              <tr>
+                <td><strong>Commercial: Atlan, Collibra, Alation</strong></td>
+                <td>Mature stewardship workflows, business-glossary tooling, vendor support</td>
+                <td>Large enterprises with mature governance functions and willingness to operate a SaaS catalog</td>
+              </tr>
+              <tr>
+                <td><strong>Native: Unity Catalog, Snowflake Horizon</strong></td>
+                <td>Tightly integrated with the host platform's auth, lineage, and access controls</td>
+                <td>When the data estate is anchored on a single managed platform</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Lineage</h3>
+          <ul class="tab-list">
+            <li><strong>OpenLineage.</strong> Standard for emitting lineage events from Spark, Airflow, dbt, and other tools into the catalog.</li>
+            <li><strong>Column-level lineage</strong> via dbt and supported catalogs &mdash; not just table-to-table arrows.</li>
+            <li><strong>Cross-system lineage</strong> from CDC source through streaming → lake → warehouse → BI tool &mdash; tracing a regulatory report all the way back to its operational origin.</li>
+            <li><strong>Lineage as audit evidence.</strong> A regulator question about "where did this number come from?" answerable in minutes, not weeks.</li>
+          </ul>
+
+          <h3 class="tab-h3">Data contracts &amp; quality</h3>
+          <ul class="tab-list">
+            <li><strong>Schema and semantics contracts</strong> defined per data product, versioned in Git, reviewed in PR.</li>
+            <li><strong>Quality tests.</strong> dbt tests, Great Expectations, Soda &mdash; running in the same pipeline as the transformation, failing the pipeline if the contract breaks.</li>
+            <li><strong>Freshness SLAs.</strong> Each data product has a freshness target; misses produce alerts and incident tickets.</li>
+            <li><strong>Anomaly detection.</strong> Monte Carlo, custom heuristics, or platform-native tooling to catch statistical regressions before downstream consumers do.</li>
+            <li><strong>Quality dashboards</strong> per data product, showing SLA compliance, top failure modes, and active incidents.</li>
+          </ul>
+
+          <h3 class="tab-h3">Master Data Management (MDM)</h3>
+          <ul class="tab-list">
+            <li><strong>Domain-by-domain scoping.</strong> Customer, product, account, counterparty &mdash; we MDM one domain at a time, not boil-the-ocean.</li>
+            <li><strong>Golden-record design.</strong> Match-merge logic, deterministic and probabilistic patterns, with the survivor rules documented and reviewed.</li>
+            <li><strong>Source-system reconciliation.</strong> Reconciliation reports per source, with mismatches routed to data stewards.</li>
+            <li><strong>Stewardship workflow.</strong> Web UI for stewards to review proposed matches, approve merges, and resolve conflicts.</li>
+            <li><strong>Operational MDM vs analytical MDM.</strong> We are explicit about whether the golden record drives operational systems (writes back) or is purely analytical.</li>
+          </ul>
+
+          <h3 class="tab-h3">Privacy &amp; access control</h3>
+          <ul class="tab-list">
+            <li><strong>PII detection and classification</strong> across the data estate, refreshed on schema changes.</li>
+            <li><strong>Row-level and column-level security</strong> tied to your identity provider, not bolted on per-tool.</li>
+            <li><strong>Masking and tokenisation</strong> for PII in non-production environments.</li>
+            <li><strong>Purpose-based access controls</strong> for regulatory regimes (GDPR purpose-limitation, sectoral consent regimes).</li>
+            <li><strong>Audit logging</strong> of every access event, retained per regulatory requirement.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a governance engagement</h4>
+            <ul>
+              <li>A working catalog with the first cohort of data products onboarded</li>
+              <li>End-to-end lineage from source systems through transformations to consumption</li>
+              <li>Data contracts running as CI checks, blocking breaking changes</li>
+              <li>Quality tests, freshness SLAs, and an incident-response workflow tied to your existing IR loop</li>
+              <li>Privacy classifications and access policies tied to your IdP</li>
+              <li>An audit-evidence capture path that survives the next regulator visit</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 06 Analytics & BI ===== -->
+        <div
+          class="tab-panel"
+          id="panel-analytics"
+          role="tabpanel"
+          aria-labelledby="tab-analytics"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">06 — Analytics &amp; BI</span>
+          </div>
+          <h2 class="tab-section-title">A semantic layer your reports can trust.</h2>
+          <p class="tab-section-lede">
+            Most BI estates accumulate hundreds of reports that agree on the headlines and
+            disagree on the numbers. The fix is rarely "buy a new BI tool" &mdash; it is
+            putting a <strong>semantic layer</strong> between the warehouse and the BI tool so
+            that "revenue", "active customer", and "delinquency" mean one thing.
+          </p>
+
+          <h3 class="tab-h3">Semantic layer</h3>
+          <ul class="tab-list">
+            <li><strong>dbt</strong> as the transformation and semantic backbone for analytical models &mdash; tests, documentation, lineage, version control, all in one engineering practice.</li>
+            <li><strong>Cube, MetricFlow, or LookML</strong> as the consumer-facing semantic layer, depending on the BI tool and the contracting model.</li>
+            <li><strong>SQLMesh</strong> for organisations needing first-class virtual environments and time-travel-friendly modelling.</li>
+            <li><strong>Metrics-as-code.</strong> Every metric defined once, versioned in Git, peer-reviewed, with explicit ownership.</li>
+          </ul>
+
+          <h3 class="tab-h3">BI tooling</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Strengths</th>
+                <th>Typical fit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Looker</strong></td>
+                <td>Strong semantic layer (LookML), governance-friendly, embedded analytics</td>
+                <td>Mid-to-large enterprises wanting governed self-service</td>
+              </tr>
+              <tr>
+                <td><strong>Microsoft Power BI</strong></td>
+                <td>Ubiquitous in Microsoft-anchored estates, strong report-authoring</td>
+                <td>Microsoft-first enterprises, large business-user populations</td>
+              </tr>
+              <tr>
+                <td><strong>Tableau</strong></td>
+                <td>Strong visual-exploration, mature dashboarding</td>
+                <td>Analyst-heavy organisations, exploratory work</td>
+              </tr>
+              <tr>
+                <td><strong>Apache Superset</strong></td>
+                <td>Open-source, self-hosted, container-native</td>
+                <td>Disconnected environments, organisations preferring an open-source BI tier</td>
+              </tr>
+              <tr>
+                <td><strong>Metabase / Lightdash / Evidence</strong></td>
+                <td>Lighter-weight, modern-data-stack-native</td>
+                <td>Smaller estates, teams already on dbt</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Self-service governance</h3>
+          <p>
+            Self-service analytics fails when the boundary between governed and ungoverned
+            queries is unclear. We design that boundary explicitly:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Certified marts.</strong> Datasets that have passed quality, lineage, and ownership checks. Tagged in the catalog and the BI tool.</li>
+            <li><strong>Sandbox tier.</strong> Where analysts can explore, model, and prototype &mdash; without their work appearing in board-level dashboards by accident.</li>
+            <li><strong>Promotion path.</strong> Documented route for moving a sandbox dataset into the certified tier &mdash; review, tests, ownership, SLA.</li>
+            <li><strong>Deprecation path.</strong> Reports nobody reads get archived; orphaned datasets get deleted.</li>
+          </ul>
+
+          <h3 class="tab-h3">Reporting that matters</h3>
+          <ul class="tab-list">
+            <li>Operational reporting tied to the source-of-record system.</li>
+            <li>Regulatory reporting with end-to-end lineage from the report back to operational data.</li>
+            <li>Embedded analytics in customer-facing applications.</li>
+            <li>Executive scorecards that the board actually uses &mdash; with explicit definitions and a single source of truth.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an analytics &amp; BI engagement</h4>
+            <ul>
+              <li>A working semantic layer with metrics defined once and reusable</li>
+              <li>A primary BI tool rolled out with governed self-service patterns</li>
+              <li>Certified marts onboarded for the first cohort of business areas</li>
+              <li>A deprecation backlog of legacy reports replaced by certified equivalents</li>
+              <li>An analytics governance model your data and business stakeholders both signed</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 07 Data for AI ===== -->
+        <div
+          class="tab-panel"
+          id="panel-aidata"
+          role="tabpanel"
+          aria-labelledby="tab-aidata"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">07 — Data for AI</span>
+          </div>
+          <h2 class="tab-section-title">AI rides on the governed data layer &mdash; or it doesn't ride at all.</h2>
+          <p class="tab-section-lede">
+            Most enterprise AI programmes stall at the data layer. The lesson is consistent
+            across customers: AI workloads built on shadow pipelines fail internal audit;
+            AI workloads built on the governed analytical surface ship. We build the data
+            layer so AI is a first-class consumer.
+          </p>
+
+          <h3 class="tab-h3">Feature stores</h3>
+          <ul class="tab-list">
+            <li><strong>Feast</strong> as the default open-source feature store on top of the lakehouse &mdash; offline store on Iceberg/Delta, online store on Redis or low-latency KV, registry in Git.</li>
+            <li><strong>Platform-native stores</strong> &mdash; Databricks Feature Store, Vertex AI Feature Store, SageMaker Feature Store &mdash; where the data estate is anchored on a single platform.</li>
+            <li><strong>Feature lineage.</strong> Every feature traceable back to its source data, with version history.</li>
+            <li><strong>Online/offline consistency.</strong> Documented guarantees on the relationship between training-time and serving-time feature values.</li>
+            <li><strong>Feature SLAs.</strong> Freshness and availability targets per feature, monitored in production.</li>
+          </ul>
+
+          <h3 class="tab-h3">Training-data pipelines</h3>
+          <ul class="tab-list">
+            <li><strong>Reproducible dataset versions.</strong> Every training run pinned to a specific dataset version, with signed manifests.</li>
+            <li><strong>PII handling.</strong> Tokenisation, masking, or full removal at ingestion. Differential privacy where the use case allows.</li>
+            <li><strong>Consent and purpose.</strong> Training-data inclusion tied to documented consent and purpose-limitation policies.</li>
+            <li><strong>Labelled-data pipelines</strong> with human-in-the-loop tooling (Label Studio, Argilla, vendor platforms), version control, inter-annotator agreement.</li>
+            <li><strong>Synthetic data</strong> for cases where real data is scarce, sensitive, or restricted &mdash; with documented validation against real-data behaviour.</li>
+          </ul>
+
+          <h3 class="tab-h3">Retrieval grounding for LLMs</h3>
+          <p>
+            RAG is, fundamentally, a data problem. The model is interchangeable; the retrieval
+            is what makes the answer right. We build the retrieval surface as a data product:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Source-document pipelines.</strong> Ingestion from authoritative sources with provenance, version, and last-modified tracking.</li>
+            <li><strong>Chunking strategies</strong> calibrated to your content: section-based for legal/policy documents, sentence-based for support content, hybrid for mixed corpora.</li>
+            <li><strong>Embedding pipelines</strong> with embedding-model version, batch vs streaming refresh, re-embedding triggers on document update.</li>
+            <li><strong>Vector store choice</strong> driven by latency, scale, sovereignty &mdash; not by ecosystem hype.</li>
+            <li><strong>Retrieval evaluation</strong> with a labelled eval set, recall@k metrics, blocking regressions on retrieval changes.</li>
+            <li><strong>Audit trail.</strong> Every retrieved chunk surfaced to the user with citation, retained for audit.</li>
+          </ul>
+
+          <h3 class="tab-h3">Cross-cutting</h3>
+          <p>
+            This tab overlaps with our <a href="/ai/" style="color: var(--color-accent);">AI practice</a>
+            on inference, agentic patterns, MLOps, and AI governance. The data work is the
+            substrate; the AI work is what runs on top.
+          </p>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a data-for-AI engagement</h4>
+            <ul>
+              <li>A feature store deployed and integrated with your lakehouse</li>
+              <li>Reproducible training-data pipelines with signed dataset versions</li>
+              <li>Labelled-data tooling for the use cases that need it</li>
+              <li>RAG retrieval surface treated as a versioned data product</li>
+              <li>Lineage from operational data → features → model → output, surfaced to audit</li>
+              <li>Documented consent, purpose, and PII handling for AI use cases</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
+    <div class="container" style="text-align: center;">
+      <span class="section-eyebrow" style="color: var(--color-accent);">Start a data engagement</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have a data programme that needs engineering depth?</h2>
+      <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
+        Send us a short note describing the problem. We&rsquo;ll come back with a concrete
+        first-two-weeks scope and a definition of done for the engagement.
+      </p>
+      <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+        <a href="/contact/" class="btn btn-primary">Contact us</a>
+        <a href="/ai/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">AI practice</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector("[data-tabs]");
+    if (!root) return;
+    const buttons = Array.from(root.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(root.querySelectorAll(".tab-panel"));
+
+    function activate(id, opts = {}) {
+      buttons.forEach((b) => {
+        const active = b.dataset.tabTarget === id;
+        b.setAttribute("aria-selected", active ? "true" : "false");
+        b.setAttribute("tabindex", active ? "0" : "-1");
+      });
+      panels.forEach((p) => {
+        const active = p.id === `panel-${id}`;
+        p.classList.toggle("is-active", active);
+        if (active) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
+      });
+      if (opts.updateHash) {
+        history.replaceState(null, "", `#${id}`);
+      }
+      if (opts.focus) {
+        const btn = buttons.find((b) => b.dataset.tabTarget === id);
+        btn && btn.focus();
+      }
+    }
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => activate(btn.dataset.tabTarget, { updateHash: true }));
+    });
+
+    root.addEventListener("keydown", (e) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      const current = document.activeElement;
+      const idx = buttons.indexOf(current);
+      if (idx === -1) return;
+      e.preventDefault();
+      let nextIdx = idx;
+      if (e.key === "ArrowLeft")  nextIdx = (idx - 1 + buttons.length) % buttons.length;
+      if (e.key === "ArrowRight") nextIdx = (idx + 1) % buttons.length;
+      if (e.key === "Home")       nextIdx = 0;
+      if (e.key === "End")        nextIdx = buttons.length - 1;
+      activate(buttons[nextIdx].dataset.tabTarget, { updateHash: true, focus: true });
+    });
+
+    const initial = (location.hash || "").replace(/^#/, "");
+    if (initial && buttons.some((b) => b.dataset.tabTarget === initial)) {
+      activate(initial);
+    }
+  })();
+</script>

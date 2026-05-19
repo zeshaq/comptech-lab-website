@@ -1,0 +1,129 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const certifications = [
+  { name: "ISO/IEC 27001", scope: "Information security management", status: "In progress", note: "Targeted certification for the firm's own information-security posture." },
+  { name: "ISO/IEC 27701", scope: "Privacy information management", status: "Planned", note: "Privacy-management extension of ISO 27001." },
+  { name: "SOC 2 Type I", scope: "Trust services criteria — readiness", status: "Planned", note: "Initial point-in-time attestation." },
+  { name: "SOC 2 Type II", scope: "Trust services criteria — operational", status: "Planned", note: "Operating-effectiveness attestation over a defined period." },
+  { name: "ISO/IEC 42001", scope: "AI management system", status: "Planned", note: "AI management certification for our AI-practice operating model." },
+];
+---
+
+<Layout
+  title="Trust &amp; compliance — CompTech Lab"
+  description="The firm's own information-security posture, compliance certifications, data handling, sub-processors, and security contact."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Trust &amp; compliance</span>
+      <h1 class="hero-title">Our own security posture.</h1>
+      <p class="hero-lede">
+        We help our customers operate audit-grade platforms. The same discipline applies to
+        the firm. This page is the public-facing summary of how CompTech Lab itself handles
+        information security, customer data, and compliance &mdash; the source of truth your
+        procurement and security functions will reference.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width: 880px;">
+      <article class="prose">
+        <h2>Certifications &amp; attestations</h2>
+        <p>
+          Formal attestations the firm holds or is pursuing. Letters of certification, audit
+          reports, and gap-assessment summaries are available under NDA on request.
+        </p>
+      </article>
+
+      <table class="tab-table" style="margin-top: 1.5rem;">
+        <thead>
+          <tr>
+            <th>Standard</th>
+            <th>Scope</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {certifications.map((c) => (
+            <tr>
+              <td><strong>{c.name}</strong></td>
+              <td>{c.scope}</td>
+              <td><span class="pill pill-accent">{c.status}</span></td>
+              <td>{c.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <article class="prose">
+        <h2>Information-security posture</h2>
+        <p>
+          The firm operates an internal information-security management programme aligned to
+          ISO 27001 controls. Key elements:
+        </p>
+        <ul>
+          <li><strong>Identity.</strong> All personnel access flows through a federated identity provider with MFA enforced. SCIM lifecycle from the directory of record.</li>
+          <li><strong>Endpoints.</strong> Managed laptops with full-disk encryption, EDR, automatic OS patching, and conditional-access policies.</li>
+          <li><strong>Credentials.</strong> No customer credentials stored outside HashiCorp Vault or the customer's own credential-custody platform. Personnel access via short-lived dynamic credentials.</li>
+          <li><strong>Code &amp; artefacts.</strong> Source control on managed Git platforms with branch protection, mandatory review, signed commits, and SBOM generation in CI.</li>
+          <li><strong>Logging &amp; audit.</strong> Centralised logs from endpoints, IdP, code platform, and engineering tooling, with retention aligned to control frameworks.</li>
+          <li><strong>Vulnerability management.</strong> Continuous scanning of firm assets with documented SLAs and risk-acceptance discipline.</li>
+          <li><strong>Incident response.</strong> Documented IR plan, escalation paths, customer-notification thresholds, and breach-reporting timelines aligned to regulatory regimes.</li>
+        </ul>
+
+        <h2>Customer data handling</h2>
+        <p>
+          We process customer data under three explicit principles:
+        </p>
+        <ul>
+          <li><strong>Minimisation.</strong> We collect and retain only what is necessary for the engagement, and we prefer access to your systems over copies of your data.</li>
+          <li><strong>In-place by default.</strong> Where possible, customer data stays in the customer's environment and our engineers access it via federated identity, not by extraction.</li>
+          <li><strong>Documented retention.</strong> Where data is held by us during an engagement, retention is documented in the engagement contract with deletion verified at engagement close.</li>
+        </ul>
+
+        <h2>Sub-processors</h2>
+        <p>
+          A current list of sub-processors that may process customer data during engagements
+          is available under NDA. The list includes the cloud, identity, and engineering-tool
+          platforms we operate the practice on. We notify customers in advance of material
+          additions.
+        </p>
+
+        <h2>Data residency</h2>
+        <p>
+          We accommodate customer data-residency requirements (regional, national, or
+          air-gapped) as part of engagement scoping. For regulated customers with strict
+          sovereignty requirements, we operate inside the customer's environment with no
+          customer data leaving the boundary.
+        </p>
+
+        <h2>Vulnerability disclosure</h2>
+        <p>
+          If you believe you have found a vulnerability in our website or in any service
+          operated under our control, please contact <a href="mailto:security@comptech-lab.com">security@comptech-lab.com</a>.
+          We will acknowledge receipt within two business days, share remediation timelines,
+          and credit reporters with their consent.
+        </p>
+
+        <h2>Procurement &amp; security review</h2>
+        <p>
+          For enterprise procurement and vendor-security reviews, we maintain a standard
+          response pack covering controls, sub-processors, business-continuity, insurance,
+          and contractual terms. To request access, contact
+          <a href="mailto:trust@comptech-lab.com">trust@comptech-lab.com</a>.
+        </p>
+
+        <h2>Contact</h2>
+        <ul>
+          <li>Security and vulnerability disclosure: <a href="mailto:security@comptech-lab.com">security@comptech-lab.com</a></li>
+          <li>Trust and procurement: <a href="mailto:trust@comptech-lab.com">trust@comptech-lab.com</a></li>
+          <li>Privacy &amp; data protection: <a href="mailto:privacy@comptech-lab.com">privacy@comptech-lab.com</a></li>
+          <li>General enquiries: <a href="/contact/">contact form</a></li>
+        </ul>
+      </article>
+    </div>
+  </section>
+</Layout>

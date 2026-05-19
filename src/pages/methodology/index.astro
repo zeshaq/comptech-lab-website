@@ -1,0 +1,259 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const phases = [
+  {
+    n: "01",
+    name: "Assess",
+    duration: "1–3 weeks",
+    goal: "Discover the current state and produce the case for the work.",
+    activities: [
+      "Stakeholder interviews and current-state walkthrough",
+      "Technical-debt and architectural-risk profile",
+      "Regulatory and compliance mapping to current platform",
+      "Use-case prioritisation (where AI is in scope)",
+      "Build-vs-buy and effort-vs-impact ranking",
+    ],
+    deliverables: [
+      "Current-state diagnostic with named gaps and concrete impact",
+      "Recommended engagement scope with ranked options",
+      "Indicative budget, timeline, and risk register",
+      "Go/no-go recommendation",
+    ],
+    who: "Lead engineer + practice lead from CompTech Lab; sponsor and 2–4 technical stakeholders from the customer side.",
+  },
+  {
+    n: "02",
+    name: "Design",
+    duration: "3–6 weeks",
+    goal: "Produce a reference architecture and operating model that engineering can build against.",
+    activities: [
+      "Reference architecture across platform, identity, security, and integration boundaries",
+      "Operating model: GitOps shape, on-call structure, change management",
+      "Architecture decisions (ADRs) for every non-obvious choice",
+      "Risk register with mitigation strategies",
+      "Detailed implementation plan and acceptance criteria",
+    ],
+    deliverables: [
+      "Reference architecture document (diagrams + narrative)",
+      "ADR set for non-obvious decisions",
+      "Operating model definition (responsibility matrix, on-call, change paths)",
+      "Implementation plan with sequenced workstreams",
+      "Acceptance criteria for each major milestone",
+    ],
+    who: "Lead engineer + 1–2 senior engineers from CompTech Lab; platform-lead and security-lead from the customer side; architecture-review board if one exists.",
+  },
+  {
+    n: "03",
+    name: "Deploy",
+    duration: "8–20 weeks",
+    goal: "Build the platform and onboard the first workloads, sequenced so each layer is fully ready before the next depends on it.",
+    activities: [
+      "Foundation: networking, DNS, identity, credential custody, image supply, source control",
+      "Platform: cluster install (connected, disconnected, or hybrid), GitOps bootstrap, multi-cluster management",
+      "Security posture: runtime security, supply chain, secret custody, audit logging",
+      "Application delivery path: build, scan, sign, deploy",
+      "First workload onboarding with the customer's application team",
+    ],
+    deliverables: [
+      "Running platform matching the reference architecture",
+      "Install manual reproducible against a fresh environment",
+      "Application delivery path tested end-to-end",
+      "Runbooks for installed components",
+      "First-workload-onboarded evidence",
+    ],
+    who: "Full CompTech Lab pod (3–6 engineers depending on scope); customer platform and application team in joint working sessions.",
+  },
+  {
+    n: "04",
+    name: "Operate",
+    duration: "4–8 weeks (overlapping with Deploy)",
+    goal: "Stand up the day-2 operations practice that survives staff turnover.",
+    activities: [
+      "SRE practice bring-up: SLOs, error budgets, alerting baselines",
+      "On-call structure, escalation paths, postmortem cadence",
+      "Incident response runbooks indexed by failure mode",
+      "Observability stack (metrics, logs, traces) wired through platform and applications",
+      "Cost and capacity baselines tied to FinOps reporting",
+      "Backup, DR, and restore drills",
+    ],
+    deliverables: [
+      "Operating model document with named responsibilities",
+      "Runbook library indexed by failure mode, verified against the live system",
+      "Observability dashboards tied to SLOs",
+      "Postmortem template and the first round of postmortems",
+      "DR drill evidence with documented RPO/RTO",
+    ],
+    who: "Operations lead from CompTech Lab + customer platform team operating as a single pod.",
+  },
+  {
+    n: "05",
+    name: "Hand over",
+    duration: "2–4 weeks",
+    goal: "Transfer ownership so the customer's team owns the platform with documentation deep enough to outlast staff turnover.",
+    activities: [
+      "Architecture decision walkthrough (ADR-by-ADR)",
+      "Runbook walkthrough and joint failure-injection drills",
+      "Residual-risk register review",
+      "Documentation gap-fill pass",
+      "Handover sign-off and knowledge-transfer attestations",
+    ],
+    deliverables: [
+      "Documented residual-risk register accepted by the customer's audit function",
+      "Knowledge-transfer attestations from named customer engineers",
+      "Final handover document linking every artefact",
+      "12-month outlook of recommended next investments",
+      "Optional: bridge managed-services scope for capability gaps",
+    ],
+    who: "Lead engineer + practice lead from CompTech Lab; customer platform team taking over operations.",
+  },
+];
+---
+
+<Layout
+  title="Methodology — CompTech Lab"
+  description="A five-phase delivery discipline: Assess, Design, Deploy, Operate, Hand over. The detailed view of how we run engagements."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Methodology</span>
+      <h1 class="hero-title">Five phases. One delivery discipline.</h1>
+      <p class="hero-lede">
+        Every engagement runs through the same five phases &mdash; sized to scope, but never
+        skipped. The endpoint is a platform your team owns, with documentation deep enough to
+        outlast staff turnover and a residual-risk register your audit function can sign for.
+      </p>
+      <div class="hero-actions">
+        <a href="/contact/" class="btn btn-primary">Discuss an engagement</a>
+        <a href="/services/" class="btn btn-secondary">All services</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width: 980px;">
+      <div class="section-header">
+        <span class="section-eyebrow">At a glance</span>
+        <h2 class="section-title">The five phases.</h2>
+        <p class="section-lede">
+          Sequenced so each phase produces the artefacts the next phase depends on.
+        </p>
+      </div>
+
+      <table class="tab-table">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Goal</th>
+            <th>Typical duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {phases.map((p) => (
+            <tr>
+              <td><strong>{p.n} &mdash; {p.name}</strong></td>
+              <td>{p.goal}</td>
+              <td>{p.duration}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {phases.map((p, i) => (
+    <section class="section" style={i % 2 === 0 ? "background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border);" : ""}>
+      <div class="container" style="max-width: 980px;">
+        <div style="display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+          <span style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 2.5rem; font-weight: 700; color: var(--color-accent); line-height: 1; letter-spacing: -0.03em;">{p.n}</span>
+          <div>
+            <span class="section-eyebrow">Phase {p.n}</span>
+            <h2 class="section-title" style="margin: 0;">{p.name}</h2>
+          </div>
+          <span class="pill pill-accent" style="margin-left: auto;">{p.duration}</span>
+        </div>
+
+        <p style="font-size: 1.1rem; line-height: 1.6; color: var(--color-ink); margin: 0 0 2rem; max-width: 60ch;">
+          {p.goal}
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <div class="card" style="cursor: default;">
+            <p class="card-eyebrow">Activities</p>
+            <ul class="tab-list" style="margin-top: 0.5rem; margin-bottom: 0;">
+              {p.activities.map((a) => <li>{a}</li>)}
+            </ul>
+          </div>
+          <div class="card" style="cursor: default;">
+            <p class="card-eyebrow">Deliverables</p>
+            <ul class="tab-list" style="margin-top: 0.5rem; margin-bottom: 0;">
+              {p.deliverables.map((d) => <li>{d}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        <p style="margin-top: 1.5rem; font-size: 0.92rem; color: var(--color-muted); line-height: 1.55;">
+          <strong style="color: var(--color-ink);">Team shape:</strong> {p.who}
+        </p>
+      </div>
+    </section>
+  ))}
+
+  <section class="section">
+    <div class="container" style="max-width: 980px;">
+      <div class="section-header">
+        <span class="section-eyebrow">Engagement contracting</span>
+        <h2 class="section-title">How we contract and bill.</h2>
+      </div>
+
+      <article class="prose">
+        <p>
+          The five-phase methodology maps to a small set of contracting models. We do not
+          run open-ended retainers; every engagement is bounded by either a scope or a clock.
+        </p>
+
+        <h3>Time-boxed engagement (default)</h3>
+        <p>
+          A fixed duration with defined scope and deliverables. Most platform, security, AI,
+          and data engagements run on this model. Phase boundaries are checkpoints; scope
+          changes are agreed in writing before they affect the budget.
+        </p>
+
+        <h3>Phase-by-phase</h3>
+        <p>
+          For larger or higher-risk programmes, we contract Phase 01 (Assess) separately so
+          the case for the engagement is jointly built before the larger commitment. Common
+          where the customer needs internal approval based on the Phase 01 output.
+        </p>
+
+        <h3>Bridge managed services</h3>
+        <p>
+          A time-boxed operations engagement during the period when the customer's team is
+          building capability to take ownership. Always bounded by a calendar end-date or
+          a capability-handover trigger. Not a permanent retainer.
+        </p>
+
+        <h3>Sub-contracting</h3>
+        <p>
+          We engage as a sub-contractor under partner master agreements (Red Hat consulting,
+          Cisco SI engagements, customer-preferred SI primes) where that is the contractually
+          simpler route for the customer.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
+    <div class="container" style="text-align: center;">
+      <span class="section-eyebrow" style="color: var(--color-accent);">Start an engagement</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have a programme that needs this discipline?</h2>
+      <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
+        Send us a short note describing the problem. We&rsquo;ll come back with a Phase 01
+        scope, a definition of done, and what we&rsquo;d need from your team.
+      </p>
+      <div style="margin-top: 1.75rem;">
+        <a href="/contact/" class="btn btn-primary">Contact us</a>
+      </div>
+    </div>
+  </section>
+</Layout>
