@@ -8,7 +8,7 @@ Personal blog at `/Users/ze/Documents/zeshaq-pages-dev/`.
 
 - GitHub repo: `zeshaq/zahid` (public) — kept as `zahid` per user preference
 - Cloudflare Pages project: `zeshaq` (renamed 2026-05-10 from `zahid`)
-- **Live URL: `https://zeshaq.pages.dev`** (clean subdomain)
+- **Live URL: `https://blog.comptech-lab.com`** (clean subdomain)
 - Auto-deploy: `.github/workflows/deploy.yml` runs on push to `main` using `cloudflare/wrangler-action@v3`
 - GH repo secrets set: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 

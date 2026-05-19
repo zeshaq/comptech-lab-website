@@ -25,7 +25,7 @@ const related = (await getCollection("case-studies", ({ data }) => !data.draft))
 const otherServices = allServices.filter((s) => s.id !== entry.id);
 ---
 
-<Layout title={`${entry.data.title} — CompTech Lab`} description={entry.data.description}>
+<Layout title={`${entry.data.title} — CompTech`} description={entry.data.description}>
   <section class="hero">
     <HeroBackground variant="cubes" />
     <div class="container">

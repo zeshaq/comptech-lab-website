@@ -4,7 +4,7 @@ description: Layout, theme colors, and typography preferences for the zahid blog
 type: feedback
 originSessionId: 9009fcee-2cb8-47a7-8eec-b01b91ac79c5
 ---
-Visual preferences for `zeshaq.pages.dev` (the zahid blog), refined across multiple iterations:
+Visual preferences for `blog.comptech-lab.com` (the zahid blog), refined across multiple iterations:
 
 **Width:** Full-width — no `max-w-*` caps on content, prose, or diagrams. Outer padding (e.g. `padding: 3rem 2.5rem`) for breathing room from screen edges is fine.
 

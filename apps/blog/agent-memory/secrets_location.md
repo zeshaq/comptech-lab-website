@@ -8,7 +8,7 @@ On the Linux lab host, tokens live in `/home/ze/secrets/` as plain text or JSON 
 
 - `/home/ze/secrets/cloudflare-token` — Cloudflare API token.
 - `/home/ze/secrets/github-token` — GitHub PAT.
-- `/home/ze/secrets/cloudflare-access-zeshaq-docs-service-token.json` — Cloudflare Access service token for `zeshaq.pages.dev/docs`; use `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers from this JSON for protected docs access.
+- `/home/ze/secrets/cloudflare-access-zeshaq-docs-service-token.json` — Cloudflare Access service token for `blog.comptech-lab.com/docs`; use `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers from this JSON for protected docs access.
 - `/home/ze/secrets/security-lab/credentials.md` — security lab credentials.
 - `/home/ze/secrets/security-lab/wazuh-passwords.txt` — generated Wazuh service passwords.
 

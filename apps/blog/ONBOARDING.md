@@ -31,7 +31,7 @@ Read this once end-to-end, then keep it open as a reference. When you finish a c
 
 ## 1. What this site is
 
-- **Live URL:** https://blog.comptech-lab.com (the legacy URL `zeshaq.pages.dev` still serves while the old deployment remains live)
+- **Live URL:** https://blog.comptech-lab.com (the legacy URL `blog.comptech-lab.com` still serves while the old deployment remains live)
 - **GitHub repo:** https://github.com/zeshaq/comptech-lab (the monorepo) — blog source under `apps/blog/`
 - **Hosting:** Cloudflare Pages, project name **`comptech-lab-blog`**
 - **Stack:** Astro 5 + MDX, React islands (`@xyflow/react` for diagrams), Tailwind v4

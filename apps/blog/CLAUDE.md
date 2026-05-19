@@ -14,7 +14,7 @@ This file is for the **next AI agent** working on the blog. It captures the conv
 
 ## 1. What this app is
 
-- **Public blog + docs + learning tracks** at `https://blog.comptech-lab.com`. (Previously hosted at `zeshaq.pages.dev` — the old URL still works while the old Cloudflare Pages project remains live.)
+- **Public blog + docs + learning tracks** at `https://blog.comptech-lab.com`. (Previously hosted at `blog.comptech-lab.com` — the old URL still works while the old Cloudflare Pages project remains live.)
 - Built with **Astro 5**, **MDX**, **React islands** (`@xyflow/react` for diagrams), **Tailwind v4**, hosted on **Cloudflare Pages** via a GitHub Actions workflow at the monorepo root.
 - The author is **Zahid** (`zeshaq@gmail.com`, GH handle `zeshaq`). The Cloudflare Pages project is named `comptech-lab-blog`. The historical project name was `zeshaq` because `zahid.pages.dev` was globally taken at the time of creation — see [Blog ADR 0001](src/content/docs/openshift-platform/06-architecture-decisions/12-blog/01-adr-0001-multi-collection-content-model.mdx) and the `project_zahid_blog.md` memory.
 - The site has three audiences, served by three content collections:

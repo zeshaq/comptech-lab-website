@@ -90,7 +90,7 @@ This site is written for four overlapping audiences:
 | **Platform admins** new to the rebuild | The reading order in the next section, plus the operator handoff (§5) and the architecture decisions (§6). |
 | **Application developers** onboarding to the golden path | The [Application Delivery](/docs/04-application-delivery) section: how to build, scan, push, deploy. Foundations (§1) for the shared vocabulary, [Lab Infrastructure](/docs/02-lab-infrastructure) for the registry endpoints. |
 | **Security and audit reviewers** | The compliance and PCI-DSS material in [Operations](/docs/05-operations), the credential custody rules on the [Credential Custody Rules](/docs/01-foundations/04-credential-custody-rules) page, and the [ADR](/docs/06-architecture-decisions) record. |
-| **Curious external readers** | The blog posts on [zeshaq.pages.dev](https://zeshaq.pages.dev/blog/) cover individual subsystems in narrative form. This docs site is the structured reference. |
+| **Curious external readers** | The blog posts on [blog.comptech-lab.com](https://blog.comptech-lab.com/blog/) cover individual subsystems in narrative form. This docs site is the structured reference. |
 
 If you are operating the platform — making changes, troubleshooting, onboarding a new tenant — the source-of-truth runbooks live in the private `opp-full-plat` workspace, not here. This site is published with sanitized prose; internal IP addresses, credentials, and secret values are redacted. Treat this site as the orientation layer.
 
@@ -147,7 +147,7 @@ When this site says "see the operator handoff" or "see `connection-details/...`,
 
 ## How this site is published
 
-This site is built with [Astro](https://astro.build/) using MDX and React Flow (for the Whiteboard component) and Mermaid (for sequence and state diagrams). Source lives at `github.com/zeshaq/zahid`. A GitHub Actions workflow builds the site on every push to `main` and deploys to [Cloudflare Pages](https://pages.cloudflare.com/) at `zeshaq.pages.dev`.
+This site is built with [Astro](https://astro.build/) using MDX and React Flow (for the Whiteboard component) and Mermaid (for sequence and state diagrams). Source lives at `github.com/zeshaq/zahid`. A GitHub Actions workflow builds the site on every push to `main` and deploys to [Cloudflare Pages](https://pages.cloudflare.com/) at `blog.comptech-lab.com`.
 
 There is **no live read of cluster state into this site**; everything on these pages is hand-authored prose with `last_reviewed: <date>` frontmatter. If a `last_reviewed` date is more than a few months old, treat the page as historical until a session re-validates it against the source-of-truth.
 

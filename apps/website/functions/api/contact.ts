@@ -4,7 +4,7 @@
  * Env vars (set in Cloudflare Pages → Settings → Environment variables):
  *   RESEND_API_KEY  — Resend API key (https://resend.com)
  *   CONTACT_TO      — destination email (e.g. zeshaq@gmail.com)
- *   CONTACT_FROM    — verified sender (e.g. "CompTech Lab <hello@comptech-lab.com>")
+ *   CONTACT_FROM    — verified sender (e.g. "CompTech <hello@comptech-lab.com>")
  *
  * If RESEND_API_KEY is unset, the function returns 200 and logs the submission
  * so the form is usable in preview environments without leaking secrets.

@@ -1,6 +1,6 @@
 # comptech-lab-website
 
-Source of **https://www.comptech-lab.com** — the CompTech Lab consulting site. Astro 5 + MDX + React islands, deployed to Cloudflare Pages on every push to `main`.
+Source of **https://www.comptech-lab.com** — the CompTech consulting site. Astro 5 + MDX + React islands, deployed to Cloudflare Pages on every push to `main`.
 
 ## Quick start
 

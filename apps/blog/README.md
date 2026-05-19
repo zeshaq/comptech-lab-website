@@ -1,6 +1,6 @@
 # zeshaq-pages-dev
 
-Source of **https://zeshaq.pages.dev** — blog, platform docs, learning tracks, and a whiteboard tool. Astro 5 + MDX + React islands, deployed to Cloudflare Pages on every push to `main`.
+Source of **https://blog.comptech-lab.com** — blog, platform docs, learning tracks, and a whiteboard tool. Astro 5 + MDX + React islands, deployed to Cloudflare Pages on every push to `main`.
 
 ## Contributors: start here
 

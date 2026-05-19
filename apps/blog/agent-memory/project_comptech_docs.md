@@ -6,7 +6,7 @@ originSessionId: 9009fcee-2cb8-47a7-8eec-b01b91ac79c5
 ---
 The blog now has a second content collection beyond the `blog` posts: a **docs** collection mounted at `/docs/`.
 
-- **URL:** https://zeshaq.pages.dev/docs/
+- **URL:** https://blog.comptech-lab.com/docs/
 - **Source folder:** `src/content/docs/`
 - **Schema fields (per `src/content.config.ts`):** `title`, `description?`, `sidebar_label?`, `last_reviewed?`, `draft?` (no `category` — different from blog posts)
 - **Size:** ~216 mdx files at last check (2026-05-10), organized into 9 top-level numbered sections

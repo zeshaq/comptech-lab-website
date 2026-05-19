@@ -13,8 +13,8 @@ interface Props {
 }
 
 const {
-  title = "CompTech Lab — systems integration for regulated industries",
-  description = "CompTech Lab is a specialist systems integrator for regulated industries — cloud platforms, application modernization, end-to-end security, and operations across banking, insurance, telecom, and public sector.",
+  title = "CompTech — systems integration for regulated industries",
+  description = "CompTech is a specialist systems integrator for regulated industries — cloud platforms, application modernization, end-to-end security, and operations across banking, insurance, telecom, and public sector.",
   image = "/og-default.svg",
   type = "website",
   published,
@@ -45,7 +45,7 @@ const ogImage = new URL(image, Astro.site).toString();
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="CompTech Lab" />
+    <meta property="og:site_name" content="CompTech" />
     {published && <meta property="article:published_time" content={published.toISOString()} />}
     {category && <meta property="article:section" content={category} />}
 
