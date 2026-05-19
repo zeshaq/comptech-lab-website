@@ -1,0 +1,95 @@
+---
+title: "Installation Manual - 89 Hub system:deployers cleanup preflight"
+sidebar_label: "89 Hub system:deployers cleanup preflight"
+description: "Read-only preflight for hub-dc-v7 namespace system:deployers RBAC cleanup."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` read-only preflight for the namespace
+`system:deployers` cleanup candidate.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-18` / `#410` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-17` / `#409` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Current Compliance State
+
+Read-only validation before and after evidence collection confirmed:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `ComplianceScan/ocp4-cis` | `DONE / COMPLIANT` |
+| `ComplianceScan/ocp4-cis-node-master` | `DONE / COMPLIANT` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Target Evidence
+
+| Check | Result |
+| --- | --- |
+| Target `system:deployers` RoleBindings | `19/19` present |
+| Target `deployer` ServiceAccounts | `19/19` present |
+| Target ownerReferences | none reported |
+| Target ServiceAccount referenced Secrets | `0` for every target |
+| Target ServiceAccount imagePullSecrets | `0` for every target |
+| Pods using ServiceAccount `deployer` | `0` |
+| Workload controllers using ServiceAccount `deployer` | `0` |
+| DeploymentConfigs | `0` |
+| BuildConfigs | `0` |
+
+The target RoleBindings carry `openshift.io/description`, and companion
+default namespace RBAC such as `system:image-builders` exists. This means
+runtime usage appears safe, but default-project-RBAC recreation or churn is
+still possible.
+
+## Decision
+
+Do not run a 19-namespace cleanup as the next live change.
+
+Use a single-namespace canary first. The preferred first target is:
+
+```text
+platform-bootstrap
+```
+
+That namespace currently has no pods or workload controllers.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-19: hub platform-bootstrap system:deployers cleanup canary
+```
+
+That gate should remove only:
+
+- `RoleBinding/platform-bootstrap/system:deployers`;
+- `ServiceAccount/platform-bootstrap/deployer`.
+
+Then it should wait and confirm whether OpenShift recreates either object
+before considering any batch cleanup.

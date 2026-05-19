@@ -1,0 +1,149 @@
+---
+title: "Installation Manual - 53 Vault R1 build custody and auth"
+sidebar_label: "53 Vault R1 build"
+description: "Replacement Vault R1 build, custody proof, Kubernetes auth, and MinIO admin blocker."
+---
+
+This chapter records the automated continuation of the single-phase v7 Vault
+replacement.
+
+The work built and validated the replacement Vault, then stopped before MinIO
+credential rotation because MinIO admin custody was not available from the
+current access path.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Replacement VMs
+
+| VM | IP | MAC | Role |
+| --- | --- | --- | --- |
+| `gf-ocp-vault-r1-seed-01` | `30.30.200.34` | `52:54:00:70:08:34` | Seed/transit Vault |
+| `gf-ocp-vault-r1-01` | `30.30.200.35` | `52:54:00:70:08:35` | Main Vault Raft voter |
+| `gf-ocp-vault-r1-02` | `30.30.200.36` | `52:54:00:70:08:36` | Main Vault Raft voter |
+| `gf-ocp-vault-r1-03` | `30.30.200.37` | `52:54:00:70:08:37` | Main Vault Raft voter |
+
+`vault.v7.comptech-lab.com` was not changed.
+
+## Custody
+
+New local custody:
+
+```text
+secrets/greenfield-vault-r1/
+```
+
+Backup custody:
+
+```text
+dl385-2:/home/ze/greenfield-ocp-work-folder/secrets/greenfield-vault-r1/
+```
+
+The backup custody directory is mode `700`. Do not print token values,
+recovery shares, private keys, kubeconfigs, or MinIO credentials.
+
+## Vault Validation
+
+Seed Vault:
+
+- initialized;
+- unsealed;
+- storage type `raft`;
+- file audit enabled;
+- transit enabled.
+
+Main Vault:
+
+- initialized;
+- transit auto-unsealed;
+- storage type `raft`;
+- three voters;
+- Autopilot healthy;
+- failure tolerance `1`;
+- file audit enabled;
+- `secret/` KV v2 enabled.
+
+A restart of `gf-ocp-vault-r1-02` returned it to unsealed standby, proving
+transit auto-unseal for a main follower.
+
+## Kubernetes Auth
+
+The valid v7 kubeconfigs are on the bootstrap VM:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Replacement Vault auth was configured for hub and spoke ESO:
+
+| Cluster | Auth mount | Role | Policy |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `kubernetes-hub-dc-v7` | `eso-secrets` | `hub-dc-v7-eso-secrets` |
+| `spoke-dc-v7` | `kubernetes-spoke-dc-v7` | `eso-secrets` | `spoke-dc-v7-eso-secrets` |
+
+Smoke reads passed:
+
+```text
+hub-dc-v7 k8s-auth smoke-read ok
+spoke-dc-v7 k8s-auth smoke-read ok
+```
+
+## OADP Role Prepared
+
+The replacement Vault now has dedicated future OADP policies and roles:
+
+| Cluster | Role | Policy |
+| --- | --- | --- |
+| `hub-dc-v7` | `oadp-backup` | `hub-dc-v7-oadp-backup` |
+| `spoke-dc-v7` | `oadp-backup` | `spoke-dc-v7-oadp-backup` |
+
+The policies are scoped to:
+
+```text
+secret/greenfield/object-storage/minio/users/oadp-backup
+```
+
+The role expects the future service account:
+
+```text
+openshift-adp/oadp-vault-auth
+```
+
+## Hard Stop
+
+MinIO admin custody was not available.
+
+Findings:
+
+- MinIO health is OK.
+- `mc` exists on `dl385-2`.
+- The discovered `gf-local` credential is not admin-capable.
+- `mc admin info` returned `Access Denied`.
+- SSH to the physical MinIO host `30.30.200.1` as `ze` returned
+  `Permission denied`.
+
+No MinIO user, bucket, policy, access key, or secret key was changed.
+
+## Actions Not Taken
+
+- No stable DNS cutover.
+- No `vault-r1` DNS record creation.
+- No old Vault mutation.
+- No GitOps desired-state change.
+- No persistent OpenShift mutation.
+- No OADP reapply.
+- No MinIO mutation.
+- No secret values were printed.
+
+## Next Action
+
+Restore or provide a MinIO admin-capable path. Then rotate or recreate the
+`oadp-backup` credential, seed replacement Vault, add OADP GitOps store
+resources, and re-run the DPA gate.

@@ -1,0 +1,303 @@
+---
+title: "Installation Manual - 46 Spoke worker systemd-coredump service mask rollout"
+sidebar_label: "46 Spoke worker systemd-coredump service mask rollout"
+description: "How the spoke-dc-v7 worker systemd-coredump service mask MachineConfig was rolled out and validated."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the final coredump-family worker MachineConfig rollout on
+`spoke-dc-v7`: `rhcos4-high-worker-service-systemd-coredump-disabled`.
+
+The target control masks:
+
+```text
+systemd-coredump.socket
+systemd-coredump.service
+```
+
+After the rollout and a fresh Compliance Operator scan, the target rule
+reports `PASS`. The full tracked coredump-family worker set now reports
+`PASS`.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-33`, issue `#383` |
+| Cluster | `spoke-dc-v7` |
+| ComplianceScan | `rhcos4-high-worker` |
+| Target ComplianceCheckResult | `rhcos4-high-worker-service-systemd-coredump-disabled` |
+| MachineConfig | `75-worker-service-systemd-coredump-disabled` |
+| Worker render | `rendered-worker-f0e88bd1790c27d2d60ef88b60ba0e6f` |
+| GitOps commit | `cfe7d9109cb4d74306b233fa8e89c509b5ed0df2` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-service-systemd-coredump-disabled-rollout.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Guardrails
+
+This gate applied only `service-systemd-coredump-disabled`.
+
+It intentionally followed these already validated controls:
+
+```text
+rhcos4-high-worker-coredump-disable-storage
+rhcos4-high-worker-disable-users-coredumps
+rhcos4-high-worker-sysctl-kernel-core-pattern
+```
+
+This gate did not patch `PDB/noobaa-db-pg-cluster-primary` and did not run a
+live drain command.
+
+## Pre-Apply Validation
+
+Validate Argo, cluster health, MCPs, storage, current compliance state, and
+drainability before applying the MachineConfig.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+```
+
+Observed before apply:
+
+```text
+hub spoke-dc-v7-cluster-config Synced/Healthy at a9e32bb9df2d9404a77ddf701314f9db63ed12ce
+spoke spoke-dc-v7-cluster-config Synced/Healthy at a9e32bb9df2d9404a77ddf701314f9db63ed12ce
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-318451b7f36fb50c086630f75ba86cbf Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa Ready
+StorageCluster Ready
+CephCluster Ready HEALTH_OK
+CNPG=2/2
+```
+
+The prior coredump-family controls were already present:
+
+```text
+/etc/systemd/coredump.conf
+/etc/security/limits.d/75-disable_users_coredumps.conf
+/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf
+kernel.core_pattern=|/bin/false
+```
+
+The target systemd units were not masked before rollout:
+
+```text
+systemd-coredump.socket static active
+systemd-coredump.service inactive
+```
+
+Server-side dry-run apply of the full node-hardening kustomization succeeded:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-service-systemd-coredump-disabled created (server dry run)
+```
+
+Pre-apply server-side dry-run drain posture:
+
+| Worker | Result | Notes |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-1` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-2` | fail | hosted protected NooBaa DB primary |
+
+## GitOps Change
+
+Add the MachineConfig to the active platform GitOps repository.
+
+```text
+clusters/spoke-dc-v7/node-hardening/machineconfig-worker-service-systemd-coredump-disabled.yaml
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+```
+
+The MachineConfig masks both systemd-coredump units:
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 75-worker-service-systemd-coredump-disabled
+  labels:
+    machineconfiguration.openshift.io/role: worker
+    compliance.comptech-lab.com/gate: OP-GF-SPOKEDCV7-33
+spec:
+  config:
+    ignition:
+      version: 3.1.0
+    systemd:
+      units:
+        - name: systemd-coredump.socket
+          enabled: false
+          mask: true
+        - name: systemd-coredump.service
+          enabled: false
+          mask: true
+```
+
+Commit:
+
+```text
+cfe7d9109cb4d74306b233fa8e89c509b5ed0df2 Add spoke worker systemd coredump mask hardening
+```
+
+Fast-forward the bootstrap GitOps clone and refresh Argo CD.
+
+```bash
+cd /home/ze/greenfield-ops/openshift-gitops
+git pull --ff-only
+
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate applications.argoproj.io spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+## Rollout Watch
+
+Watch Argo CD and the worker MCP until every worker reaches the new render.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o jsonpath='sync={.status.sync.status} health={.status.health.status} revision={.status.sync.revision}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker \
+  -o jsonpath='config={.status.configuration.name} updated={.status.conditions[?(@.type=="Updated")].status} updating={.status.conditions[?(@.type=="Updating")].status} degraded={.status.conditions[?(@.type=="Degraded")].status} ready={.status.readyMachineCount} updatedCount={.status.updatedMachineCount} machineCount={.status.machineCount}{"\n"}'
+```
+
+Observed:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at cfe7d9109cb4d74306b233fa8e89c509b5ed0df2
+worker MCP rendered-worker-f0e88bd1790c27d2d60ef88b60ba0e6f Updated=True Updating=False Degraded=False 3/3
+```
+
+Rollout order:
+
+1. `spoke-dc-v7-worker-2`
+2. `spoke-dc-v7-worker-1`
+3. `spoke-dc-v7-worker-0`
+
+Rollout completed at `2026-05-17T17:11:11Z`.
+
+CNPG automatically moved the NooBaa DB primary away from updating workers. No
+direct PDB patch was made.
+
+## Host Validation
+
+Validate the rendered MachineConfig and host state.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r '.spec.config.systemd.units[]? | select(.name | test("systemd-coredump")) | [.name, (.mask|tostring)] | @tsv'
+
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" debug "node/$node" --quiet -- \
+    chroot /host bash -c \
+    'printf "kernel.core_pattern="; sysctl -n kernel.core_pattern; systemctl is-enabled systemd-coredump.socket; systemctl is-active systemd-coredump.socket || true; systemctl is-enabled systemd-coredump.service; systemctl is-active systemd-coredump.service || true'
+done
+```
+
+Observed on all workers:
+
+```text
+kernel.core_pattern=|/bin/false
+systemd-coredump.socket masked inactive
+systemd-coredump.service masked inactive
+```
+
+## Compliance Rescan
+
+Trigger a one-off rescan.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  annotate compliancescan rhcos4-high-worker \
+  compliance.openshift.io/rescan= --overwrite
+```
+
+Observed scan:
+
+```text
+start=2026-05-17T17:14:28Z
+end=2026-05-17T17:16:41Z
+phase=DONE
+result=NON-COMPLIANT
+```
+
+The overall suite remains `NON-COMPLIANT` because unrelated worker checks
+still fail. The target rule passes:
+
+```text
+rhcos4-high-worker-service-systemd-coredump-disabled PASS
+```
+
+The tracked coredump-family worker controls all pass:
+
+```text
+rhcos4-high-worker-coredump-disable-backtraces        PASS
+rhcos4-high-worker-coredump-disable-storage          PASS
+rhcos4-high-worker-disable-users-coredumps           PASS
+rhcos4-high-worker-service-systemd-coredump-disabled PASS
+rhcos4-high-worker-sysctl-kernel-core-pattern        PASS
+```
+
+## Final Health
+
+Final state:
+
+```text
+hub/spoke Argo Synced/Healthy at cfe7d9109cb4d74306b233fa8e89c509b5ed0df2
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+worker MCP rendered-worker-f0e88bd1790c27d2d60ef88b60ba0e6f Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa Ready
+StorageCluster Ready
+CephCluster HEALTH_OK
+CNPG 2/2
+```
+
+Post-rollout server-side dry-run drain posture:
+
+| Worker | Result | Notes |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-1` | pass | hosts NooBaa DB replica |
+| `spoke-dc-v7-worker-2` | fail | hosts protected NooBaa DB primary |
+
+The coredump-family gates are complete. The next operator setup move should
+start with a new governed issue/gate and fresh read-only validation.

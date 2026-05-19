@@ -1,0 +1,204 @@
+---
+title: "Installation Manual - 35 Spoke ODF NooBaa drainability gate"
+sidebar_label: "35 Spoke ODF NooBaa drainability gate"
+description: "How to validate ODF, NooBaa, Loki, and worker drainability before spoke-dc-v7 worker maintenance."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the ODF and NooBaa drainability gate that followed the
+worker banner MachineConfig rollout. The goal was to determine which
+`spoke-dc-v7` workers are currently safe voluntary drain targets and whether
+the NooBaa DB primary PDB still blocks worker maintenance.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-23`, issue `#373` |
+| Cluster | `spoke-dc-v7` |
+| Scope | Read-only ODF, NooBaa, Loki, PDB, and dry-run drain validation |
+| GitOps revision | `89907515eef83cdf166e1dc2b73e6f6db0254b09` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/noobaa-drainability-gate.md` |
+| Live changes | None |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Baseline Health
+
+Confirm GitOps, cluster health, node state, and MCP state before interpreting
+drain results.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io hub-dc-v7-bootstrap spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+```
+
+Observed baseline:
+
+```text
+OpenShift version: 4.20.18
+ClusterVersion: Available=True Progressing=False Failing=False
+Nodes: 6 Ready
+ClusterOperators: no non-steady operators reported
+MCP master: Updated=True Updating=False Degraded=False
+MCP worker: Updated=True Updating=False Degraded=False
+```
+
+Final GitOps evidence:
+
+```text
+hub-dc-v7-bootstrap:        Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+hub spoke cluster config:   Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+spoke local cluster config: Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+```
+
+## ODF And NooBaa Health
+
+Check ODF, Ceph, NooBaa, PDBs, and NooBaa DB placement.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get storagecluster,cephcluster,noobaa
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pdb -o json \
+  | jq -r '.items[] |
+    [.metadata.name, (.spec.minAvailable // ""), (.spec.maxUnavailable // ""),
+     .status.expectedPods, .status.currentHealthy, .status.desiredHealthy,
+     .status.disruptionsAllowed] | @tsv'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -o json \
+  | jq -r '.items[] | select(.metadata.name | test("^noobaa-db-pg-cluster")) |
+    [.metadata.name, .spec.nodeName, .status.phase,
+     ([.status.conditions[]? | select(.type=="Ready") | .status][0] // ""),
+     (.metadata.labels["cnpg.io/instanceRole"] // "")] | @tsv'
+```
+
+Observed ODF status:
+
+| Object | Result |
+| --- | --- |
+| `StorageCluster/ocs-storagecluster` | `Ready`, ODF `4.20.10` |
+| `CephCluster/ocs-storagecluster-cephcluster` | `Ready`, `HEALTH_OK` |
+| `NooBaa/noobaa` | `Ready` |
+
+Observed NooBaa DB placement:
+
+| Pod | Node | Phase | Ready | Role |
+| --- | --- | --- | --- | --- |
+| `noobaa-db-pg-cluster-1` | `spoke-dc-v7-worker-2` | `Running` | `True` | `primary` |
+| `noobaa-db-pg-cluster-2` | `spoke-dc-v7-worker-1` | `Running` | `True` | `replica` |
+
+The blocking PDB is the primary-only NooBaa DB PDB:
+
+```text
+PDB: noobaa-db-pg-cluster-primary
+minAvailable: 1
+expectedPods: 1
+currentHealthy: 1
+desiredHealthy: 1
+disruptionsAllowed: 0
+selector: cnpg.io/cluster=noobaa-db-pg-cluster, cnpg.io/instanceRole=primary
+```
+
+Do not patch this PDB directly as the default fix. It protects the current
+database primary.
+
+## Loki Cross-Check
+
+The prior logging drainability blocker is still resolved.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack logging-loki -o json \
+  | jq -r '.status.conditions[] | [.type,.status,.reason] | @tsv'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get pdb
+```
+
+Observed result:
+
+```text
+LokiStack logging-loki: Ready=True Pending=False Warning=False
+All Loki PDBs: disruptionsAllowed=1
+```
+
+## Worker Drain Dry-Run
+
+Use server-side dry-run only for this gate.
+
+```bash
+for node in $(oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes \
+  -l node-role.kubernetes.io/worker= \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort); do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain "$node" \
+    --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=90s
+done
+```
+
+Observed results:
+
+| Worker | Dry-run result |
+| --- | --- |
+| `spoke-dc-v7-worker-0` | passed |
+| `spoke-dc-v7-worker-1` | passed |
+| `spoke-dc-v7-worker-2` | failed |
+
+Worker-2 failed because evicting the current NooBaa DB primary would violate
+the primary PDB:
+
+```text
+error when evicting pods/"noobaa-db-pg-cluster-1" -n "openshift-storage":
+Cannot evict pod as it would violate the pod's disruption budget.
+```
+
+Post-check node state:
+
+```text
+spoke-dc-v7-worker-0 Ready unschedulable=false
+spoke-dc-v7-worker-1 Ready unschedulable=false
+spoke-dc-v7-worker-2 Ready unschedulable=false
+```
+
+## Operating Decision
+
+Current decision:
+
+- `spoke-dc-v7-worker-0` and `spoke-dc-v7-worker-1` are valid voluntary drain
+  targets after immediate preflight revalidation.
+- `spoke-dc-v7-worker-2` is not a valid voluntary drain target while
+  `noobaa-db-pg-cluster-1` remains the primary there.
+- If worker-2 maintenance is required, open a tracked ODF/NooBaa remediation
+  gate and use an ODF/NooBaa-supported primary relocation or failover
+  procedure before rerunning the dry-run drain.
+- Do not patch the primary NooBaa DB PDB directly as the default fix.
+
+Primary placement is runtime state and can change. Recheck immediately before
+any maintenance drain.

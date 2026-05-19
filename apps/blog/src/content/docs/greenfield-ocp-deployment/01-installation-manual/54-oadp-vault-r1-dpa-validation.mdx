@@ -1,0 +1,126 @@
+---
+title: "Installation Manual - 54 OADP Vault R1 DPA validation"
+sidebar_label: "54 OADP Vault R1 DPA"
+description: "MinIO OADP credential rotation, replacement Vault seeding, and hub/spoke DPA validation."
+---
+
+This chapter records the OADP credential and DPA checkpoint after the
+replacement Vault R1 build.
+
+The checkpoint cleared the MinIO admin blocker, rotated the `oadp-backup`
+credential, seeded replacement Vault, and reconciled OADP DPAs on both v7
+clusters.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Credential Rotation
+
+MinIO admin access was restored through transient `ze@minio` VM access. The
+password was not recorded.
+
+Validated MinIO state:
+
+- bucket `ocp-oadp-backups` exists;
+- user `oadp-backup` exists;
+- policy `ocp-oadp-backups` is attached.
+
+The `oadp-backup` credential was rotated and validated with a put/stat/delete
+probe against `ocp-oadp-backups`.
+
+The new credential is stored only in ignored custody:
+
+```text
+secrets/greenfield-vault-r1/oadp-backup-minio-credentials.json
+```
+
+Backup custody on `dl385-2` was refreshed:
+
+```text
+/home/ze/greenfield-ocp-work-folder/secrets/greenfield-vault-r1/
+```
+
+## Replacement Vault Seed
+
+Replacement Vault R1 was seeded at:
+
+```text
+secret/greenfield/object-storage/minio/users/oadp-backup
+```
+
+The expected key names are:
+
+```text
+access_key,bucket,endpoint,rotated_at,secret_key
+```
+
+Secret values were not printed.
+
+## GitOps
+
+GitOps commits:
+
+```text
+428cdd3 Add v7 OADP Vault R1 backup stores
+668052d Allow spoke Argo CD to manage OADP DPA
+```
+
+The new OADP layer creates:
+
+- `ServiceAccount/openshift-adp/oadp-vault-auth`;
+- `ClusterSecretStore/vault-r1-oadp`;
+- `ExternalSecret/openshift-adp/oadp-cloud-credentials`;
+- a cluster-specific `DataProtectionApplication`.
+
+The OADP-only Vault store points at replacement Vault R1:
+
+```text
+https://30.30.200.35:8200
+```
+
+The existing `vault-platform` stores still point at
+`vault.v7.comptech-lab.com` for non-OADP consumers.
+
+## Validation
+
+Argo CD reached `Synced/Healthy` at `668052d` for:
+
+- `hub-dc-v7-bootstrap`;
+- hub-side `spoke-dc-v7-cluster-config`;
+- spoke-local `spoke-dc-v7-cluster-config`.
+
+OADP runtime state:
+
+| Cluster | Store | ExternalSecret | Secret key | DPA | BSL | Velero |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Ready | Ready | `cloud` | Reconciled | Available | `1/1` |
+| `spoke-dc-v7` | Ready | Ready | `cloud` | Reconciled | Available | `1/1` |
+
+No `VolumeSnapshotLocation`, `Schedule`, `Backup`, or `Restore` objects exist
+after this gate.
+
+Cluster health remained steady:
+
+- both ClusterVersions are OpenShift `4.20.18`;
+- no non-steady ClusterOperators were reported.
+
+## Actions Not Taken
+
+- No stable Vault DNS cutover.
+- No `vault-r1.v7.comptech-lab.com` DNS record creation.
+- No old Vault mutation.
+- No OADP schedule creation.
+- No ad hoc backup or restore object creation.
+- No secret values were printed.
+
+## Next Action
+
+Run a governed ad hoc OADP backup validation gate. Do not enable schedules
+until the ad hoc backup writes to MinIO, reaches a successful phase, and is
+cleaned up.

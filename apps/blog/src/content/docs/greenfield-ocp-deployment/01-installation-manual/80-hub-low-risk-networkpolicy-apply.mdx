@@ -1,0 +1,172 @@
+---
+title: "Installation Manual - 80 Hub low-risk NetworkPolicy apply"
+sidebar_label: "80 Hub low-risk NetworkPolicy apply"
+description: "GitOps apply and validation for the first hub-dc-v7 low-risk NetworkPolicy set."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the first `hub-dc-v7` NetworkPolicy apply gate.
+
+The gate added ingress-only default-deny policies to the five namespaces that
+were preflighted as low risk in the previous chapter.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-9` / `#401` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-8` / `#400` |
+
+## Access Path
+
+All live checks and the Compliance rescan used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## GitOps Change
+
+Platform GitOps commit:
+
+```text
+f4c643e Add hub low-risk NetworkPolicies
+```
+
+The commit added this hub kustomize layer:
+
+```text
+clusters/hub-dc-v7/platform/networkpolicy/
+```
+
+It also referenced the layer from:
+
+```text
+clusters/hub-dc-v7/kustomization.yaml
+```
+
+## Applied Policies
+
+Each namespace received:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: <target-namespace>
+  labels:
+    app.kubernetes.io/name: hub-networkpolicy-baseline
+    app.kubernetes.io/part-of: hub-dc-v7-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+```
+
+Targets:
+
+| Namespace | Policy |
+| --- | --- |
+| `default` | `NetworkPolicy/default-deny-ingress` |
+| `local-cluster` | `NetworkPolicy/default-deny-ingress` |
+| `open-cluster-management-global-set` | `NetworkPolicy/default-deny-ingress` |
+| `open-cluster-management-policies` | `NetworkPolicy/default-deny-ingress` |
+| `spoke-dc-v7` | `NetworkPolicy/default-deny-ingress` |
+
+No egress default-deny was added.
+
+## Post-Apply Validation
+
+Validation at `2026-05-19T11:42:45Z` and `2026-05-19T11:43:15Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Network type | `OVNKubernetes` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `f4c643eebd5085b3e1773d8b203173bb82ed5f79` |
+| Non-running pods | none |
+
+The five target namespaces still had no application controller workloads, no
+pods, and no routes after apply. `default` still only had the expected
+`kubernetes` and `openshift` services.
+
+## Compliance Rescan
+
+A one-off hub `ComplianceScan/ocp4-cis` rescan was triggered after Argo CD and
+cluster health were steady.
+
+| Field | Value |
+| --- | --- |
+| Trigger | `2026-05-19T11:44:07Z` |
+| Start | `2026-05-19T11:44:07Z` |
+| End | `2026-05-19T11:44:51Z` |
+| Phase | `DONE` |
+| Result | `NON-COMPLIANT` |
+
+Post-rescan counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+The remaining failed check is still:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```
+
+That is expected because this gate intentionally covered only the low-risk
+first set.
+
+## Residual Namespace Coverage
+
+After the apply, the hub inventory was:
+
+| Metric | Count |
+| --- | ---: |
+| Namespaces | 99 |
+| NetworkPolicies | 89 |
+| Namespaces with policy | 23 |
+| Namespaces without policy | 76 |
+
+Non-system namespaces still without NetworkPolicy:
+
+```text
+cert-manager
+cert-manager-operator
+external-secrets-operator
+hive
+hypershift
+multicluster-engine
+open-cluster-management
+open-cluster-management-agent
+open-cluster-management-agent-addon
+open-cluster-management-hub
+rhacs-operator
+```
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-10: design hub operator/ACM NetworkPolicy coverage or tailoring
+```
+
+Do not blanket-generate policies for these remaining namespaces. The operator
+namespaces need explicit monitoring/metrics ingress allows, and the
+ACM/MCE/Hive/Hypershift namespaces need product-aware policy design or a
+documented Compliance tailoring decision.

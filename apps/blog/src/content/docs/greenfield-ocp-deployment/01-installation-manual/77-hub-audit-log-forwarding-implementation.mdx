@@ -1,0 +1,194 @@
+---
+title: "Installation Manual - 77 Hub audit log forwarding implementation"
+sidebar_label: "77 Hub audit log forwarding implementation"
+description: "Implementation record for hub-dc-v7 audit-only log forwarding with OpenShift Logging, Loki, MinIO, Vault R1, and External Secrets."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` audit-log-forwarding implementation gate.
+
+The gate installed a hub-specific, audit-only logging path. It did not copy the
+spoke NooBaa-backed full logging pattern and did not reuse OADP object-storage
+credentials.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-6` / `#398` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-5` / `#397` |
+
+## Preflight
+
+Fresh checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+Starting state:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `92198cc` |
+| APIServer audit profile | `WriteRequestBodies` |
+| `ocp4-cis-audit-log-forwarding-enabled` | FAIL |
+| Hub `ocp4-cis` counts | `PASS=160`, `FAIL=2`, `MANUAL=21` |
+| Hub logging stack | absent |
+| StorageClass | `lvms-vg1` |
+| LVMCluster | Ready |
+
+The disconnected catalog had the required packages:
+
+| Package | Source | Version |
+| --- | --- | --- |
+| `cluster-logging` | `cs-redhat-operator-index-v4-20` | `cluster-logging.v6.5.0` |
+| `loki-operator` | `cs-redhat-operator-index-v4-20` | `loki-operator.v6.5.0` |
+
+## MinIO And Vault R1
+
+Dedicated hub Loki object storage was created:
+
+| Item | Value |
+| --- | --- |
+| Bucket | `loki-hub-dc-v7` |
+| User | `loki-hub-dc-v7` |
+| Policy | `loki-hub-dc-v7-rw` |
+| Probe | put/stat/delete passed |
+
+The credential was stored in Vault R1:
+
+| Item | Value |
+| --- | --- |
+| Vault path | `secret/greenfield/object-storage/minio/users/loki-hub-dc-v7` |
+| Vault policy | `hub-dc-v7-logging-loki` |
+| Vault role | `logging-loki` |
+| Bound service account | `openshift-logging/logging-vault-auth` |
+
+The local custody copy is intentionally ignored by Git:
+
+```text
+secrets/greenfield-vault-r1/loki-hub-dc-v7-minio-credentials.json
+```
+
+Do not paste, commit, or print values from that file.
+
+## GitOps Desired State
+
+Platform GitOps commit:
+
+```text
+d6688ad Add hub audit log forwarding
+```
+
+Added hub operator desired state:
+
+```text
+clusters/hub-dc-v7/operators/cluster-logging/
+clusters/hub-dc-v7/operators/loki-operator/
+```
+
+Added hub logging desired state:
+
+```text
+clusters/hub-dc-v7/platform/logging/
+```
+
+The logging layer contains:
+
+| Resource | Purpose |
+| --- | --- |
+| `ServiceAccount/logging-vault-auth` | Vault Kubernetes auth identity |
+| `ClusterSecretStore/vault-r1-logging` | Dedicated Vault R1 store for Loki |
+| `ExternalSecret/logging-loki-s3` | Projects the MinIO credential into `openshift-logging` |
+| `LokiStack/logging-loki` | Small hub Loki stack using `lvms-vg1` |
+| `ServiceAccount/logging-collector` | Vector collector identity |
+| collector RBAC | `collect-audit-logs` and `logging-collector-logs-writer` |
+| `ClusterLogForwarder/instance` | Audit-only forwarding to Loki |
+
+The bootstrap clone was fast-forwarded and `Application/hub-dc-v7-bootstrap`
+reconciled `Synced/Healthy` at `d6688ad`.
+
+## Validation
+
+| Check | Result |
+| --- | --- |
+| `cluster-logging.v6.5.0` CSV | `Succeeded` |
+| `loki-operator.v6.5.0` CSV | `Succeeded` |
+| `ClusterSecretStore/vault-r1-logging` | `Ready=True`, `Valid` |
+| `ExternalSecret/logging-loki-s3` | `Ready=True`, `SecretSynced` |
+| `Secret/logging-loki-s3` keys | expected S3 key names only |
+| `LokiStack/logging-loki` | `Ready=True`, `ReadyComponents` |
+| `ClusterLogForwarder/instance` | `Ready=True`, `ReconciliationComplete` |
+| `openshift-logging` pods | `18/18` Running |
+| collector DaemonSet | `3/3` |
+| Loki PVCs | 9 Bound on `lvms-vg1` |
+
+Final hub health stayed steady:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+
+## Compliance Result
+
+A one-off hub `ocp4-cis` rescan ran:
+
+| Field | Value |
+| --- | --- |
+| Trigger | `2026-05-19T11:07:31Z` |
+| Start | `2026-05-19T11:07:32Z` |
+| End | `2026-05-19T11:08:17Z` |
+| Phase | `DONE` |
+| Result | `NON-COMPLIANT` |
+
+The target finding cleared:
+
+| Check | Status |
+| --- | --- |
+| `ocp4-cis-audit-log-forwarding-enabled` | PASS |
+| `ocp4-cis-configure-network-policies-namespaces` | FAIL |
+
+New hub counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+## Object Store Note
+
+An immediate bucket listing with the dedicated Loki credential still showed
+zero objects in `loki-hub-dc-v7`. Loki was Ready and the CIS audit-forwarding
+check passed. Recheck later if explicit object-flush evidence is needed;
+object creation can wait until Loki flushes chunks or index content.
+
+## Next Gate
+
+The only remaining hub CIS failure is:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```
+
+Run the next gate as a classification first:
+
+```text
+OP-GF-COMPLIANCE-7: classify hub NetworkPolicy namespace coverage
+```
+
+Do not bulk-apply NetworkPolicies before classifying namespace ownership and
+operator expectations.

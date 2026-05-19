@@ -1,0 +1,258 @@
+---
+title: "Identity with WSO2 Identity Server"
+sidebar_label: "11 — Identity"
+description: "WSO2 IS as the OpenID Connect provider, MicroProfile JWT verifying access tokens in Liberty, and @RolesAllowed on every endpoint that needs to know who you are."
+estimated_minutes: 75
+last_updated: 2026-05-18
+prereqs: ["10 — Async messaging with Kafka"]
+---
+
+A REST endpoint with no authentication is a placeholder, not a service. This module attaches a real identity layer. **WSO2 Identity Server** issues tokens; Liberty validates them via **MicroProfile JWT**; the application enforces role-based authorization with `@RolesAllowed`.
+
+## The pattern, before the tools
+
+```
+client ─[1] login─────────► WSO2 IS  ── returns access_token (JWT)
+client ─[2] /api/...      ─► Liberty ── verifies signature, extracts claims
+                              │
+                              └── @RolesAllowed("policy-reader") gate
+```
+
+Two systems. Liberty never sees the password. WSO2 IS never sees the application data. The token is the only artifact that crosses the boundary, and it is signed.
+
+## WSO2 IS as a container
+
+```bash
+podman run -d --replace --name wso2is --network insurance-net \
+  -p 9444:9443 \
+  -p 9763:9763 \
+  docker.io/wso2/wso2is:7.0.0
+```
+
+Port 9443 inside the container is **remapped to 9444 on the host** — Liberty already uses 9443 for HTTPS, and a port conflict would just produce a confusing failure. Inside `insurance-net`, other containers reach WSO2 IS as `wso2is:9443` (the original port).
+
+First boot pulls and initializes the DB; allow 60–120 seconds. The admin console is at `https://localhost:9444/console`, default credentials `admin / admin` — change them in any non-dev setting.
+
+## Registering an OIDC application
+
+You can click through the IS console (Applications → New Application →
+OIDC Web Application) — fine for one-off exploration. For anything
+reproducible — including the SETUP.md runbook — use the **Dynamic
+Client Registration** endpoint instead. One curl, deterministic output:
+
+```bash
+RESP=$(curl -k -sS -X POST -u admin:admin \
+  https://localhost:9444/api/identity/oauth2/dcr/v1.1/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_name": "insurance-app",
+    "grant_types": ["client_credentials"],
+    "ext_token_type": "JWT"
+  }')
+echo "$RESP" | jq
+```
+
+Two non-obvious bits:
+
+- **Path is `/api/identity/oauth2/dcr/v1.1/register`.** In IS 7.0 the
+  `oauth2/dcr` segment changed from `oauth2-dcr` (hyphen) in earlier
+  versions. The old path silently returns 401. Catch by reading the
+  error body, not the status code.
+- **`ext_token_type: JWT` is non-negotiable** for our setup. Without
+  it, IS issues an opaque UUID reference token, not a JWT — Liberty's
+  `mpJwt` then rejects every request with no useful log message.
+
+Save the returned `client_id` + `client_secret` to a gitignored
+`.wso2is-creds` file that the rest of the stack will source:
+
+```bash
+cat > ~/insurance-app/.wso2is-creds <<EOF
+export WSO2IS_CLIENT_ID=$(echo "$RESP" | jq -r .client_id)
+export WSO2IS_CLIENT_SECRET=$(echo "$RESP" | jq -r .client_secret)
+export WSO2IS_TOKEN_URL=https://localhost:9444/oauth2/token
+EOF
+```
+
+The `export` keyword matters: subsequent `podman run -e WSO2IS_CLIENT_ID`
+(no value, inherit-from-env form) only finds the variable if it's
+exported.
+
+## Liberty side: mpJwt
+
+In `server.xml`:
+
+```xml
+<featureManager>
+    <!-- existing features -->
+    <feature>mpJwt-2.1</feature>
+</featureManager>
+
+<!-- The id MUST be defaultMpJwt. Liberty creates a default mpJwt config
+     internally; a custom-id config is treated as a *second* config and
+     the auth chain uses the default one. -->
+<mpJwt id="defaultMpJwt"
+       jwksUri="http://wso2is:9763/oauth2/jwks"
+       issuer="https://is.insurance-app.comptech-lab.com/oauth2/token"
+       userNameAttribute="sub"
+       groupNameAttribute="aut"
+       ignoreApplicationAuthMethod="false"
+       mapToUserRegistry="false"/>
+
+<!-- LTPA keys: Liberty's appSecurity-5.0 mints an SSO token after every
+     successful JWT auth. Without <ltpa> configured, the SSO step blows
+     up and the whole login is treated as failed even though the JWT
+     validated fine. -->
+<ltpa keysPassword="ltpaP@ssw0rd"/>
+
+<!-- Empty basicRegistry placeholder. appSecurity-5.0 needs *some* user
+     registry to be configured even when mpJwt is the only auth path;
+     the JWT's `sub` claim has to appear here as a user, or the
+     HashtableLoginModule downstream of mpJwt rejects the principal. -->
+<basicRegistry id="basic" realm="insurance-app">
+    <user name="<the JWT sub — i.e. WSO2 client_id>" password="unused"/>
+</basicRegistry>
+
+<webAppSecurity allowFailOverToBasicAuth="false"/>
+```
+
+In `web.xml`, declare MP-JWT as the auth method:
+
+```xml
+<login-config>
+    <auth-method>MP-JWT</auth-method>
+    <realm-name>insurance-app</realm-name>
+</login-config>
+<security-role><role-name>APPLICATION</role-name></security-role>
+```
+
+And bind the role to any authenticated user via `<application-bnd>` on
+the `<webApplication>` element (or in `ibm-application-bnd.xml`):
+
+```xml
+<webApplication contextRoot="/" location="insurance-app.war">
+    <application-bnd>
+        <security-role name="APPLICATION">
+            <special-subject type="ALL_AUTHENTICATED_USERS"/>
+        </security-role>
+    </application-bnd>
+</webApplication>
+```
+
+Why all this scaffolding for what looks like a one-line mpJwt config?
+Because Liberty 24.0.0.12's mpJwt does **not** bypass the rest of
+appSecurity-5.0. The full working stack is: mpJwt validates the
+signature + iss + audience, then appSecurity drives `HashtableLoginModule`
+which expects the JWT subject to be a user in *some* registry — even
+with `mapToUserRegistry=false`. The basicRegistry + application-bnd +
+ltpa combo is the minimal recipe to keep all of that happy.
+
+Three things still happen at the high level:
+
+- **`jwksUri`** — Liberty fetches public keys from WSO2 IS to verify
+  token signatures. We use the **HTTP port 9763** instead of HTTPS
+  9443 to dodge the self-signed-cert chain dance for the JWKS fetch.
+- **`issuer`** — Tokens whose `iss` claim doesn't match are rejected.
+  After IS's hostname swap (see SETUP.md Phase 6.5), the iss is the
+  public hostname, not `localhost:9443`.
+- **`userNameAttribute=sub`** — IS doesn't put the standard `upn`
+  claim in tokens; we use `sub`.
+
+## Protecting endpoints
+
+```java
+@Path("/policies")
+@Produces(MediaType.APPLICATION_JSON)
+@RolesAllowed({"policy-reader"})
+public class PolicyResource {
+
+    @GET
+    public List<Policy> list() { return repo.findAll(); }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"policy-writer"})
+    public Policy create(Policy p) {
+        Policy saved = repo.create(p);
+        redis.del("policy:" + saved.getPolicyNo());
+        publisher.published(saved);
+        return saved;
+    }
+}
+```
+
+Two roles, two scopes of access. `policy-reader` can list; `policy-writer` can create. The `groups` claim in the JWT must contain the matching role names.
+
+## Trying it end to end
+
+Acquire a token (client-credentials flow — easiest for curl):
+
+```bash
+TOKEN=$(curl -sk -X POST \
+  -u "<client_id>:<client_secret>" \
+  -d "grant_type=client_credentials&scope=internal_application_mgt_view" \
+  https://localhost:9444/oauth2/token | jq -r .access_token)
+```
+
+Call Liberty with it:
+
+```bash
+curl http://localhost:9080/api/policies \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Without the header: `401 Unauthorized`. With a valid token but missing role: `403 Forbidden`. With a valid token and the right role: `200 OK` and the list of policies. Each outcome shows up in SigNoz as a distinct span attribute — a 403 trace looks exactly like a 200 trace with a different `http.status_code`.
+
+## Where the secrets go
+
+The client secret is currently a plaintext value living somewhere — env var, server.xml, or `microprofile-config.properties`. None of those are right for production. In production:
+
+- The secret comes from **Vault** (or whatever secret store the platform team runs).
+- WSO2 IS itself is fronted by HTTPS with a real certificate.
+- Logs scrub bearer tokens before they're emitted.
+
+We're out of scope for those here — they belong to the secrets-management module of a different track. For now, the literal value in dev is acceptable.
+
+## Common stumbles
+
+- **DCR returns 401 on `oauth2-dcr/v1.1/register`.** The path renamed
+  to `oauth2/dcr/v1.1/register` (slash, not hyphen) in IS 7.0. The
+  old path still answers, with a misleading 401.
+- **Token mints but body has an opaque UUID, not a JWT.** Forgot
+  `ext_token_type: JWT` on the DCR call. Re-register with the
+  parameter, or PATCH the existing app config.
+- **Every authed POST returns 401 with a fresh, valid token.** Two
+  causes: (1) the JWT `iss` claim doesn't match Liberty's `mpJwt
+  issuer` — if you ran the IS hostname swap, both have to use the
+  public-hostname form. (2) The `<basicRegistry>` user in `server.xml`
+  is stale; the new JWT carries a different `sub` claim.
+- **Recreating the `wso2is` container loses my DCR client.** The
+  stock IS image has no volume mount on its H2 database. The
+  insurance-app runbook adds a `wso2is-data` named volume on
+  `/home/wso2carbon/wso2is-7.0.0/repository/database` to fix this —
+  re-create the container the first time with the volume in place,
+  then DCR clients + the admin user survive across restarts.
+- **JWKS fetch fails at Liberty startup.** Switch to `http://wso2is:9763/oauth2/jwks`
+  (HTTP variant on the same host inside `insurance-net`). Avoids the
+  self-signed cert chain entirely, since the JWT signatures are
+  independently authenticated regardless of transport.
+- **Token expiry surprises.** Default access-token lifetime is short
+  (5–15 min for end users; ~1 h for client_credentials). Set up
+  refresh-token flow for any UI client.
+
+## What you have
+
+- WSO2 IS as the OIDC provider for the project.
+- Liberty validating JWTs without ever talking to IS at request time (just at startup).
+- Role-based authorization on every endpoint.
+
+Module 12 puts an API gateway in front of the whole thing.
+
+> **What about human users, not just service accounts?** Everything in
+> this chapter is the `client_credentials` flow — fine for backend-to-
+> backend, useless for a real person logging in. The browser-side OIDC
+> dance (authorization code + PKCE, BFF-managed session cookie, no JWT
+> in the browser) is its own chapter much later in the track —
+> [27 — Real human OIDC end-to-end](/learn/openliberty/real-human-oidc) —
+> once the customer-facing SvelteKit app exists to host it.
+
+Next: [12 — API gateway with WSO2 API Manager →](/learn/openliberty/api-gateway)

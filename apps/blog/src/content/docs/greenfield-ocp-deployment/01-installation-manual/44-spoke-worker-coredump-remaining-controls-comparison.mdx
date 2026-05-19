@@ -1,0 +1,392 @@
+---
+title: "Installation Manual - 44 Spoke worker coredump remaining controls comparison"
+sidebar_label: "44 Spoke worker coredump remaining controls comparison"
+description: "No-change comparison preflight for the remaining spoke-dc-v7 worker coredump-family Compliance Operator controls."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the no-change comparison preflight for the two remaining
+worker coredump-family Compliance Operator failures on `spoke-dc-v7`.
+
+The compared controls are:
+
+```text
+rhcos4-high-worker-service-systemd-coredump-disabled
+rhcos4-high-worker-sysctl-kernel-core-pattern
+```
+
+No persistent live cluster change was made in this gate.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-31`, issue `#381` |
+| Cluster | `spoke-dc-v7` |
+| ComplianceScan | `rhcos4-high-worker` |
+| Compared controls | `service-systemd-coredump-disabled`, `sysctl-kernel-core-pattern` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-coredump-remaining-controls-comparison-preflight.md` |
+| Result | Compare only; no remediation applied |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Guardrails
+
+This was a comparison preflight only.
+
+Do not run any of these during this gate:
+
+- GitOps commit
+- MachineConfig apply
+- ComplianceScan rescan annotation
+- PDB patch
+- cordon
+- live drain
+
+Read-only `oc get`, `oc debug node` host observation, server-side dry-run
+apply, and server-side dry-run drain checks were allowed.
+
+## Preflight Health
+
+Validate Argo, cluster health, MCPs, and storage before comparing controls.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+```
+
+Observed:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at 4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-1 targetPrimary=noobaa-db-pg-cluster-1
+```
+
+## Compliance Baseline
+
+The worker scan was current from the previous evidence gate.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancescan rhcos4-high-worker \
+  -o jsonpath='phase={.status.phase} result={.status.result} start={.status.startTimestamp} end={.status.endTimestamp}{"\n"}'
+```
+
+Observed:
+
+```text
+phase=DONE result=NON-COMPLIANT start=2026-05-17T15:20:57Z end=2026-05-17T15:23:10Z
+```
+
+Read the two target check results.
+
+```bash
+for result in \
+  rhcos4-high-worker-service-systemd-coredump-disabled \
+  rhcos4-high-worker-sysctl-kernel-core-pattern; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+    get compliancecheckresult "$result" -o json \
+    | jq -r '{
+        name: .metadata.name,
+        status: .status,
+        checkStatus: .metadata.labels["compliance.openshift.io/check-status"],
+        severity: .severity,
+        lastScan: .metadata.annotations["compliance.openshift.io/last-scanned-timestamp"],
+        rule: .metadata.annotations["compliance.openshift.io/rule"],
+        id: .id
+      }'
+done
+```
+
+Observed:
+
+```text
+rhcos4-high-worker-service-systemd-coredump-disabled  FAIL  lastScan=2026-05-17T15:20:57Z
+rhcos4-high-worker-sysctl-kernel-core-pattern         FAIL  lastScan=2026-05-17T15:20:57Z
+```
+
+## Current Worker State
+
+The current worker render contains neither remaining control.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r '{
+      render: env.worker_render,
+      sysctlKernelCorePatternFile:
+        ([.spec.config.storage.files[]?.path]
+          | index("/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf") != null),
+      systemdCoredumpUnits:
+        ([.spec.config.systemd.units[]?.name]
+          | map(select(. == "systemd-coredump.socket" or . == "systemd-coredump.service")))
+    }'
+```
+
+Observed:
+
+```json
+{
+  "render": "rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66",
+  "sysctlKernelCorePatternFile": false,
+  "systemdCoredumpUnits": []
+}
+```
+
+Observed host state on all workers:
+
+```text
+kernel.core_pattern=|/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h
+/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf absent
+systemd-coredump.socket enabled=static active=active masked=false
+systemd-coredump.service active=inactive masked=false
+```
+
+## Remediation A: systemd-coredump service
+
+Inspect the generated remediation.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get complianceremediation rhcos4-high-worker-service-systemd-coredump-disabled -o json \
+  | jq -r '{
+      name: .metadata.name,
+      apply: .spec.apply,
+      applicationState: .status.applicationState,
+      currentKind: .spec.current.object.kind,
+      systemdUnits:
+        [.spec.current.object.spec.config.systemd.units[]?
+          | {name: .name, enabled: .enabled, mask: .mask}]
+    }'
+```
+
+Observed:
+
+```json
+{
+  "name": "rhcos4-high-worker-service-systemd-coredump-disabled",
+  "apply": false,
+  "applicationState": "NotApplied",
+  "currentKind": "MachineConfig",
+  "systemdUnits": [
+    {
+      "name": "systemd-coredump.socket",
+      "enabled": false,
+      "mask": true
+    },
+    {
+      "name": "systemd-coredump.service",
+      "enabled": false,
+      "mask": true
+    }
+  ]
+}
+```
+
+Dry-run a synthesized GitOps-safe MachineConfig object only.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get complianceremediation rhcos4-high-worker-service-systemd-coredump-disabled -o json \
+  | jq --arg name "75-worker-service-systemd-coredump-disabled" \
+      '.spec.current.object + {
+        metadata: {
+          name: $name,
+          labels: {
+            "machineconfiguration.openshift.io/role": "worker",
+            "compliance.comptech-lab.com/gate": "OP-GF-SPOKEDCV7-31"
+          }
+        }
+      }' \
+  | oc --kubeconfig "$SPOKE_KUBECONFIG" apply --dry-run=server -f -
+```
+
+Observed:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-service-systemd-coredump-disabled created (server dry run)
+```
+
+Risk:
+
+- Requires worker MCP rollout.
+- Masks the normal systemd-coredump socket and service.
+- Highest diagnostic impact of the two remaining controls.
+- Keep it as a separate later decision.
+
+## Remediation B: kernel core pattern
+
+Inspect the generated remediation.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get complianceremediation rhcos4-high-worker-sysctl-kernel-core-pattern -o json \
+  | jq -r '{
+      name: .metadata.name,
+      apply: .spec.apply,
+      applicationState: .status.applicationState,
+      currentKind: .spec.current.object.kind,
+      filePaths:
+        [.spec.current.object.spec.config.storage.files[]?.path]
+    }'
+```
+
+Observed:
+
+```json
+{
+  "name": "rhcos4-high-worker-sysctl-kernel-core-pattern",
+  "apply": false,
+  "applicationState": "NotApplied",
+  "currentKind": "MachineConfig",
+  "filePaths": [
+    "/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf"
+  ]
+}
+```
+
+The decoded file content is:
+
+```text
+kernel.core_pattern = |/bin/false
+```
+
+Dry-run a synthesized GitOps-safe MachineConfig object only.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get complianceremediation rhcos4-high-worker-sysctl-kernel-core-pattern -o json \
+  | jq --arg name "75-worker-sysctl-kernel-core-pattern" \
+      '.spec.current.object + {
+        metadata: {
+          name: $name,
+          labels: {
+            "machineconfiguration.openshift.io/role": "worker",
+            "compliance.comptech-lab.com/gate": "OP-GF-SPOKEDCV7-31"
+          }
+        }
+      }' \
+  | oc --kubeconfig "$SPOKE_KUBECONFIG" apply --dry-run=server -f -
+```
+
+Observed:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-sysctl-kernel-core-pattern created (server dry run)
+```
+
+Risk:
+
+- Requires worker MCP rollout.
+- Changes kernel-level core dump routing from systemd-coredump to
+  `|/bin/false`.
+- Leaves systemd-coredump units unmasked.
+- Lower operational blast radius than the service-mask control, but still
+  affects crash diagnostics.
+
+## Drain Posture
+
+Run server-side dry-run drain checks before any future worker rollout.
+
+```bash
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain "$node" \
+    --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=20s
+done
+```
+
+Observed:
+
+```text
+spoke-dc-v7-worker-0 pass
+spoke-dc-v7-worker-1 pass
+spoke-dc-v7-worker-2 fail, protected NooBaa DB primary
+```
+
+Worker-2 hosts `noobaa-db-pg-cluster-1` as the NooBaa DB primary, and
+`PDB/noobaa-db-pg-cluster-primary` has `disruptionsAllowed=0`.
+
+## Recommendation
+
+Do not apply both controls in one rollout.
+
+Recommended sequence:
+
+1. Roll out `rhcos4-high-worker-sysctl-kernel-core-pattern` first in a
+   separate tracked gate.
+2. Run a fresh Compliance Operator rescan and validate the target result.
+3. Reassess whether `rhcos4-high-worker-service-systemd-coredump-disabled` is
+   still required or should become a deliberate exception.
+4. If still required, roll out `service-systemd-coredump-disabled` separately
+   with explicit acceptance that systemd-coredump will be masked.
+
+The sysctl control is the narrower first candidate. The service-mask control
+has higher diagnostic impact because it removes the normal systemd-coredump
+collection path.
+
+## Final Health
+
+Final validation remained steady:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at 4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-1 targetPrimary=noobaa-db-pg-cluster-1
+```
+
+## Result
+
+The comparison preflight is complete. Both remediations are feasible from a
+server-side dry-run perspective, but they should stay separate. The next
+recommended rollout candidate is:
+
+```text
+rhcos4-high-worker-sysctl-kernel-core-pattern
+```
+
+Do not patch `PDB/noobaa-db-pg-cluster-primary` directly as the default
+workaround for worker-2 drainability.

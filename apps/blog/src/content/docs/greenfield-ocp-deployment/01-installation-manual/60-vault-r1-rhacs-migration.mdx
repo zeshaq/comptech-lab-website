@@ -1,0 +1,136 @@
+---
+title: "Installation Manual - 60 Vault R1 RHACS migration"
+sidebar_label: "60 Vault R1 RHACS"
+description: "Migration of hub-dc-v7 and spoke-dc-v7 RHACS ExternalSecrets to replacement Vault R1."
+---
+
+This chapter records the RHACS consumer migration to replacement Vault R1. It
+followed the ESO smoke gate and moved only RHACS ExternalSecrets to a
+dedicated R1 store.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+Read-only checks used the required path:
+
+```text
+local coordinator -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+| Cluster | OpenShift | ClusterOperators | Nodes | RHACS ExternalSecrets | OADP |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | Ready on `vault-platform` | DPA Reconciled, BSL Available, Velero `1/1` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | Ready on `vault-platform` | DPA Reconciled, BSL Available, Velero `1/1` |
+
+Live RHACS target Secret key shapes were checked without printing values.
+
+## Replacement Vault Seed
+
+Replacement Vault R1 was seeded from the currently reconciled Kubernetes
+Secrets. Secret values were not printed.
+
+Created replacement Vault roles:
+
+| Cluster | Auth mount | Role | Policy |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `kubernetes-hub-dc-v7` | `rhacs-secrets` | `hub-dc-v7-rhacs-secrets` |
+| `spoke-dc-v7` | `kubernetes-spoke-dc-v7` | `rhacs-secrets` | `spoke-dc-v7-rhacs-secrets` |
+
+Seeded replacement Vault paths:
+
+| Path | Key shape |
+| --- | --- |
+| `secret/greenfield/openshift/hub-dc-v7/rhacs/init-bundle` | admission-control, collector, and sensor TLS properties |
+| `secret/greenfield/openshift/hub-dc-v7/rhacs/admin` | `password` |
+| `secret/greenfield/openshift/spoke-dc-v7/rhacs/init-bundle` | admission-control, collector, and sensor TLS properties |
+
+Kubernetes auth read validation passed for the `rhacs-secrets` role on both
+clusters using short-lived service-account tokens. The validation printed only
+property keys.
+
+## GitOps Change
+
+GitOps commit:
+
+```text
+93daa29 Move RHACS secrets to Vault R1
+```
+
+The commit added:
+
+| Cluster | New store |
+| --- | --- |
+| `hub-dc-v7` | `ClusterSecretStore/vault-r1-rhacs` |
+| `spoke-dc-v7` | `ClusterSecretStore/vault-r1-rhacs` |
+
+Then RHACS ExternalSecrets were changed to reference `vault-r1-rhacs`.
+
+Hub moved:
+
+- `stackrox/admission-control-tls`
+- `stackrox/central-admin-password`
+- `stackrox/collector-tls`
+- `stackrox/sensor-tls`
+
+Spoke moved:
+
+- `stackrox/admission-control-tls`
+- `stackrox/collector-tls`
+- `stackrox/sensor-tls`
+
+## Validation
+
+Both overlays rendered locally with `kubectl kustomize`, and server-side
+dry-run accepted both overlays. The dry-run showed that
+`ClusterSecretStore/vault-r1-rhacs` would be created on each cluster.
+
+The bootstrap GitOps clone was fast-forwarded to `93daa29`, and Argo CD was
+hard-refreshed.
+
+| Argo application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `93daa29` |
+| hub-side `spoke-dc-v7-cluster-config` | Synced | Healthy | `93daa29` |
+| spoke-local `spoke-dc-v7-cluster-config` | Synced | Healthy | `93daa29` |
+
+Post-change RHACS validation:
+
+| Cluster | Store | ExternalSecrets | Refresh times | Target Secret keys |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `vault-r1-rhacs` Ready | 4/4 Ready / `SecretSynced` | `2026-05-17T23:23:33Z` to `2026-05-17T23:23:35Z` | expected admin and TLS keys |
+| `spoke-dc-v7` | `vault-r1-rhacs` Ready | 3/3 Ready / `SecretSynced` | `2026-05-17T23:23:22Z` | expected TLS keys |
+
+Other consumers stayed Ready:
+
+| Consumer | Store | Result |
+| --- | --- | --- |
+| ESO smoke | `vault-r1-eso-smoke` | Ready |
+| OADP cloud credentials | `vault-r1-oadp` | Ready |
+| Spoke logging bridge | `logging-local` | Ready |
+
+## Final State
+
+| Cluster | OpenShift | ClusterOperators | Nodes | StackRox pods | OADP |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | `18/18` acceptable | DPA Reconciled, BSL Available, Velero `1/1` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | `16/16` acceptable | DPA Reconciled, BSL Available, Velero `1/1` |
+
+## Actions Not Taken
+
+- No old Vault mutation was made.
+- No stable Vault DNS cutover was made.
+- No RHACS certificate or admin password rotation was performed.
+- No secret values were printed.
+
+## Next Action
+
+Run a final stable Vault DNS promotion readiness gate before changing
+`vault.v7.comptech-lab.com`.

@@ -1,0 +1,157 @@
+---
+title: "Installation Manual - 76 Hub audit log forwarding decision preflight"
+sidebar_label: "76 Hub audit log forwarding decision"
+description: "Decision and preflight for the remaining hub-dc-v7 CIS audit-log-forwarding finding after hub API/config hardening."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` audit-log-forwarding decision gate after
+hub CIS API/config hardening.
+
+The gate was read-only. It did not install logging, Loki, MinIO credentials,
+Vault paths, or any `ClusterLogForwarder`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-5` / `#397` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Previous gate | `OP-GF-COMPLIANCE-4` / `#396` |
+
+## Starting Point
+
+After chapter 75, hub `ocp4-cis` was reduced to two failures:
+
+| Check | Status |
+| --- | --- |
+| `ocp4-cis-audit-log-forwarding-enabled` | FAIL |
+| `ocp4-cis-configure-network-policies-namespaces` | FAIL |
+
+Audit-log forwarding comes first because the hub APIServer audit profile is
+now `WriteRequestBodies`. That makes audit retention more important and also
+increases the volume that any logging path must absorb.
+
+## Hub Read-Only State
+
+Hub health during the preflight:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `92198cc` |
+
+Audit/compliance state:
+
+| Check | Result |
+| --- | --- |
+| APIServer audit profile | `WriteRequestBodies` |
+| `ocp4-cis-audit-log-forwarding-enabled` | FAIL |
+| Hub `ocp4-cis` counts | `PASS=160`, `FAIL=2`, `MANUAL=21` |
+
+Logging state:
+
+| Item | Result |
+| --- | --- |
+| logging/Loki namespace | absent |
+| cluster-logging Subscription/CSV | absent |
+| Loki Subscription/CSV | absent |
+| `ClusterLogForwarder` CRD | absent |
+| `LokiStack` CRD | absent |
+| `ClusterLogging` CRD | absent |
+
+Storage and secret-delivery state:
+
+| Item | Result |
+| --- | --- |
+| block storage | `StorageClass/lvms-vg1` |
+| LVMCluster | `openshift-lvm-storage/lvmcluster` Ready |
+| ObjectBucket API | absent |
+| object-bucket storage class | absent |
+| Vault R1 ClusterSecretStores | Ready |
+| Existing ExternalSecrets | Ready |
+| OADP MinIO path | BSL Available |
+
+Catalog availability:
+
+| Package | Available version |
+| --- | --- |
+| `cluster-logging` | `cluster-logging.v6.5.0` |
+| `loki-operator` | `loki-operator.v6.5.1` |
+
+## Spoke Pattern Compared
+
+The spoke pattern is under:
+
+```text
+clusters/spoke-dc-v7/operators/cluster-logging/
+clusters/spoke-dc-v7/operators/loki-operator/
+clusters/spoke-dc-v7/platform-services/logging/
+```
+
+It installs Logging/Loki 6.5, provisions a NooBaa
+`ObjectBucketClaim/loki-bucket`, reshapes the generated OBC secret with
+External Secrets, creates `LokiStack/logging-loki`, and forwards application,
+infrastructure, and audit logs through `ClusterLogForwarder/instance`.
+
+That exact pattern is not portable to hub because hub has no NooBaa or
+ObjectBucket API.
+
+## Decision
+
+Do not make a permanent hub exception the preferred path.
+
+The hub is the management plane, `WriteRequestBodies` is enabled, and the CIS
+control expects audit logs to be shipped for retention. A formal exception
+would leave the hub with weaker audit evidence than the spoke.
+
+Do not copy the spoke logging stack directly.
+
+The spoke stack assumes ODF/NooBaa object storage. The hub is compact and has
+LVMS local block storage only.
+
+The next gate should implement a hub-specific, audit-only design:
+
+| Component | Decision |
+| --- | --- |
+| Operators | Install `cluster-logging` and `loki-operator` on hub |
+| Object storage | Dedicated external MinIO bucket, for example `loki-hub-dc-v7` |
+| Credential custody | Dedicated MinIO user/policy, stored in Vault R1 |
+| Secret delivery | External Secrets projects `Secret/logging-loki-s3` |
+| LokiStack | `1x.pico`, `storageClassName: lvms-vg1`, tenants mode `openshift-logging` |
+| Forwarding | Audit-only `ClusterLogForwarder/instance` first |
+| RBAC | `collect-audit-logs` and `logging-collector-logs-writer` only |
+
+Forwarding application and infrastructure logs can be added later if needed.
+The first remediation gate should stay narrow and target the failing CIS
+audit-log-forwarding control.
+
+## Next Gate
+
+Run:
+
+```text
+OP-GF-COMPLIANCE-6: implement hub audit-log forwarding
+```
+
+The implementation gate should:
+
+1. Create a dedicated MinIO bucket and credential for hub Loki.
+2. Seed the credential into Vault R1 with a dedicated policy/role.
+3. Add hub GitOps desired state for Logging/Loki operators.
+4. Add `LokiStack/logging-loki` and an audit-only `ClusterLogForwarder`.
+5. Validate collector and Loki readiness.
+6. Run a hub `ocp4-cis` rescan and verify
+   `ocp4-cis-audit-log-forwarding-enabled` moves to PASS.
+
+After that, handle the final hub CIS failure:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```

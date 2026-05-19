@@ -1,0 +1,118 @@
+---
+title: "Installation Manual - 87 Hub RBAC least-privilege inventory"
+sidebar_label: "87 Hub RBAC least-privilege inventory"
+description: "Read-only RBAC inventory for hub-dc-v7 CIS manual RBAC checks."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` RBAC least-privilege inventory for the
+remaining CIS manual RBAC checks.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-16` / `#408` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-15` / `#407` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Current Compliance State
+
+Read-only validation before and after inventory confirmed:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `ComplianceScan/ocp4-cis` | `DONE / COMPLIANT` |
+| `ComplianceScan/ocp4-cis-node-master` | `DONE / COMPLIANT` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Inventory Scope
+
+Objects inventoried:
+
+| Object type | Count |
+| --- | ---: |
+| ClusterRoles | `909` |
+| Roles | `241` |
+| ClusterRoleBindings | `349` |
+| RoleBindings | `567` |
+
+Risk selectors:
+
+- wildcard access: resource `*` plus verb `*`;
+- Secret access: resource `secrets` or `*` plus read/write/delete verbs;
+- pod mutation: resource `pods` or `*` plus create/update/patch/delete verbs.
+
+## Risk Counts
+
+| Area | Count |
+| --- | ---: |
+| ClusterRoles with wildcard access | `22` |
+| ClusterRoles with Secret access | `116` |
+| ClusterRoles with pod mutation | `70` |
+| Roles with wildcard access | `5` |
+| Roles with Secret access | `44` |
+| Roles with pod mutation | `12` |
+
+These counts are not remediation targets by themselves. OpenShift and platform
+operators need broad RBAC for controller behavior. The next gate classifies
+what should become an accepted exception and what might be safely reduced.
+
+## Initial Review Queue
+
+| ID | Area | Candidate | Initial handling |
+| --- | --- | --- | --- |
+| `RBAC-001` | GitOps | Argo CD application-controller cluster-admin | Keep current exception; design least-privilege separately. |
+| `RBAC-002` | Break-glass | `User::ze` cluster-admin and managedclusterset admin/view | Keep until identity and break-glass process are formalized. |
+| `RBAC-003` | RHACS | RHACS operator and StackRox sensor/Central bindings | Classify as vendor/platform exceptions before reduction. |
+| `RBAC-004` | ACM/MCE | MulticlusterHub, MCE, application-manager, policy, klusterlet, Hypershift addon roles | Treat as platform exception candidates. |
+| `RBAC-005` | GitOps service role | `gitops-service-cluster` Secret access | Review with Argo CD RBAC work. |
+| `RBAC-006` | Namespace defaults | `system:deployers` in platform namespaces | Low-priority cleanup preflight after checking ownership/recreation behavior. |
+| `RBAC-007` | Monitoring metrics RoleBindings | Prometheus bindings to ACM addon metrics roles with Secret access | Validate whether Secret access is required or inherited. |
+
+## Local High-Privilege Bindings
+
+The cluster has expected OpenShift system/operator `cluster-admin` bindings.
+The local/platform exceptions to track are:
+
+| Binding | Subject | Disposition |
+| --- | --- | --- |
+| `argocd-hub-dc-v7-platform-cluster-admin` | `ServiceAccount:openshift-gitops:openshift-gitops-argocd-application-controller` | Current GitOps bootstrap exception. |
+| `cluster-admin-0` | `User:ze` | Current lab break-glass exception. |
+
+## Result
+
+The hub RBAC posture is now inventoried, but no RBAC reduction has been
+performed. Most broad access belongs to platform/operator control planes.
+
+Do not remove RBAC from this inventory directly. The next gate should classify
+exceptions and design any reduction path with rollback validation.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-17: hub RBAC exception register and reduction design
+```

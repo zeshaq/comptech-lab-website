@@ -1,0 +1,233 @@
+---
+title: "Installation Manual - 33 Spoke logging drainability and GitHub source"
+sidebar_label: "33 Spoke logging drainability and GitHub source"
+description: "How the v7 platform GitOps source moved to GitHub and how spoke-dc-v7 logging was made drainable for worker maintenance."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the recovery and hardening gate that made
+`spoke-dc-v7` logging safe for worker maintenance drains. During the same
+gate, the operational GitOps source was moved from the removed greenfield
+GitLab service to GitHub.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Source pivot issue | `OP-GF-GITHUB-GITOPS1`, issue `#369` |
+| Logging gate issue | `OP-GF-SPOKEDCV7-21`, issue `#368` |
+| Active GitOps repo | `https://github.com/zeshaq/openshift-platform-gitops` |
+| Argo repo URL | `git@github.com:zeshaq/openshift-platform-gitops.git` |
+| Source pivot revision | `286c402e0323719b7692a5ea051d70f3aadedfcc` |
+| Loki change revision | `747067dfdd49adbbb01bc2c70251f83e587f327b` |
+| LokiStack | `openshift-logging/logging-loki` |
+| Loki size | `1x.pico` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/logging-drainability-gate.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, pull secrets, PAT values, repository private keys,
+Secret data, or full Secret manifests.
+
+## GitHub Source Pivot
+
+The active v7 GitOps source is now GitHub:
+
+```text
+https://github.com/zeshaq/openshift-platform-gitops
+git@github.com:zeshaq/openshift-platform-gitops.git
+```
+
+The bootstrap clone remains:
+
+```bash
+cd /home/ze/greenfield-ops/openshift-gitops
+```
+
+Validate that the clone tracks GitHub.
+
+```bash
+git status --short --branch
+git remote -v
+git log -2 --oneline
+```
+
+Expected source state:
+
+```text
+origin  git@github.com:zeshaq/openshift-platform-gitops.git
+286c402 Point greenfield GitOps to GitHub
+747067d Make spoke LokiStack drainable
+```
+
+## Argo Source Validation
+
+Confirm that hub and spoke OpenShift GitOps are reading GitHub.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io \
+  -o custom-columns=NAME:.metadata.name,REPO:.spec.source.repoURL,REV:.status.sync.revision,SYNC:.status.sync.status,HEALTH:.status.health.status
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io \
+  -o custom-columns=NAME:.metadata.name,REPO:.spec.source.repoURL,REV:.status.sync.revision,SYNC:.status.sync.status,HEALTH:.status.health.status
+```
+
+Final evidence from this gate:
+
+```text
+hub-dc-v7-bootstrap:        Synced/Healthy at 286c402e0323719b7692a5ea051d70f3aadedfcc
+spoke-dc-v7-cluster-config: Synced/Healthy at 286c402e0323719b7692a5ea051d70f3aadedfcc
+spoke local cluster config: Synced/Healthy at 286c402e0323719b7692a5ea051d70f3aadedfcc
+```
+
+Repository credential metadata should show only the GitHub repository
+credential.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get secrets -l argocd.argoproj.io/secret-type=repository
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-gitops \
+  get secrets -l argocd.argoproj.io/secret-type=repository
+```
+
+Expected credential name:
+
+```text
+repo-openshift-platform-gitops-github
+```
+
+The old GitLab repository credential Secrets were deleted during this gate.
+
+## Loki Drainability Change
+
+The worker MachineConfig gate in chapter 32 found that `1x.demo` Loki created
+single-replica components whose PDBs blocked worker drains. The fix was to use
+the smallest operator-supported HA footprint:
+
+```yaml
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: logging-loki
+  namespace: openshift-logging
+spec:
+  size: 1x.pico
+```
+
+Changed files:
+
+```text
+clusters/spoke-dc-v7/platform-services/logging/lokistack.yaml
+clusters/spoke-dc-v7/platform-services/logging/kustomization.yaml
+```
+
+## Loki Validation
+
+Check the LokiStack state.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack logging-loki -o jsonpath='{.spec.size}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack logging-loki -o json \
+  | jq -r '.status.conditions[] | [.type,.status,.reason] | @tsv'
+```
+
+Expected state:
+
+```text
+1x.pico
+Ready    True     ReadyComponents
+Pending  False    PendingComponents
+Warning  False    InsufficientIngesterReplicas
+```
+
+Check pods and PDBs.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get pods -l app.kubernetes.io/instance=logging-loki -o wide
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get pdb -o json \
+  | jq -r '.items[] | select(.metadata.name|startswith("logging-loki-")) |
+    [.metadata.name, (.spec.minAvailable // ""), .status.expectedPods,
+     .status.currentHealthy, .status.desiredHealthy,
+     .status.disruptionsAllowed] | @tsv'
+```
+
+Final PDB evidence:
+
+```text
+logging-loki-distributor      allowed=1
+logging-loki-gateway          allowed=1
+logging-loki-index-gateway    allowed=1
+logging-loki-ingester         allowed=1
+logging-loki-querier          allowed=1
+logging-loki-query-frontend   allowed=1
+```
+
+## Worker Drain Dry Run
+
+Use server-side dry-run before any real worker maintenance drain.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain spoke-dc-v7-worker-2 \
+  --ignore-daemonsets \
+  --delete-emptydir-data \
+  --dry-run=server \
+  --timeout=90s
+```
+
+Final result from this gate:
+
+```text
+node/spoke-dc-v7-worker-2 drained (server dry run)
+```
+
+No actual worker drain or reboot was performed.
+
+## Cluster Health
+
+Run the standard post-change checks.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+```
+
+Final evidence:
+
+```text
+OpenShift version: 4.20.18
+Nodes: 6 Ready
+MCP master: Updated=True Updating=False Degraded=False, 3/3 ready
+MCP worker: Updated=True Updating=False Degraded=False, 3/3 ready
+ClusterOperators: no non-steady operators reported
+```
+
+## Residuals
+
+- A real worker drain was not performed in this gate.
+- GitHub branch protection and rulesets were not configured for the new
+  private operational GitOps repository.
+- Resume worker MachineConfig hardening in small batches only, with Argo,
+  Loki PDB, MCP, and node readiness validation before and after each change.

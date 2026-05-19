@@ -1,0 +1,268 @@
+---
+title: "Installation Manual - 97 Hub Gatekeeper operand preflight"
+sidebar_label: "97 Hub Gatekeeper operand preflight"
+description: "Preflight and rollback design for the first hub Gatekeeper operand rollout with no constraints."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-06` hub Gatekeeper operand
+no-constraints preflight and rollback-design gate.
+
+This gate did not create a live `Gatekeeper` custom resource, admission
+webhook, constraint template, constraint, ComplianceScan, OADP backup, node
+drain, storage object, or GitOps desired-state change.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-06` / `#418` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-05` / `#417` |
+
+## Intent
+
+The hub and spoke now both have the Red Hat Gatekeeper Operator installed.
+The next risky step is creating the `Gatekeeper` operand because that creates
+the admission webhook surface. This gate preflighted the hub operand shape and
+rollback path before any live operand is created.
+
+## Access Path
+
+Live checks used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+Hub kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+```
+
+## Hub Health
+
+Hub health during preflight:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+## Current Operator-only State
+
+```text
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=943566f35aebd1135f03645cc71b1a6097bdbd11
+subscription=gatekeeper-operator-product state=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=gatekeeper-operator-product.v3.21.0 phase=Succeeded reason=InstallSucceeded
+installplan=install-wtjf5 phase=Complete
+pod=gatekeeper-operator-controller-c7d5c4476-8vr54 status=Running node=hub-dc-v7-master-0
+```
+
+Current guardrails:
+
+- no `Gatekeeper` custom resources;
+- no Gatekeeper constraint APIs;
+- no Gatekeeper webhook configurations;
+- no Gatekeeper operand workloads beyond the operator deployment.
+
+## CRD Shape
+
+The installed CRD is:
+
+```text
+gatekeepers.operator.gatekeeper.sh
+scope=Cluster
+version=v1alpha1 served=true storage=true
+```
+
+Important spec fields:
+
+```text
+validatingWebhook
+mutatingWebhook
+webhook
+mutatingWebhookConfig
+audit
+config
+image
+nodeSelector
+tolerations
+affinity
+podAnnotations
+```
+
+Important defaults from the live CRD:
+
+```text
+validatingWebhook default=Enabled
+mutatingWebhook default=Enabled
+webhook.failurePolicy default=Ignore for validating/mutating webhooks
+audit.logLevel default=INFO
+webhook.logLevel default=INFO
+```
+
+The CSV `alm-examples` manifest only sets `validatingWebhook: Enabled`. That
+would leave the mutating webhook enabled by default, so the first canary
+should explicitly disable mutation.
+
+## Scheduling Check
+
+The compact hub nodes have no taints and carry the worker role. A default
+Gatekeeper operand is not blocked by master taints.
+
+## Dry-runs
+
+Server-side dry-runs accepted these operand shapes:
+
+```text
+implicit spec
+spec: {}
+OLM example with validatingWebhook: Enabled
+validatingWebhook: Enabled and mutatingWebhook: Disabled
+validatingWebhook: Disabled and mutatingWebhook: Disabled
+recommended candidate
+```
+
+The recommended candidate is:
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+Server-side dry-run result:
+
+```text
+gatekeeper.operator.gatekeeper.sh/gatekeeper created (server dry run)
+```
+
+Post-dry-run guardrails confirmed no live operand, constraints, or webhooks
+were created.
+
+## Future GitOps Design
+
+Recommended future path:
+
+```text
+clusters/hub-dc-v7/security/gatekeeper
+```
+
+Add `security/gatekeeper` to:
+
+```text
+clusters/hub-dc-v7/security/kustomization.yaml
+```
+
+Recommended future live manifest:
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+## Future Acceptance Criteria
+
+Before apply:
+
+- hub health clean;
+- hub Argo app `Synced/Healthy`;
+- Gatekeeper operator Subscription `AtLatestKnown`;
+- CSV `Succeeded`;
+- no existing `Gatekeeper` CR;
+- no existing Gatekeeper webhook configurations;
+- no constraint templates or constraints.
+
+After apply:
+
+- hub Argo app `Synced/Healthy` at the new revision;
+- `Gatekeeper/gatekeeper` exists;
+- Gatekeeper operand pods are Running;
+- validating webhook configuration exists;
+- mutating webhook configuration is absent or disabled;
+- no constraint templates or constraints exist;
+- hub health remains clean;
+- server-side admission smoke dry-run succeeds.
+
+Admission smoke:
+
+```bash
+oc --kubeconfig "$K" -n default create configmap gatekeeper-admission-smoke \
+  --from-literal=ok=true \
+  --dry-run=server -o yaml >/dev/null
+```
+
+## Rollback Design
+
+Preferred rollback is GitOps:
+
+1. Remove the future `security/gatekeeper` resource from GitOps.
+2. Let Argo prune the `Gatekeeper` CR. The hub app has automated prune and
+   self-heal enabled.
+3. Hard-refresh the hub Argo app if needed.
+4. Validate that the `Gatekeeper` CR, Gatekeeper webhook configurations, and
+   Gatekeeper operand pods are gone.
+
+Break-glass rollback, if Argo cannot remove the operand:
+
+```bash
+oc --kubeconfig "$K" delete gatekeeper.operator.gatekeeper.sh gatekeeper --wait=false
+```
+
+If webhook configurations remain after the CR is gone and API availability is
+at risk, list only Gatekeeper-named webhook configurations:
+
+```bash
+oc --kubeconfig "$K" get validatingwebhookconfiguration,mutatingwebhookconfiguration | grep -i gatekeeper
+```
+
+Review the exact names before deleting anything.
+
+Post-rollback guardrails:
+
+- no `Gatekeeper` CR;
+- no Gatekeeper webhook configurations;
+- no Gatekeeper operand deployments or pods, except the operator deployment;
+- no constraint template or constraint instances from the gate;
+- hub health clean;
+- admission smoke dry-run succeeds.
+
+## Result
+
+The preflight is complete. The future live gate can proceed on hub only with
+the recommended no-constraints, no-mutation candidate.
+
+The next recommended gate is:
+
+```text
+OP-GF-OPERATORS-07: hub Gatekeeper operand no-constraints live canary
+```

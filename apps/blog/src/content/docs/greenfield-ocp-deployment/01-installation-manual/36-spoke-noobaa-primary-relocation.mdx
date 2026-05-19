@@ -1,0 +1,224 @@
+---
+title: "Installation Manual - 36 Spoke NooBaa primary relocation"
+sidebar_label: "36 Spoke NooBaa primary relocation"
+description: "How to relocate the spoke-dc-v7 NooBaa database primary before draining the worker that currently hosts it."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the NooBaa database primary relocation gate for
+`spoke-dc-v7`. The previous drainability gate found that worker-2 could not be
+drained while it hosted the NooBaa DB primary. This gate moved the primary to
+the other NooBaa DB instance and proved worker-2 drainability by server-side
+dry run.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-24`, issue `#374` |
+| Cluster | `spoke-dc-v7` |
+| Scope | NooBaa DB primary relocation for worker-2 drainability |
+| CNPG resource | `clusters.postgresql.cnpg.noobaa.io/noobaa-db-pg-cluster` |
+| Promoted instance | `noobaa-db-pg-cluster-2` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/noobaa-primary-relocation-gate.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Supported Mechanism
+
+The NooBaa DB pods are owned by an ODF-managed CNPG cluster:
+
+```text
+postgresql.cnpg.noobaa.io/v1/Cluster/noobaa-db-pg-cluster
+```
+
+The bundled plugin exposes the supported primary relocation command:
+
+```text
+kubectl-cnpg promote CLUSTER INSTANCE
+```
+
+CloudNativePG documents this as the command to promote a selected pod to
+primary for maintenance or switchover:
+
+```text
+https://cloudnative-pg.io/documentation/preview/kubectl-plugin/#promote
+```
+
+Do not patch `PDB/noobaa-db-pg-cluster-primary` directly. The PDB protects the
+current database primary.
+
+## Preflight
+
+Confirm baseline health and current NooBaa DB placement.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get clusters.postgresql.cnpg.noobaa.io noobaa-db-pg-cluster -o json \
+  | jq -r '"currentPrimary=\(.status.currentPrimary) targetPrimary=\(.status.targetPrimary) readyInstances=\(.status.readyInstances) phase=\(.status.phase)"'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -o json \
+  | jq -r '.items[] | select(.metadata.name | test("^noobaa-db-pg-cluster")) |
+    [.metadata.name, .spec.nodeName, .status.phase,
+     ([.status.conditions[]? | select(.type=="Ready") | .status][0] // ""),
+     (.metadata.labels["cnpg.io/instanceRole"] // "")] | @tsv'
+```
+
+Pre-change state:
+
+```text
+currentPrimary=noobaa-db-pg-cluster-1
+targetPrimary=noobaa-db-pg-cluster-1
+readyInstances=2
+phase=Cluster in healthy state
+
+noobaa-db-pg-cluster-1  spoke-dc-v7-worker-2  Running  True  primary
+noobaa-db-pg-cluster-2  spoke-dc-v7-worker-1  Running  True  replica
+```
+
+## Plugin Handling
+
+The controller pod contains the matching ODF-bundled plugin. Copy it to the
+bootstrap VM and run it with the existing cluster-admin kubeconfig.
+
+```bash
+controller_pod=$(oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -o json \
+  | jq -r '.items[] | select(.metadata.name | test("^cnpg-controller-manager-")) |
+    .metadata.name' | head -1)
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  exec "$controller_pod" -- cat /usr/bin/kubectl-cnpg \
+  > /tmp/kubectl-cnpg-noobaa
+
+chmod 700 /tmp/kubectl-cnpg-noobaa
+/tmp/kubectl-cnpg-noobaa version --kubeconfig "$SPOKE_KUBECONFIG"
+```
+
+Observed version:
+
+```text
+Build: Version 4.20.10
+```
+
+The in-pod `status` command works, but the in-pod `promote` path failed on
+the controller service account's discovery path in this environment. Running
+the same binary from the bootstrap VM with the cluster kubeconfig avoided that
+RBAC/discovery issue.
+
+## Promote The Replica
+
+Promote the replica that is not on the worker being drained.
+
+```bash
+/tmp/kubectl-cnpg-noobaa promote noobaa-db-pg-cluster noobaa-db-pg-cluster-2 \
+  -n openshift-storage \
+  --kubeconfig "$SPOKE_KUBECONFIG" \
+  --request-timeout=60s
+```
+
+Expected response:
+
+```text
+Node noobaa-db-pg-cluster-2 in cluster noobaa-db-pg-cluster will be promoted
+```
+
+The cluster may briefly show:
+
+```text
+phase=Switchover in progress
+```
+
+Wait until it returns to:
+
+```text
+currentPrimary=noobaa-db-pg-cluster-2
+targetPrimary=noobaa-db-pg-cluster-2
+readyInstances=2
+phase=Cluster in healthy state
+```
+
+## Final Validation
+
+Validate cluster health:
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get storagecluster ocs-storagecluster -o jsonpath='{.status.phase}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cephcluster ocs-storagecluster-cephcluster -o jsonpath='{.status.ceph.health}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa -o jsonpath='{.status.phase}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack logging-loki
+```
+
+Validate worker drain behavior:
+
+```bash
+for node in $(oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes \
+  -l node-role.kubernetes.io/worker= \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort); do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain "$node" \
+    --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=90s
+done
+```
+
+Final observed state:
+
+```text
+noobaa-db-pg-cluster-1  spoke-dc-v7-worker-2  Running  True  replica
+noobaa-db-pg-cluster-2  spoke-dc-v7-worker-1  Running  True  primary
+```
+
+Drain dry-run result:
+
+| Worker | Result |
+| --- | --- |
+| `spoke-dc-v7-worker-0` | passed |
+| `spoke-dc-v7-worker-1` | failed, now hosts protected NooBaa DB primary |
+| `spoke-dc-v7-worker-2` | passed |
+
+Worker-2 evidence:
+
+```text
+node/spoke-dc-v7-worker-2 drained (server dry run)
+```
+
+All workers remained schedulable after the dry-run checks.
+
+## Operating Decision
+
+This gate made `spoke-dc-v7-worker-2` drainable without weakening the NooBaa
+primary PDB.
+
+It did not make all workers simultaneously drainable. With the current
+two-instance NooBaa DB shape, whichever worker hosts the primary will be the
+blocked voluntary drain target.
+
+If worker-1 must be drained later, first relocate the primary away from
+worker-1 and rerun dry-run drain validation.

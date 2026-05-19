@@ -1,0 +1,233 @@
+---
+title: "Installation Manual - 100 Spoke Gatekeeper operand preflight"
+sidebar_label: "100 Spoke Gatekeeper operand preflight"
+description: "Preflight and rollback design for the first spoke Gatekeeper operand rollout with no constraints."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-09`, the spoke Gatekeeper operand
+no-constraints preflight and rollback design.
+
+This was a no-change gate. It did not create a live `Gatekeeper` custom
+resource, admission webhook, constraint template, constraint, mutation config,
+hub operand change, ComplianceScan, OADP backup, node drain, storage object,
+or platform GitOps desired-state change.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-09` / `#421` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-08` / `#420` |
+
+## Intent
+
+The hub Gatekeeper no-constraints operand has been installed and its rollback
+path has been drilled. The next step is to preflight the same no-constraints
+operand shape on `spoke-dc-v7` before introducing any spoke admission webhook.
+
+## Access Path
+
+Live checks used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Spoke Health
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=6/6
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+## Argo State
+
+```text
+hub_side_app=spoke-dc-v7-cluster-config sync=Synced health=Healthy rev=27770eaf9ffd93fdda6e482d08368624a33c04ad
+spoke_side_app=spoke-dc-v7-cluster-config sync=Synced health=Healthy rev=27770eaf9ffd93fdda6e482d08368624a33c04ad
+```
+
+## Operator State
+
+```text
+subscription=gatekeeper-operator-product state=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=gatekeeper-operator-product.v3.21.0 phase=Succeeded reason=InstallSucceeded
+installplan=install-fcm92 phase=Complete approved=true
+pod=gatekeeper-operator-controller-c7d5c4476-hwvxb status=Running node=spoke-dc-v7-worker-0
+```
+
+Use `subscriptions.operators.coreos.com` for OLM checks. The short name
+`subscription` is ambiguous on this cluster because ACM also defines a
+Subscription API.
+
+## Current Guardrails
+
+```text
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_api_resources=none
+mutation_instances=none
+```
+
+## CRD Shape
+
+```text
+crd=gatekeepers.operator.gatekeeper.sh scope=Cluster
+version=v1alpha1 served=true storage=true
+validatingWebhook_default=Enabled
+mutatingWebhook_default=Enabled
+webhook_failurePolicy_default=<none>
+webhook_logLevel_default=INFO
+audit_logLevel_default=INFO
+```
+
+Because both webhooks default to `Enabled`, the future spoke canary must set
+`mutatingWebhook: Disabled` explicitly. The CRD schema did not expose a
+default for `webhook.failurePolicy` in this check, so the future manifest
+should set `Ignore` explicitly.
+
+## Scheduling Facts
+
+```text
+node=spoke-dc-v7-master-0 roles=control-plane,master taints=node-role.kubernetes.io/master:NoSchedule
+node=spoke-dc-v7-master-1 roles=control-plane,master taints=node-role.kubernetes.io/master:NoSchedule
+node=spoke-dc-v7-master-2 roles=control-plane,master taints=node-role.kubernetes.io/master:NoSchedule
+node=spoke-dc-v7-worker-0 roles=worker taints=
+node=spoke-dc-v7-worker-1 roles=worker taints=
+node=spoke-dc-v7-worker-2 roles=worker taints=
+```
+
+Default operand scheduling should land on the untainted worker nodes. The
+current operator pod already runs on `spoke-dc-v7-worker-0`.
+
+## Dry-runs
+
+Server-side dry-runs accepted:
+
+```text
+implicit spec
+spec: {}
+recommended no-constraints candidate
+validatingWebhook: Disabled and mutatingWebhook: Disabled
+exact future GitOps candidate with Argo annotations
+```
+
+The exact future manifest dry-run returned:
+
+```text
+gatekeeper.operator.gatekeeper.sh/gatekeeper
+```
+
+Post-dry-run guardrails confirmed no live operand, webhooks, constraints, or
+mutation resources were created.
+
+## Future GitOps Design
+
+Recommended future path:
+
+```text
+clusters/spoke-dc-v7/security/gatekeeper
+```
+
+Add `security/gatekeeper` to:
+
+```text
+clusters/spoke-dc-v7/security/kustomization.yaml
+```
+
+Recommended future manifest:
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+## Future Acceptance Criteria
+
+Before apply:
+
+- spoke health clean;
+- hub-side and spoke-side Argo apps `Synced/Healthy`;
+- Gatekeeper operator Subscription `AtLatestKnown`;
+- CSV `Succeeded`;
+- no existing `Gatekeeper` CR;
+- no existing Gatekeeper webhook configurations;
+- no `ConstraintTemplate` instances, constraints, or mutation instances.
+
+After apply:
+
+- hub-side and spoke-side Argo apps `Synced/Healthy` at the new revision;
+- `Gatekeeper/gatekeeper` exists with validating enabled, mutation disabled,
+  and failure policy `Ignore`;
+- Gatekeeper operand pods are Running;
+- validating webhook configuration exists and is fail-open;
+- mutating webhook configuration remains absent;
+- no `ConstraintTemplate` instances or constraints exist;
+- no mutation instances exist;
+- spoke health remains clean;
+- server-side admission smoke dry-run succeeds.
+
+## Rollback Pattern
+
+Primary rollback is GitOps-first:
+
+- remove `security/gatekeeper` from
+  `clusters/spoke-dc-v7/security/kustomization.yaml`;
+- remove `clusters/spoke-dc-v7/security/gatekeeper`;
+- push the rollback commit;
+- refresh the hub-side and spoke-side `spoke-dc-v7-cluster-config` apps if
+  needed;
+- let Argo prune the operand;
+- validate no `Gatekeeper` CR, no Gatekeeper webhooks, no operand workloads,
+  clean spoke health, and a passing server-side admission smoke dry-run.
+
+Break-glass rollback is reserved for a failed GitOps rollback:
+
+```bash
+oc --kubeconfig "$SPOKE" delete gatekeeper.operator.gatekeeper.sh gatekeeper
+```
+
+If webhook configurations persist after the CR is gone and admission
+availability is at risk, inspect and remove only webhook configurations with
+`gatekeeper` in the name.
+
+## Result
+
+The gate passed. `spoke-dc-v7` is ready for a future no-constraints
+Gatekeeper operand canary.
+
+Recommended next gate:
+
+```text
+OP-GF-OPERATORS-10: spoke Gatekeeper operand no-constraints live canary
+```

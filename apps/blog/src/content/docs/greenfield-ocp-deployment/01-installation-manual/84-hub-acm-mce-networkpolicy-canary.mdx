@@ -1,0 +1,175 @@
+---
+title: "Installation Manual - 84 Hub ACM MCE NetworkPolicy canary"
+sidebar_label: "84 Hub ACM MCE NetworkPolicy canary"
+description: "GitOps canary and validation for hub-dc-v7 ACM/MCE namespace NetworkPolicies."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` ACM/MCE NetworkPolicy canary gate for
+the remaining hub compliance namespaces:
+
+- `multicluster-engine`
+- `open-cluster-management`
+- `open-cluster-management-hub`
+
+The gate applied only ingress policies. It did not add egress default-deny.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-13` / `#405` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-12` / `#404` |
+
+## Access Path
+
+All live checks, Argo reconciliation, and the Compliance rescan used the
+established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Preflight
+
+Preflight at `2026-05-19T12:46:43Z` confirmed:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Target bad pods | none |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `cbd823129191540acea25807495c5784e6eabd53` |
+| Target NetworkPolicies | `0` in each target namespace |
+
+ACM/MCE raw API discovery passed for:
+
+- `/apis/clusterview.open-cluster-management.io/v1`
+- `/apis/clusterview.open-cluster-management.io/v1alpha1`
+- `/apis/proxy.open-cluster-management.io/v1beta1`
+
+Admission server dry-runs passed for:
+
+- `MulticlusterEngine/multiclusterengine`
+- `MulticlusterHub/open-cluster-management/multiclusterhub`
+- first `ManagedCluster`
+- first `ManifestWork`
+
+CRD conversion list checks also passed. Two stale CRD conversion service
+references were discovered and left as residual product-state risk:
+
+- `multicluster-engine/webhook-service`
+- `open-cluster-management/multicluster-observability-webhook-service`
+
+## GitOps Change
+
+Platform GitOps commit:
+
+```text
+12c68ae Add ACM MCE hub NetworkPolicy canary
+```
+
+Full final Argo revision:
+
+```text
+12c68aee6d6a77dfcc197926d4f36594ea224625
+```
+
+## Applied Policies
+
+Each target namespace received:
+
+- `default-deny-ingress`
+- `allow-same-namespace-ingress`
+- `allow-service-ports-ingress`
+
+The service-port rules are source-wide but destination-port scoped. This was
+chosen because the ACM/MCE namespaces host admission webhooks, aggregated API
+backends, CRD conversion paths, route-backed endpoints, console services,
+managed-cluster agent endpoints, and metrics services.
+
+Port model:
+
+| Namespace | Allowed TCP destination ports |
+| --- | --- |
+| `multicluster-engine` | `80`, `443`, `3000`, `6443`, `8000`, `8080`, `8090`, `8091`, `8443`, `9091`, `9092`, `9443` |
+| `open-cluster-management` | `443`, `3000`, `8381`, `8383`, `8389`, `8443`, `9442`, `9443` |
+| `open-cluster-management-hub` | `9443` |
+
+Both Service ports and target container ports are included where they differ,
+following the previous OVNKubernetes canary result.
+
+## Validation
+
+Final validation at `2026-05-19T12:51:59Z`:
+
+| Check | Result |
+| --- | --- |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Non-running pods | none |
+| Target deployments | all Ready and Available |
+| Target NetworkPolicies | `3` per namespace |
+| ACM/MCE raw API discovery | passed |
+| Admission server dry-runs | passed |
+
+Post-apply NetworkPolicy inventory:
+
+| Metric | Count |
+| --- | ---: |
+| Namespaces | 99 |
+| NetworkPolicies | 119 |
+| Namespaces with NetworkPolicy | 34 |
+| Namespaces without NetworkPolicy | 65 |
+
+No user/project namespace remains without NetworkPolicy. The only non-prefixed
+namespace still without NetworkPolicy is the system namespace `openshift`.
+
+## Compliance Rescan
+
+One-off hub `ComplianceScan/ocp4-cis` rescan:
+
+| Field | Value |
+| --- | --- |
+| Trigger | `2026-05-19T12:50:52Z` |
+| End | `2026-05-19T12:51:40Z` |
+| Phase | `DONE` |
+| Result | `COMPLIANT` |
+
+Post-rescan counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 162 |
+| MANUAL | 21 |
+| FAIL | 0 |
+
+The namespace NetworkPolicy check is now passing:
+
+```text
+ocp4-cis-configure-network-policies-namespaces = PASS
+```
+
+## Residual Risk
+
+The ACM/MCE policy set is a conservative compliance canary, not final
+least-privilege segmentation. Future tightening should be planned in a
+separate gate and should account for the stale CRD conversion service
+references found during preflight.
+
+## Next Gate
+
+Review the remaining hub compliance `MANUAL` checks, then select the next
+OpenShift operator/platform readiness gate.

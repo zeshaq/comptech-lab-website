@@ -1,0 +1,148 @@
+---
+title: "Installation Manual - 83 Hub webhook NetworkPolicy canary"
+sidebar_label: "83 Hub webhook NetworkPolicy canary"
+description: "GitOps canary and validation for hub-dc-v7 webhook and APIService-sensitive NetworkPolicies."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` webhook/APIService NetworkPolicy canary
+gate for `cert-manager`, `hive`, and `hypershift`.
+
+The gate applied only ingress policies. It did not add egress default-deny,
+and it did not touch the broader ACM/MCE namespaces.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-12` / `#404` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-11` / `#403` |
+
+## Access Path
+
+All live checks and the Compliance rescan used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## GitOps Changes
+
+Initial platform GitOps commit:
+
+```text
+bec1755 Add hub webhook NetworkPolicy canary
+```
+
+Corrective platform GitOps commit:
+
+```text
+cbd8231 Broaden hub canary webhook port allows
+```
+
+Full final Argo revision:
+
+```text
+cbd823129191540acea25807495c5784e6eabd53
+```
+
+## Applied Policies
+
+Each canary namespace received:
+
+- `default-deny-ingress`
+- `allow-same-namespace-ingress`
+- `allow-kube-apiserver-ingress`
+- `allow-monitoring-ingress`
+
+Final port model:
+
+| Namespace | Webhook/APIService ports | Monitoring ports |
+| --- | --- | --- |
+| `cert-manager` | `443`, `10250` | `9402` |
+| `hive` | `443`, `9443` | `2112`, `6060` |
+| `hypershift` | `443`, `9443` | `9393`, `9000` |
+
+The webhook/APIService rules are source-wide but port-scoped. The first
+source-constrained rule set caused webhook/APIService timeouts, so the final
+GitOps state preserves the relevant destination ports while keeping the rest
+of ingress denied.
+
+## Validation
+
+Final validation at `2026-05-19T12:36:11Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Network type | `OVNKubernetes` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `cbd823129191540acea25807495c5784e6eabd53` |
+| Non-running pods | none |
+| Canary workloads | all deployments and StatefulSets Ready |
+| Hive APIService | `Available=True`, reason `Passed` |
+| Hive raw discovery | `APIResourceList admission.hive.openshift.io/v1` |
+| cert-manager webhook dry-run | passed |
+| Hypershift webhook dry-run | reached webhook and returned normal spec validation |
+
+## Compliance Rescan
+
+One-off hub `ComplianceScan/ocp4-cis` rescan:
+
+| Field | Value |
+| --- | --- |
+| Trigger | `2026-05-19T12:36:30Z` |
+| Start | `2026-05-19T12:36:31Z` |
+| End | `2026-05-19T12:37:16Z` |
+| Phase | `DONE` |
+| Result | `NON-COMPLIANT` |
+
+Post-rescan counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+The remaining failed check is:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```
+
+## Residual Coverage
+
+Post-apply inventory at `2026-05-19T12:37:37Z`:
+
+| Metric | Count |
+| --- | ---: |
+| Namespaces | 99 |
+| NetworkPolicies | 110 |
+| Namespaces with NetworkPolicy | 31 |
+| Namespaces without NetworkPolicy | 68 |
+
+Remaining non-system namespaces without NetworkPolicy:
+
+```text
+multicluster-engine
+open-cluster-management
+open-cluster-management-hub
+```
+
+## Next Gate
+
+The next gate should handle the broader ACM/MCE hub namespaces:
+
+```text
+OP-GF-COMPLIANCE-13: ACM/MCE hub namespace NetworkPolicy design or tailoring
+```

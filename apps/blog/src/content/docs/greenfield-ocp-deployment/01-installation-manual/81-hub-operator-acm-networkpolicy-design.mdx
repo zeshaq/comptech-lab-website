@@ -1,0 +1,162 @@
+---
+title: "Installation Manual - 81 Hub operator ACM NetworkPolicy design"
+sidebar_label: "81 Hub operator ACM NetworkPolicy design"
+description: "Read-only design gate for remaining hub-dc-v7 NetworkPolicy coverage after the first low-risk apply set."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` design gate for the remaining
+NetworkPolicy coverage work after the first low-risk set.
+
+The gate was read-only. It did not apply new NetworkPolicies or change the
+Compliance Operator baseline.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-10` / `#402` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-9` / `#401` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Live Health
+
+Read-only validation at `2026-05-19T11:55:47Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Network type | `OVNKubernetes` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `f4c643e` |
+| Non-running pods | none |
+| Target CIS check | FAIL |
+
+ComplianceCheckResult counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+## Remaining Namespaces
+
+Non-system namespaces still without NetworkPolicy:
+
+```text
+cert-manager
+cert-manager-operator
+external-secrets-operator
+hive
+hypershift
+multicluster-engine
+open-cluster-management
+open-cluster-management-agent
+open-cluster-management-agent-addon
+open-cluster-management-hub
+rhacs-operator
+```
+
+## Lower-Risk Apply Candidates
+
+These namespaces do not expose admission webhooks, APIService backends, or
+routes in the live inventory.
+
+| Namespace | Proposed next action |
+| --- | --- |
+| `cert-manager-operator` | default-deny ingress plus monitoring allow on `8443` |
+| `external-secrets-operator` | default-deny ingress plus monitoring allow on `8443` and `8080` |
+| `rhacs-operator` | default-deny ingress plus monitoring allow on `8443` |
+| `open-cluster-management-agent` | default-deny ingress only |
+| `open-cluster-management-agent-addon` | default-deny ingress plus monitoring allow on `8443` and `8388` |
+
+Monitoring source namespaces are labeled:
+
+```text
+network.openshift.io/policy-group=monitoring
+```
+
+## Sensitive Namespaces
+
+These namespaces need a separate canary policy or tailoring decision.
+
+| Namespace | Sensitive ingress |
+| --- | --- |
+| `cert-manager` | validating and mutating webhooks |
+| `hive` | `APIService/v1.admission.hive.openshift.io` and admission service |
+| `hypershift` | validating and mutating HostedCluster/NodePool webhooks |
+| `multicluster-engine` | routes, APIService backends, validating/mutating webhooks |
+| `open-cluster-management` | route, validating webhooks, metrics |
+| `open-cluster-management-hub` | core ACM validating/mutating webhooks |
+
+Router source namespace is labeled:
+
+```text
+network.openshift.io/policy-group=ingress
+```
+
+Admission webhook/APIService traffic needs extra care because kube-apiserver
+pods are host-networked. Do not apply broad default-deny to these namespaces
+without canary validation.
+
+## Tailoring Surface
+
+The hub has no `TailoredProfile` today. The current `ScanSettingBinding/cis`
+uses `Profile/ocp4-cis` and `Profile/ocp4-cis-node`.
+
+Relevant variable:
+
+```text
+ocp4-var-network-policies-namespaces-exempt-regex
+```
+
+Current value:
+
+```text
+None
+```
+
+If strict policy design is too risky for product-owned webhook/APIService
+namespaces, use a documented `TailoredProfile` rather than an unreviewed
+blanket default-deny.
+
+Potential later tailoring candidate set:
+
+```text
+cert-manager|hive|hypershift|multicluster-engine|open-cluster-management|open-cluster-management-hub
+```
+
+## Recommendation
+
+Use a split sequence:
+
+1. Apply lower-risk operator/agent policies in a separate gate.
+2. Validate hub health, Argo, pod readiness, metrics exposure, and Compliance
+   inventory.
+3. Design canary webhook/APIService policies or a documented tailoring
+   decision for the remaining product-owned namespaces.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-11: apply hub lower-risk operator/agent NetworkPolicies
+```

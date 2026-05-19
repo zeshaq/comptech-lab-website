@@ -1,0 +1,81 @@
+---
+// Site-wide search powered by Pagefind. The trigger button lives in
+// SectionNav.astro (id="site-search-trigger"); this component renders only
+// the modal + the Pagefind UI initialization. Pagefind generates its index
+// and UI assets at build time into /pagefind/*.
+//
+// In `astro dev` the /pagefind/* assets don't exist, so the script gracefully
+// degrades — clicking the trigger shows a placeholder message.
+---
+
+<dialog id="site-search-modal" class="search-modal" aria-label="Site search">
+  <div class="search-modal-inner">
+    <button type="button" class="search-close" aria-label="Close search">×</button>
+    <div id="site-search-ui"></div>
+    <p class="search-footer">Press <kbd>Esc</kbd> to close · <kbd>↑↓</kbd> to navigate</p>
+  </div>
+</dialog>
+
+<link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+<script src="/pagefind/pagefind-ui.js" is:inline></script>
+<script is:inline>
+  (() => {
+    const trigger = document.getElementById("site-search-trigger");
+    const modal = document.getElementById("site-search-modal");
+    const closeBtn = modal?.querySelector(".search-close");
+    let initialized = false;
+
+    function initUI() {
+      if (initialized || typeof window.PagefindUI === "undefined") return;
+      try {
+        new window.PagefindUI({
+          element: "#site-search-ui",
+          showSubResults: true,
+          showImages: false,
+          resetStyles: false,
+          autofocus: true,
+          translations: { placeholder: "Search blog, docs, learn…" },
+        });
+        initialized = true;
+      } catch (e) {
+        console.warn("Pagefind UI init failed", e);
+      }
+    }
+
+    function openModal() {
+      if (!modal) return;
+      if (typeof window.PagefindUI === "undefined") {
+        alert("Search is built at deploy time — try `npm run build && npm run preview` locally, or use the live site.");
+        return;
+      }
+      initUI();
+      modal.showModal();
+      setTimeout(() => {
+        const input = modal.querySelector(".pagefind-ui__search-input");
+        if (input instanceof HTMLInputElement) input.focus();
+      }, 30);
+    }
+
+    function closeModal() {
+      modal?.close();
+    }
+
+    trigger?.addEventListener("click", openModal);
+    closeBtn?.addEventListener("click", closeModal);
+    modal?.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      const cmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (cmdOrCtrl && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openModal();
+      }
+      if (e.key === "Escape" && modal?.open) {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+  })();
+</script>

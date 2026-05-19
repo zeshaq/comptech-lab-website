@@ -1,0 +1,217 @@
+---
+title: "Installation Manual - 99 Hub Gatekeeper rollback drill"
+sidebar_label: "99 Hub Gatekeeper rollback drill"
+description: "Hub Gatekeeper no-constraints soak and GitOps rollback-and-restore drill."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-08`, the live no-constraints soak and
+rollback drill for the `hub-dc-v7` Gatekeeper operand.
+
+The drill removed and restored only the hub `Gatekeeper/gatekeeper` operand
+through GitOps. It did not create constraint templates, constraints, mutation
+configs, a spoke operand, ComplianceScans, OADP backups, node drains, or
+storage changes.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-08` / `#420` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-07` / `#419` |
+
+## Intent
+
+The previous gate created the first hub Gatekeeper operand with no policies.
+Before adding any policy objects or a spoke operand, this gate proved that the
+team can remove and restore the hub operand through the same GitOps path.
+
+## Access Path
+
+Live checks and reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+Hub kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+```
+
+## Soak Baseline
+
+The corrected short soak confirmed the canary was stable:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=9ef3b532d9f69172c92307b55d71f83d1242f041
+gatekeeper=gatekeeper validatingWebhook=Enabled mutatingWebhook=Disabled failurePolicy=Ignore
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+gatekeeper_namespace_pods_running=5/5
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_instances=none
+mutation_instances=none
+admission_smoke=passed
+```
+
+## Rollback Commit
+
+Rollback platform GitOps commit:
+
+```text
+e09788d Drill hub Gatekeeper operand rollback
+e09788d0812c2cdd9a253b82ce71ca5fdd56da3f
+```
+
+The rollback removed only:
+
+```text
+clusters/hub-dc-v7/security/gatekeeper
+```
+
+and the `gatekeeper` include from:
+
+```text
+clusters/hub-dc-v7/security/kustomization.yaml
+```
+
+The hub Gatekeeper Operator install remained in desired state.
+
+Local validation before push:
+
+```text
+git diff --check passed
+oc kustomize clusters/hub-dc-v7 rendered 2516 lines
+rendered Gatekeeper operand absent
+rendered constraint and mutation objects absent
+```
+
+## Rollback Result
+
+After the bootstrap clone fast-forwarded to `e09788d`, the hub bootstrap app
+was hard-refreshed. Argo pruned the operand and settled at:
+
+```text
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=e09788d0812c2cdd9a253b82ce71ca5fdd56da3f
+gatekeeper_cr=absent
+operator_deployment=gatekeeper-operator-controller ready=1/1
+gatekeeper-audit=absent
+gatekeeper-controller-manager=absent
+validating_webhook=absent
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_instances=none
+mutation_instances=none
+admission_smoke=passed
+```
+
+Hub health stayed clean:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+## Restore Commit
+
+Restore platform GitOps commit:
+
+```text
+27770ea Restore hub Gatekeeper operand after rollback drill
+27770eaf9ffd93fdda6e482d08368624a33c04ad
+```
+
+The restore re-added the same no-constraints operand:
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+Local validation before push:
+
+```text
+git diff --check passed
+oc kustomize clusters/hub-dc-v7 rendered 2532 lines
+rendered Gatekeeper/gatekeeper present
+rendered constraint and mutation objects absent
+```
+
+## Restore Result
+
+After the bootstrap clone fast-forwarded to `27770ea`, the hub bootstrap app
+was hard-refreshed again. Argo restored the canary and settled at:
+
+```text
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=27770eaf9ffd93fdda6e482d08368624a33c04ad
+gatekeeper=gatekeeper validatingWebhook=Enabled mutatingWebhook=Disabled failurePolicy=Ignore
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+all_gatekeeper_namespace_pods=Running
+validating_webhook=present failurePolicy=Ignore
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_instances=none
+mutation_instances=none
+admission_smoke=passed
+```
+
+Final hub health stayed clean:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+## Result
+
+The gate passed. The hub Gatekeeper operand can be removed and restored
+through GitOps before any policies are introduced.
+
+The final state is the restored canary:
+
+- hub `Gatekeeper/gatekeeper` present;
+- validating webhook enabled and fail-open;
+- mutating webhook disabled;
+- no constraint templates;
+- no constraints;
+- no mutation instances;
+- spoke operand still deferred.
+
+Recommended next gate:
+
+```text
+OP-GF-OPERATORS-09: spoke Gatekeeper operand no-constraints preflight and rollback design
+```

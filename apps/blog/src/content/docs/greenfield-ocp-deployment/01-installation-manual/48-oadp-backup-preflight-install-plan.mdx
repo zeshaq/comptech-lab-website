@@ -1,0 +1,219 @@
+---
+title: "Installation Manual - 48 OADP backup preflight and install plan"
+sidebar_label: "48 OADP backup preflight"
+description: "Read-only OADP backup preflight for hub-dc-v7 and spoke-dc-v7, including catalog, MinIO, Vault/ESO, snapshot, and install sequencing decisions."
+---
+
+This gate checked whether `hub-dc-v7` and `spoke-dc-v7` are ready for OADP
+without installing the operator or creating any backup resources.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-SPOKEDCV7-35` / `#386` |
+| Phase | `OP-GF-SPOKEDCV7-35` |
+| Scope | preflight and install planning only |
+| Live path | `dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs` |
+| Result | proceed next with operator-only install |
+
+The gate made no OADP install, no GitOps desired-state change, no Secret
+creation, no DataProtectionApplication, no Backup or Restore, and no MinIO or
+Vault mutation.
+
+## Cluster Health
+
+Both clusters were steady:
+
+| Cluster | OpenShift | Node/MCP state | ClusterOperators |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | 3 compact nodes Ready; master MCP updated and not degraded | no non-steady rows |
+| `spoke-dc-v7` | `4.20.18` | 6 nodes Ready; master and worker MCPs updated and not degraded | no non-steady rows |
+
+`spoke-dc-v7-cluster-config` was `Synced/Healthy` in the spoke-local Argo CD
+instance. The hub-side pull-model parent Application reported `Synced` and
+`Progressing` because of an ACM `AdditionalStatusReport`; its operation state
+was `Succeeded` and no unhealthy child resource rows were returned.
+
+## OADP Absence
+
+OADP was not installed yet:
+
+```text
+openshift-adp namespace: absent on hub and spoke
+redhat-oadp-operator Subscription: absent on hub and spoke
+OADP or Velero CSVs: absent on hub and spoke
+velero.io and oadp.openshift.io CRDs: absent on hub and spoke
+```
+
+That means the next install can start cleanly through GitOps.
+
+## Catalog Decision
+
+The mirrored Red Hat catalog was Ready on both clusters:
+
+```text
+cs-redhat-operator-index-v4-20
+quay.v7.comptech-lab.com/openshift-operators/redhat/redhat-operator-index:v4.20
+```
+
+The OADP package resolved to:
+
+```text
+channel: stable
+current CSV: oadp-operator.v1.5.5
+```
+
+The hub `PackageManifest` selected `redhat-operators` by default, while the
+spoke selected the mirrored `cs-redhat-operator-index-v4-20`. Because of that,
+the Subscription must explicitly pin:
+
+```yaml
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: redhat-oadp-operator
+  source: cs-redhat-operator-index-v4-20
+  sourceNamespace: openshift-marketplace
+  startingCSV: oadp-operator.v1.5.5
+```
+
+Use the same bundle unpack timeout convention as the other v7 operators:
+
+```yaml
+metadata:
+  annotations:
+    operatorframework.io/bundle-unpack-timeout: 30m
+```
+
+## MinIO Reachability
+
+The greenfield MinIO backup contract is already reserved:
+
+| Item | Value |
+| --- | --- |
+| Bucket | `ocp-oadp-backups` |
+| Service user | `oadp-backup` |
+| Internal endpoint | `http://30.30.200.1:9000` |
+| Public endpoint | `https://minio.v7.comptech-lab.com` |
+| Vault custody path | `secret/greenfield/object-storage/minio/users/oadp-backup` |
+
+Bootstrap VM health checks returned HTTP 200 for both internal and public
+health endpoints.
+
+Existing unrestricted cluster pods could also reach MinIO:
+
+| Cluster | Pod source | Internal endpoint | Public endpoint |
+| --- | --- | --- | --- |
+| hub | OpenShift GitOps repo-server/server and console | HTTP 200 | HTTP 200 |
+| spoke | OpenShift console | HTTP 200 | HTTP 200 |
+
+External Secrets pods timed out to MinIO on both clusters. That is expected:
+the `external-secrets` namespace has a default deny NetworkPolicy plus
+explicit egress only for the API server, DNS, and Vault.
+
+Do not copy that policy shape into `openshift-adp` unless the same commit adds
+egress to:
+
+- MinIO `30.30.200.1:9000`;
+- Vault;
+- DNS;
+- Kubernetes API.
+
+## Vault And ESO
+
+`ClusterSecretStore/vault-platform` was `Ready=True` on both clusters, and all
+External Secrets Operator deployments were available.
+
+This gate did not read or print MinIO credential values. The DPA gate must
+choose the v7 credential delivery shape before applying a
+DataProtectionApplication:
+
+- either create per-cluster OADP Vault paths with one `cloud` property holding
+  the full Velero AWS credentials INI body;
+- or template that `cloud` key from the existing `oadp-backup` MinIO user
+  custody path after key names are verified without exposing values.
+
+Velero expects:
+
+```text
+Secret: openshift-adp/cloud-credentials
+Key: cloud
+Format: [default] AWS credentials INI body
+```
+
+## Snapshot Prerequisites
+
+Snapshot classes were present:
+
+| Cluster | VolumeSnapshotClass |
+| --- | --- |
+| hub | `lvms-vg1` |
+| spoke | `ocs-storagecluster-cephfsplugin-snapclass` |
+| spoke | `ocs-storagecluster-rbdplugin-snapclass` |
+
+Spoke storage was healthy: NooBaa `Ready`, StorageCluster `Ready`,
+CephCluster `HEALTH_OK`, and CNPG `2/2`.
+
+## Install Sequence
+
+### Gate 36: operator only
+
+Add only:
+
+- `clusters/hub-dc-v7/operators/oadp/namespace.yaml`;
+- `clusters/hub-dc-v7/operators/oadp/operatorgroup.yaml`;
+- `clusters/hub-dc-v7/operators/oadp/subscription.yaml`;
+- `clusters/spoke-dc-v7/operators/oadp/namespace.yaml`;
+- `clusters/spoke-dc-v7/operators/oadp/operatorgroup.yaml`;
+- `clusters/spoke-dc-v7/operators/oadp/subscription.yaml`.
+
+Add the new operator directories to each cluster `kustomization.yaml`.
+
+Do not add a DPA, ExternalSecret, Schedule, Backup, Restore, or OADP
+NetworkPolicy in this first install gate.
+
+### Gate 37: credentials and DPA
+
+After the CSV succeeds, add `cloud-credentials` delivery and one DPA per
+cluster.
+
+Recommended object layout:
+
+| Cluster | DPA | Bucket | Prefix | Endpoint |
+| --- | --- | --- | --- | --- |
+| hub | `hub-dc-v7` | `ocp-oadp-backups` | `hub-dc-v7/general` | `http://30.30.200.1:9000` |
+| spoke | `spoke-dc-v7` | `ocp-oadp-backups` | `spoke-dc-v7/general` | `http://30.30.200.1:9000` |
+
+Keep the OADP finalization lessons from the old environment:
+
+```text
+AWS_RETRY_MODE=standard
+AWS_MAX_ATTEMPTS=10
+Velero memory request >= 512Mi
+```
+
+### Gate 38: ad hoc backup validation
+
+Run one cluster at a time. Prove:
+
+- DPA reconciled;
+- BSL is `Available`;
+- Velero pod reaches MinIO;
+- resource-only backup completes and writes a tarball;
+- snapshot-enabled spoke backup completes;
+- no backup remains stuck in `InProgress` or `Finalizing`.
+
+### Gate 39: schedules and restore drills
+
+Only enable schedules after ad hoc validation succeeds. Stagger hub and spoke
+backup windows so both clusters do not finalize to the same single-node MinIO
+target at the same time. Define restore expectations separately for hub
+resource restore, ACM restore, and spoke application namespace restore.
+
+## Decision
+
+The next step is an operator-only OADP install gate on hub and spoke.
+
+Do not combine the operator install with DPA, schedules, or restore testing.
+Those require a separate credential and validation gate.

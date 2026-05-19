@@ -1,0 +1,297 @@
+---
+title: "Installation Manual - 34 Spoke worker banner MachineConfig hardening"
+sidebar_label: "34 Spoke worker banner MachineConfig hardening"
+description: "How to apply and validate the worker-pool legal notice banner MachineConfig for spoke-dc-v7."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the worker-pool follow-up to the master banner hardening
+gate. The logging drainability blocker from chapter 32 was removed in chapter
+33, so this gate safely applied the same `/etc/issue.d/legal-notice` banner to
+the `spoke-dc-v7` workers.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-22`, issue `#370` |
+| Cluster | `spoke-dc-v7` |
+| Final scope | Worker pool |
+| MachineConfig | `75-worker-etc-issue-banner` |
+| File path | `/etc/issue.d/legal-notice` |
+| GitOps revision | `89907515eef83cdf166e1dc2b73e6f6db0254b09` |
+| Worker render | `rendered-worker-3bc729038076d53c3844c4707f54127f` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-banner-machineconfig-gate.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Baseline Health
+
+Confirm GitOps and cluster state before adding a worker MachineConfig.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io hub-dc-v7-bootstrap spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+```
+
+Baseline for this gate:
+
+```text
+OpenShift version: 4.20.18
+Nodes: 6 Ready
+ClusterOperators: no non-steady operators reported
+MCP master: Updated=True Updating=False Degraded=False
+MCP worker: Updated=True Updating=False Degraded=False
+LokiStack: Ready=True Pending=False Warning=False
+Loki PDBs: all operator-managed Loki PDBs disruptionsAllowed=1
+worker rendered config contains /etc/issue.d/legal-notice: false
+```
+
+## GitOps Change
+
+Use the GitHub-backed operational GitOps clone on the bootstrap VM.
+
+```bash
+cd /home/ze/greenfield-ops/openshift-gitops
+git status --short --branch
+```
+
+Changed files:
+
+```text
+clusters/spoke-dc-v7/node-hardening/machineconfig-worker-etc-issue-banner.yaml
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+```
+
+The worker MachineConfig selects the worker pool:
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 75-worker-etc-issue-banner
+  labels:
+    machineconfiguration.openshift.io/role: worker
+    compliance.comptech-lab.com/gate: OP-GF-SPOKEDCV7-22
+spec:
+  config:
+    storage:
+      files:
+        - path: /etc/issue.d/legal-notice
+```
+
+Render and server-side dry run before commit.
+
+```bash
+oc kustomize clusters/spoke-dc-v7 >/tmp/spoke-dc-v7-render.yaml
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" apply --dry-run=server \
+  -k clusters/spoke-dc-v7
+
+git diff --check
+```
+
+Expected dry-run signal:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-etc-issue-banner created (server dry run)
+```
+
+Commit:
+
+```text
+8990751 Add spoke worker banner hardening
+```
+
+The bootstrap clone uses a read-only GitHub deploy key. For this gate, the
+commit was bundled back to a local GitHub-authenticated clone, pushed to
+GitHub, then fetched back onto the bootstrap VM so the bootstrap checkout and
+remote both pointed at the same revision.
+
+## Argo Refresh
+
+Hard-refresh the hub and spoke Applications after the GitHub push.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate application.argoproj.io/hub-dc-v7-bootstrap \
+  argocd.argoproj.io/refresh=hard --overwrite
+
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate application.argoproj.io/spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-gitops \
+  annotate application.argoproj.io/spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Final Argo evidence:
+
+```text
+hub-dc-v7-bootstrap:        Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+hub spoke cluster config:   Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+spoke local cluster config: Synced/Healthy at 89907515eef83cdf166e1dc2b73e6f6db0254b09
+```
+
+## Rollout Watch
+
+Watch the worker MCP until every worker is on the new rendered config. Do not
+stop at the first updated worker.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker -w
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes -o json \
+  | jq -r '.items[] | select(.metadata.labels["node-role.kubernetes.io/worker"] != null) |
+    [.metadata.name,
+     (.status.conditions[] | select(.type=="Ready").status),
+     .metadata.annotations["machineconfiguration.openshift.io/state"],
+     .metadata.annotations["machineconfiguration.openshift.io/currentConfig"],
+     .metadata.annotations["machineconfiguration.openshift.io/desiredConfig"]] | @tsv'
+```
+
+Observed update order:
+
+```text
+spoke-dc-v7-worker-2
+spoke-dc-v7-worker-1
+spoke-dc-v7-worker-0
+```
+
+Final worker MCP evidence:
+
+```text
+Updated=True
+Updating=False
+Degraded=False
+readyMachineCount=3
+updatedMachineCount=3
+degradedMachineCount=0
+machineCount=3
+configuration=rendered-worker-3bc729038076d53c3844c4707f54127f
+```
+
+## Rendered Config Validation
+
+Check the active render and source list without opening node shells.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r 'any(.spec.config.storage.files[]?; .path == "/etc/issue.d/legal-notice")'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker -o json \
+  | jq -r 'any(.status.configuration.source[]?; .name == "75-worker-etc-issue-banner")'
+```
+
+Expected result:
+
+```text
+true
+true
+```
+
+## Final Validation
+
+Run standard post-change checks.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack logging-loki
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get pdb
+```
+
+Final evidence from this gate:
+
+```text
+ClusterVersion: 4.20.18 Available=True Progressing=False Failing=False
+ClusterOperators: no non-steady operators reported
+Nodes: 6 Ready
+MCP master: Updated=True Updating=False Degraded=False
+MCP worker: Updated=True Updating=False Degraded=False
+LokiStack/logging-loki: Ready=True Pending=False Warning=False
+Loki PDBs: all six operator-managed PDBs disruptionsAllowed=1
+```
+
+## Drain Dry Run Finding
+
+A post-rollout server-side dry-run drain of `spoke-dc-v7-worker-2` found a new
+voluntary-drain blocker in ODF/NooBaa.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain spoke-dc-v7-worker-2 \
+  --ignore-daemonsets \
+  --delete-emptydir-data \
+  --dry-run=server \
+  --timeout=90s
+```
+
+The command failed because the NooBaa DB primary pod could not be evicted
+without violating its PDB:
+
+```text
+openshift-storage/noobaa-db-pg-cluster-1
+PDB/noobaa-db-pg-cluster-primary
+disruptionsAllowed=0
+```
+
+Confirm that the dry run did not change the node:
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get node spoke-dc-v7-worker-2 -o json \
+  | jq -r '{unschedulable:(.spec.unschedulable // false),
+            ready:(.status.conditions[] | select(.type=="Ready").status)}'
+```
+
+Final evidence:
+
+```text
+worker2_unschedulable=false
+worker2_ready=True
+```
+
+## Residuals
+
+- Worker banner hardening is complete.
+- Further voluntary worker drains should recheck NooBaa DB primary placement
+  and `PDB/noobaa-db-pg-cluster-primary`.
+- Full voluntary worker drain remains untested outside the MCO-managed
+  MachineConfig rollout path.
+- Do not start the next worker MachineConfig gate until current PDB placement,
+  Loki health, MCP health, and node readiness are revalidated.

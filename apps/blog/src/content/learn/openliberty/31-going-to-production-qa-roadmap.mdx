@@ -1,0 +1,626 @@
+---
+title: "Going to production — the QA roadmap"
+sidebar_label: "31 — Going to production (QA roadmap)"
+description: "How to think about turning the teaching artifact into production-ready software. An eight-phase roadmap; all eight phases are now closed — scanners, unit + integration tests, OpenAPI + Schemathesis + Pact + Playwright, k6 baseline + soak + spike, ZAP + auth-specific tests, five chaos drills, compliance + backup-restore drill + synthetic monitor. The fuzz, the load test, and the audit-completeness test each found real bugs; they're all fixed."
+estimated_minutes: 55
+last_updated: 2026-05-18
+prereqs: ["30 — Hardening pass"]
+---
+
+The track stops one step short of "you can take real money with this."
+Everything up to chapter 30 buys you a working stack — features, OIDC,
+two real portals, a hardened SETUP.md — but **none of it constitutes
+proof that the software is ready for production**. The end-to-end
+smoke at 205/0 is great cover; it is not a substitute for unit tests,
+contract tests, load tests, a third-party penetration test, or a
+written regulatory gap analysis.
+
+This chapter is the bridge. It points you at `docs/qa-roadmap.md` in
+the insurance-app repo, walks through the eight phases the roadmap
+defines (seven original plus a 0.5 hygiene phase that emerged
+mid-flight), and tells you which four things to do first if you only
+have time for four. **All eight phases have now shipped** — scanners
+on every PR, unit + integration + contract + E2E + load + chaos
+tests with their respective gates, a 60-second synthetic monitor on
+the VM, a measured backup/restore drill, and a regulator-facing
+compliance doc set. **Plus a post-roadmap debt-fix session that
+closed every deferred follow-up except one upstream-limited MinIO
+finding.** The rest of the chapter treats all eight phases as
+finished bodies of work and surfaces the three iterations that each
+found real bugs and closed them (Phase 2 Schemathesis, Phase 3 k6,
+Phase 6 audit-completeness test).
+
+Companion artifacts:
+
+- [`docs/qa-roadmap.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/qa-roadmap.md) — the roadmap itself.
+- [`docs/security-baseline.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/security-baseline.md) — the Phase 0 numbers, plus a **"Bug fixes since the baseline"** section recording every closure since: the five Phase 2 Schemathesis fixes (#51, #52), the Phase 3 VIN-length finding (#62), and the 2026-05-18 debt-fix session (#56–#61).
+- [Eight GitHub Milestones](https://github.com/zeshaq/insurance-app/milestones?state=closed) with 39 issues; **all closed** as of 2026-05-18.
+- Live findings stream from the scanners: [github.com/zeshaq/insurance-app/security](https://github.com/zeshaq/insurance-app/security).
+- The new `com.example.insurance.error/` package (three `@Provider` mappers + matching unit tests) for the canonical "name the exception you don't want bubbling up as 500; map to a 4xx with a JSON body" pattern.
+
+## Phase 0 — what just shipped
+
+Five scanners, one baseline doc, one closed milestone. Each scanner
+runs on every push and PR via GitHub Actions; findings publish as
+SARIF to the GitHub **Security** tab so they're filterable +
+dismissible from one place.
+
+| Tool | What it checks | What it found |
+|---|---|---|
+| **Dependabot** | Maven (Liberty), npm (×2 — customer-app + agent-app), Docker (×3 Containerfiles), `github-actions` | **13 update PRs** open: 6 Maven, 5 npm (agent-app), 2 github-actions. customer-app + Docker base images already current. |
+| **gitleaks** | Pre-commit + CI scan of the diff for committed secrets | **0 leaked secrets.** The WSO2 platform defaults (`wso2carbon`, `insurance`) in `compose/infra/...` are documented, not real. |
+| **Trivy (fs)** | Filesystem vulnerability scan: deps + misconfig + secrets, `ignore-unfixed` (all severities reported, fixable-only) | **23 alerts** — 11 high / 7 medium / 5 low. Mostly transitive CVEs that the Maven/npm Dependabot bumps will eat. |
+| **Trivy (config)** | Containerfile / IaC misconfiguration check, separate SARIF category | (Subset of the 23 above) — `USER root`, no non-root user on intermediate stages. Some unavoidable for IBM Liberty's `full` base image. |
+| **Semgrep OSS** | Rulesets: `p/default`, `p/owasp-top-ten`, `p/java`, `p/typescript` | **2 warnings**, both probable false-positives (see below). `.semgrepignore` triage queued. |
+
+The triage policy is in the baseline doc and worth repeating: **merge
+`github-actions` updates immediately when CI passes; hold Maven/npm
+majors until Phase 1's test coverage can prove nothing broke**. The
+bundled Maven bump (Kafka 3.9→4.2, MinIO 8→9, Flyway 10→12) is a
+breaking-change minefield without unit tests in front of it.
+
+The two Semgrep warnings are the kind of finding you'll see on every
+SAST tool, on every codebase, forever: the rule fires on a pattern that
+*can* be unsafe but isn't here. The first
+(`javascript.express.security.audit.xss.direct-response-write`) flags
+the agent-app BFF's `res.send(buf)` line where `buf` is the response
+body coming back from the internal Liberty `/api/*` call. Semgrep can't
+see the trust boundary; we can. The second
+(`python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1`)
+matches a string in a vendored asset — there's no Python in this repo.
+Both go to `.semgrepignore` with a comment explaining the trust
+boundary, not a blanket rule-disable.
+
+### The trivy-action tag-prefix gotcha — worth its own paragraph
+
+This is a small but instructive failure mode: most GitHub Actions
+authors publish release tags **with** a `v` prefix (`v1.0.0`,
+`v0.36.0`), but the marketplace page often shows usage like
+`uses: aquasecurity/trivy-action@0.36.0` (no prefix). Both forms
+*look* equivalent. They are not.
+
+`uses: <owner>/<action>@<ref>` resolves `<ref>` against the action's
+git refs — literally, byte-for-byte. If the publisher only pushes
+`v0.36.0` and your workflow says `@0.36.0`, GitHub Actions can't find
+the ref and the job fails at startup with `unable to resolve action`.
+Three commits in the insurance-app history show the iteration:
+
+- **`50660fe`** (initial Trivy workflow): used `@0.28.0`. Failed
+  immediately. The error message points at the action ref, not at
+  Trivy itself.
+- **`61c17aa`** (first fix): pinned to `@v0.36.0`. Resolved; this is
+  the form that works.
+- **`26c69eb`** (settled): switched to `@master` while we work out a
+  release-pinning convention. Less safe than a pinned tag (master can
+  break under you), but stable enough for a Dependabot-watched action
+  during Phase 0.
+
+The general lesson: **always test the `uses:` line against the
+action's actual tag list**, not against the marketplace's prose. `gh
+api repos/<owner>/<action>/tags` is one line and answers the question
+deterministically. The chapter-30 image-pinning ritual generalizes
+here — content-addressable refs for everything you depend on, with a
+re-pin cadence you can describe in writing.
+
+The Phase 0 milestone is **closed (5/5)** as of `26c69eb` — see
+[milestone #1](https://github.com/zeshaq/insurance-app/milestone/1).
+The baseline doc at
+[`docs/security-baseline.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/security-baseline.md)
+captures the snapshot; subsequent re-baselines will overwrite it as
+findings move.
+
+## Phase 1 + Phase 2 — what just shipped
+
+Phases 1 and 2 landed in one push of nine commits. Each milestone is
+five issues; both are now **closed 5/5** ([Phase 1](https://github.com/zeshaq/insurance-app/milestone/2),
+[Phase 2](https://github.com/zeshaq/insurance-app/milestone/3)). The
+short version of what's now wired in:
+
+| Phase | Layer | What runs |
+|---|---|---|
+| 1 | Java unit (`abbedb9`, `7fed9d2`) | JUnit 5 + Mockito + AssertJ scaffolding; 21 tests on `QuoteService` (100% line) and `PaymentService` (97.9%). |
+| 1 | Java integration (`0de3473`) | Testcontainers spins real Postgres + Redis; the `quote → JPA → Redis` round-trip is asserted end to end. |
+| 1 | JS unit (`5f34c67`) | Vitest on both BFFs. `liberty.ts` at 97.3% / 87.9%; `agent-app server/index.ts` at 63.75% (OIDC + static-serve branches skipped — they need a test IdP). |
+| 1 | CI gate (`2d257d6`) | JaCoCo `<check>` execution + Vitest per-file thresholds. PRs that drop coverage below the floor fail. |
+| 2 | API spec + fuzz (`a7d3898`) | `mpOpenAPI-3.1` publishes a real OpenAPI spec at `/openapi`; Schemathesis 4.18.5 fuzzes it on every PR with Bearer auth. 19 paths, 21 operations covered. |
+| 2 | Contracts (`7826fee`) | Pact-JS consumer tests on both BFFs; Pact-JVM provider verification replays them against a live Liberty. Pact files committed to `pacts/` so CI `git diff --exit-code`s them. |
+| 2 | Browser E2E (`4b1a104`) | Playwright drives the real OIDC click-through (`POST /auth/signin` → IS authorize → credential entry → callback → signed-in landing) for both customer and agent portals. Curl-based smoke can't get past the IS HTML form; Playwright can. |
+
+The interesting story isn't the test counts — it's what the fuzz
+found the first time it ran.
+
+### The fuzz found five real bugs (the canonical iteration)
+
+The whole point of property-based fuzzing is that it runs the
+endpoint with input shapes you didn't think to test. Schemathesis's
+default check set includes `not_a_server_error` — any 500 response
+is flagged as a contract violation. On the very first run against a
+fully-running Liberty, it surfaced **five** of them:
+
+| Endpoint | Was | Now | Closed by |
+|---|---|---|---|
+| `POST /api/quotes` (malformed JSON) | 500 | **400** | `JsonbExceptionMapper` |
+| `POST /api/policies` (malformed JSON) | 500 | **400** | `JsonbExceptionMapper` |
+| `POST /api/payments` (malformed JSON) | 500 | **400** | `JsonbExceptionMapper` |
+| `POST /api/claims` (broken multipart) | 500 | **400** | `ProcessingExceptionMapper` (plus Liberty falls through to `policyNumber required` 400) |
+| `GET /api/audit/contrast/{unknown-id}` | 500 | **404** | `AuditResource.contrast()` returns `NotFoundException` |
+
+All five fixed and verified live in commit
+[`4802850`](https://github.com/zeshaq/insurance-app/commit/4802850),
+closing [#51](https://github.com/zeshaq/insurance-app/issues/51) and
+[#52](https://github.com/zeshaq/insurance-app/issues/52). The baseline
+doc records the closures under a new
+[`Bug fixes since the baseline`](https://github.com/zeshaq/insurance-app/blob/main/docs/security-baseline.md#bug-fixes-since-the-baseline)
+section. This is the **canonical first iteration of the fuzz → fix →
+re-run loop** the roadmap promises: the fuzz finds bugs nobody wrote
+unit tests for, you fix them at the right layer, you re-run the fuzz,
+the new build no longer surfaces them. Subsequent iterations log new
+finds in the same table.
+
+Three patterns from the fix are worth carrying forward, each a
+genuinely instructive paragraph in its own right.
+
+**`@Provider`-annotated `ExceptionMapper<T>` classes register
+automatically.** No XML, no `META-INF/services/...`, no manual
+registration in the JAX-RS `Application` subclass. Liberty's JAX-RS
+runtime scans the WAR for `@Provider` annotations and wires every
+mapper it finds. The new `com.example.insurance.error/` package holds
+three of them — `JsonbExceptionMapper`, `JsonExceptionMapper`,
+`ProcessingExceptionMapper` — and that's the entire registration
+ceremony. The pattern to copy: **name the exception you don't want
+bubbling up as a 500; map it to a 4xx with a JSON body** containing
+enough detail for the client to do something useful with it but no
+stack traces or internal paths. Apply it preemptively for `JsonbException`,
+`ProcessingException`, `IllegalArgumentException`, `ConstraintViolationException`,
+and any custom checked exceptions you throw on validation failures.
+
+**`jakarta.json.bind.JsonbException` is not a subclass of
+`jakarta.json.JsonException`.** They're independent types in different
+packages. Yasson (Liberty's JSON-B implementation) throws `JsonbException`
+for binding failures — "tried to deserialize this JSON into your `Quote`
+record and the shape doesn't match" — and `JsonException` for low-level
+parse failures — "this isn't valid JSON at all." A single mapper on
+the parent type doesn't exist; you need one of each. We've shipped
+both as defense in depth: `JsonbExceptionMapper` covers the common
+case and `JsonExceptionMapper` catches stream-level failures Yasson
+might re-throw without wrapping. **This is the kind of JDK gotcha
+that bites only at runtime**, so the unit tests in
+`src/test/java/com/example/insurance/error/` are the durable record
+of which exception each rule fires on.
+
+**`Map.of(...)` does not tolerate `null` values.** This was the
+load-bearing line of the `AuditResource.contrast()` fix. The call site
+looked harmless:
+
+```java
+return Map.of("snapshot", snapshot, "events", events);
+```
+
+If `snapshot` came back `null` — because the audit projection had
+nothing for the requested claim id — `Map.of(K, null, ...)` threw
+`NullPointerException` at construction time, **inside the JAX-RS
+response builder**, before any of our code could intervene. JAX-RS
+turned it into a 500. The fix is two characters of typing plus a
+specific exception:
+
+```java
+if (snapshot == null && events.isEmpty())
+    throw new NotFoundException("no audit data for claim " + id);
+
+Map<String, Object> body = new HashMap<>();   // tolerates null values
+body.put("snapshot", snapshot);
+body.put("events", events);
+return body;
+```
+
+`Map.of` is for known-non-null payloads. **Anywhere downstream of a
+lookup that can return `null`, use `HashMap`** — or filter to
+non-nulls before constructing. Static analysis won't catch this; only
+the fuzz or a unit test with the right input does.
+
+The takeaway for the chapter is mechanical: the fuzz, the fix, the
+re-run, and a new row in the baseline doc. Phase 3's load test will
+do the same thing for a different class of bug.
+
+## The mental model
+
+Production-ready isn't a checklist; it's a sequence. Each phase exists
+because the *next* phase needs its outputs:
+
+```
+Phase 0   — Foundations          ─►  cheap always-on protections, security baseline
+        │
+        ▼
+Phase 0.5 — Dependency hygiene   ─►  merge the safe Dependabot updates before they pile up
+        │
+        ▼
+Phase 1   — Unit & Integration   ─►  isolate failures to one layer
+        │
+        ▼
+Phase 2   — Contract & E2E       ─►  lock the API surface, automate OIDC click-through
+        │
+        ▼
+Phase 3   — Performance          ─►  know what the architecture survives
+        │
+        ▼
+Phase 4   — Deeper Security      ─►  scanners can't catch + pen-test booked
+        │
+        ▼
+Phase 5   — Resilience / Chaos   ─►  prove the unhappy paths
+        │
+        ▼
+Phase 6   — Compliance & Prod Ops─►  the ready-to-take-real-money gate
+```
+
+The order matters. Phase 0's SAST/SCA/secrets scanners are how you'll
+hold the line against drift while you build Phase 1's test suites. Phase
+1's unit + integration coverage is the thing Phase 2's contract tests
+sit on top of. Phase 3's load tests give Phase 4's pen-testers a
+realistic staging environment to attack. And so on. Skip a phase and
+the next one's outputs are less trustworthy.
+
+## The top-four cheat sheet
+
+If only four things are done before launch — they should be these.
+Each one catches a class of bug the rest cannot, and each one unblocks
+the next:
+
+| # | What | Why first | Phase |
+|---|---|---|---|
+| 1 | **SAST + SCA + secrets scanning in CI** (Dependabot, Trivy, Semgrep, gitleaks) | Cheap, always-on, catches whole classes of bug before they merge. The dependency-vuln tide moves daily; without it you're already drifting. | 0 |
+| 2 | **Playwright tests for the OIDC click-through** | The only verification gap in the current 205-check smoke. The OIDC login form is HTML+JS; curl can't drive it; Playwright can. | 2 |
+| 3 | **k6 load test of `quote → bind → pay`** | Single-VM setups have a ceiling. You want to know where it is *before* the marketing launch, not during. | 3 |
+| 4 | **Third-party penetration test** | Their findings always need time to fix. Book 6–8 weeks before launch. Don't wait until the rest of QA is "done." | 4 |
+
+The pattern across all four: **start the long-lead-time work early**.
+The 6-week pen-test booking and the multi-day load-test infrastructure
+both have wall-clock latency that doesn't compress.
+
+## The eight phases — what each one buys you
+
+### Phase 0 — Foundations ✓ done
+
+The cheap, always-on protections. Five scanners wired into CI
+(Dependabot for Maven + npm + Docker + github-actions; gitleaks
+pre-commit + CI gate; Trivy filesystem + config; Semgrep OSS) plus
+[`docs/security-baseline.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/security-baseline.md)
+freezing the numbers the scanners report today. The detailed
+breakdown is in the section near the top of this chapter; the short
+version: **0 leaked secrets, 13 Dependabot PRs queued, 23 Trivy
+alerts (mostly transitive CVEs the Maven/npm bumps will eat), 2
+Semgrep false-positives queued for `.semgrepignore`**.
+
+**Done because:** every PR now runs all five scanners automatically,
+SARIF lands on the Security tab, and the baseline doc is in `main`
+([milestone #1](https://github.com/zeshaq/insurance-app/milestone/1)
+closed 5/5).
+
+### Phase 1 — Unit & Integration Tests ✓ done
+
+The smoke script could tell you a `POST /api/quotes` returned 500. It
+could not tell you whether the failure was JPA, Redis, Kafka, or
+business logic. The new test layers can.
+
+JUnit 5 + Mockito + AssertJ scaffolding for Liberty's service layer
+(`abbedb9`), with the first 21 unit tests on `QuoteService` (100%
+line) and `PaymentService` (97.9% line) shipped in `7fed9d2` as the
+worked example. A Testcontainers integration test (`0de3473`) spins
+real PostgreSQL + Redis and exercises the quote round-trip — JPA
+write through `em.flush()`, Redis key written as exactly
+`quote:<id>` (the slice-1 regression guard). Vitest on both BFFs
+(`5f34c67`) covers the JSON-vs-FormData branches in `liberty.ts` and
+the `requireUser`/proxy logic in the agent-app's Express BFF. JaCoCo
++ Vitest coverage ratchets (`2d257d6`) make CI fail on any PR that
+drops coverage below the floor.
+
+**Done because:** Liberty service tests + Testcontainers IT + BFF unit
+tests + per-file coverage ratchets are all in `main`; PRs that drop
+coverage fail the build. **Bonus payoff that already materialized:**
+the 6 Maven + 5 npm Dependabot majors from Phase 0 can now land with
+real "did anything break?" coverage in front of them.
+
+### Phase 2 — Contract & E2E Tests ✓ done
+
+API surface drift is the silent failure mode. The customer-app and
+agent-app BFFs are independent of Liberty's `@Path` annotations — they
+just happen to agree today. They will not agree tomorrow if no test
+asserts the agreement.
+
+`mpOpenAPI-3.1` now publishes a real OpenAPI spec at `/openapi`
+(`a7d3898`). `Schemathesis` 4.18.5 fuzzes it on every PR with Bearer
+auth from the slice-22 dev-token endpoint, using `not_a_server_error`
++ `response_schema_conformance` checks. **The first run found five
+500-bugs** (see the section near the top of this chapter — they're
+all fixed). Pact-JS + Pact-JVM contract tests (`7826fee`) lock the
+BFF↔Liberty surface; pact files live in `pacts/` and CI
+`git diff --exit-code`s them. Playwright (`4b1a104`) drives the real
+OIDC click-through end to end on both portals — the previously-manual
+last gap in the smoke is now CI-resident.
+
+**Done because:** schema drift causes a CI failure, contracts are
+versioned in the repo, and the OIDC click-through runs in CI instead
+of being a manual smoke step. Schemathesis is now on the side of
+"find new bugs each PR" rather than "discover whether it works."
+
+### Phase 3 — Performance ✓ done
+
+k6 against the canonical money chain (`quote → bind → pay`) at 1, 10,
+and 100 concurrent VUs, plus a soak (10 VUs for a parameterised
+duration, default 5m as a 24-hour proxy) and a 0→500-VU spike
+(`load/baseline.js`, `load/soak.js`, `load/spike.js`; CI workflow
+`k6.yml`). Measurements against live staging:
+
+| Scenario | Requests | Errors (excl. 429) | Global p50 / p95 / p99 |
+|---|---|---|---|
+| baseline (1→10→100 VUs, 2m35s) | 81,535 | **0 (0.000%)** | 11.0 / 28.3 / 41.0 ms |
+| soak (10 VUs / 5m proxy) | 8,800 | **0 (0.000%)** | 7.6 / 11.9 / 20.5 ms |
+| spike (0→500→0, 2m15s) | 13,837 | 611 (**4.58%**) | 30.2 / 27,691 / 50,001 ms |
+
+The spike scenario is the interesting one — first 5xx onset at t+39s
+(end of ramp-up to 500 VUs), `/api/quotes` taking the brunt with 219×
+500s. A back-to-back rerun before Liberty fully recovered logged 22.76%
+errors — treat spike as a **destructive test**, don't run it twice
+without a recovery window.
+
+**Outputs in `main`:** k6 scripts plus
+[`docs/performance-budgets.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/performance-budgets.md)
+with per-endpoint p95/p99 budgets, an SLI/SLO register (money-chain
+availability / latency / public pages / OIDC sign-in success), and the
+burn-rate escalation table that Phase 6 wires into SigNoz alerts. Like
+the Phase 2 fuzz, the spike scenario found a real bug — **VIN >17 chars
+500'd** because the schema column is `VARCHAR(17)` and there was no
+input validation. Issue
+[#62](https://github.com/zeshaq/insurance-app/issues/62) closed: Jakarta
+Bean Validation (`@Size(min=3, max=17)`, `@Min`, `@Max`, `@Pattern`) on
+`QuoteRequest` + a new `ConstraintViolationExceptionMapper` in the same
+`com.example.insurance.error/` family. The pattern later extended to
+`PolicyRequest` and `PaymentRequest`.
+
+### Phase 4 — Deeper Security ✓ done
+
+Five things shipped:
+
+1. **SvelteKit CSRF cross-origin check re-enabled** (commit `1f6b4d0`).
+   Confirmed live: cross-origin form POST → 403, same-origin → 302
+   into the OIDC flow. The previously-disabled `csrf.checkOrigin: false`
+   shortcut is gone.
+2. **OWASP ZAP DAST workflow** (`zap-baseline.yml`) runs weekly +
+   `workflow_dispatch` against the three public targets (Liberty API,
+   customer portal, agent dashboard). Report-only initially; a tuned
+   `.github/zap/rules.tsv` is the path to promoting it to a merge gate.
+3. **Three auth-specific tests against live staging**, all PASS:
+   * **PKCE replay** — capture the authorization code mid-flight, try
+     to exchange it twice. Second exchange returns
+     `400 invalid_grant ("Inactive authorization code received")`.
+   * **Refresh-token rotation** — reuse the original refresh after a
+     successful exchange; second use returns `400 invalid_grant
+     ("Persisted access token data not found")`.
+   * **Session fixation** — agent-app session cookie before login
+     differs from the one after. BFF regenerates session id on auth
+     state change.
+4. **JWT signing-key rotation runbook** in
+   [`docs/runbooks/jwt-key-rotation.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/runbooks/jwt-key-rotation.md)
+   plus a dry-run script (`e2e/tests/auth/jwt-rotation-dryrun.sh`)
+   that exercises the JWKS cache against the current key. Real rotation
+   is operator-driven; the script validates the post-rotation
+   verification path before the real rotation runs.
+5. **Pen-test vendor prep doc** at
+   [`docs/compliance/pen-test-vendor-prep.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/compliance/pen-test-vendor-prep.md)
+   — scope, vendor comparison rubric, required engagement-letter
+   clauses, our internal report-handling SLA. Booking is operator-
+   driven; the doc is what you take to the RFP.
+
+### Phase 5 — Resilience / Chaos ✓ done
+
+Five destructive drills, **all PASS** multiple iterations against the
+live VM. Each one inducts a specific failure, asserts the resilient
+behavior, and restores the environment via a trap so a failed run
+doesn't leave the lab broken.
+
+| Drill | Iters × asserts | Recovery time |
+|---|---|---|
+| **#25** kill Liberty mid-`@Transactional` during bind → no orphan policy rows | 5 × 11/11 PASS | ~1m 30s |
+| **#26** kill Postgres primary mid-bind → 5xx + Redlock TTL releases + re-bind succeeds | 3 × 9/9 PASS | ~1m 35s |
+| **#27** kill Kafka mid-payment → 201 returned + exactly-one event published after recovery | 3 × 9/9 PASS | ~3m 29s |
+| **#28** partition WSO2 IS → cached JWT keeps `/api/*` working; new sign-ins 5xx cleanly; reconnect restores fresh sign-in | 3 × 27/27 PASS | ~37s |
+| **#29** MinIO disk-full mid-multipart claim upload → 5xx + no `photoKey` exposed | 3 × 12/12 PASS | ~8s |
+
+Scripts under [`tests/chaos/`](https://github.com/zeshaq/insurance-app/tree/main/tests/chaos),
+per-drill runbooks under
+[`docs/runbooks/chaos/`](https://github.com/zeshaq/insurance-app/tree/main/docs/runbooks/chaos).
+CI workflow `chaos-drills.yml` is `workflow_dispatch` only and runs
+shellcheck against the scripts (the drills themselves can't run on a
+GitHub runner — they need podman against the live VM).
+
+**One observation worth a follow-up**: drill #29 showed MinIO retaining
+partial multipart parts on a quota-exceeded close. The user-visible
+contract still holds (5xx returned, no `photoKey` leaked), but the
+orphan parts cost disk until MinIO's async GC clears them. Investigated
+in detail in the debt-fix session below — turns out the MinIO server
+build we run silently strips the `AbortIncompleteMultipartUpload`
+lifecycle field, so the app-side fix isn't expressible. Closed as
+upstream-limited (#63).
+
+### Phase 6 — Compliance & Production Ops ✓ done
+
+The "ready to take real money" gate. Three workstreams, all shipped:
+
+**Compliance docs** under
+[`docs/compliance/`](https://github.com/zeshaq/insurance-app/tree/main/docs/compliance):
+* `regulatory-jurisdictions.md` — 8 jurisdictions analysed (Bangladesh
+  IDRA, US NAIC + state-by-state, UK FCA + PRA, EU EIOPA + GDPR + DORA,
+  Canada OSFI + PIPEDA + Quebec Bill 96, India IRDAI + DPDP, Singapore
+  MAS, Australia APRA + ASIC). Each with the regulatory body, 2–3
+  load-bearing requirements affecting a digital-first insurer, the
+  current gap, severity (blocker/moderate/minor), and an owner
+  placeholder.
+* `pii-data-flow.md` — PII classification table walking the schema
+  + a 12-edge ASCII data-flow diagram + retention policy table + right-
+  to-deletion section + cross-border data transfer matrix + sub-processor
+  list.
+
+**Code-level proofs:**
+* **Audit-trail completeness test** (`AuditCompletenessTest`) — exercises
+  each state-changing operation in turn (Quote calculate, Policy bind,
+  Payment process, Claim file, Claim approve) and asserts a record
+  appears on `audit-events` keyed by `entityType:entityId`. The test
+  failed on first run with three named gaps — Quote/Policy/Payment
+  services were emitting their own domain events but **not** to
+  `audit-events`. All three fixed in the same commit (`bbf45f9`); only
+  `ClaimService` had been doing it correctly.
+* **Flyway rollback docs** — one `docs/migrations/Vn-rollback.md` per
+  migration (7 total), plus `docs/runbooks/db-migration-dry-run.md`
+  documenting the snapshot-prod-into-clone procedure. V7 walkthrough
+  on a scratch Postgres verified the rollback SQL actually reverses the
+  forward migration.
+
+**Operational:**
+* **Backup + restore drill** —
+  [`tests/backup/snapshot-all.sh`](https://github.com/zeshaq/insurance-app/blob/main/tests/backup/snapshot-all.sh)
+  +
+  [`restore-into-scratch.sh`](https://github.com/zeshaq/insurance-app/blob/main/tests/backup/restore-into-scratch.sh)
+  do a coordinated pg_dump + `mc mirror` + Kafka topic dump, restored
+  into a separate scratch container set. **End-to-end RTO measured at
+  ~59s** against the live VM, vs a 1h target — ~60× headroom. Runbook
+  at
+  [`docs/runbooks/disaster-recovery.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/runbooks/disaster-recovery.md)
+  captures the RTO/RPO per data store and the operator decision
+  points during restore.
+* **60-second synthetic monitor** runs on the VM under a user systemd
+  timer (`tests/monitoring/quick-smoke.{sh,service,timer}`). Failures
+  pipe through `alert-on-failure.sh` to a structured log file; stubs
+  for Slack / PagerDuty webhooks are commented in. Each cycle posts a
+  `SYNMON`-prefixed quote so a daily prune timer
+  (`prune-synthetic.{sh,service,timer}`) can vacuum old rows — no
+  unbounded growth in the `quote` table.
+* **SLO + burn-rate alerts**:
+  [`docs/slos.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/slos.md)
+  consolidates the SLO register (MC-1..3 money chain, PT-1..3 portals,
+  SI-1..3 sign-in, DR-1..4 durability), with the latency targets still
+  living in `docs/performance-budgets.md`.
+  [`compose/infra/signoz/alert-rules.yml`](https://github.com/zeshaq/insurance-app/blob/main/compose/infra/signoz/alert-rules.yml)
+  encodes the burn-rate escalation table as 16 Prometheus-style rules
+  (5m+1h windows for 14× burn pages; 1h+6h for 5× tickets; 6h for 1×
+  informational). The rules currently reference OTEL collector
+  transforms that aren't installed yet — they load but don't fire
+  until the collector config is extended (Phase-6 follow-up).
+
+## Post-roadmap debt-fix session (2026-05-18)
+
+The day after Phase 6 closed, six deferred-from-Phase-0.5 major-version
+Dependabot bumps were still open, plus a couple of pattern extensions
+and the MinIO #63 observation. A focused debt-fix session resolved all
+of them:
+
+| Issue | Bump / change | Outcome |
+|---|---|---|
+| **#56** | `openid-client` 5 → 6.8.4 (agent-app) | API rewrite; four touch points in `server/index.ts` adapted. Live OIDC handshake against WSO2 IS verified post-bump. |
+| **#57** | `connect-redis` 8 → 9 (agent-app) | Constructor stable; peer dep tightened to `redis >= 5`. |
+| **#58** | `kafka-clients` 3.9 → 4.2 (Liberty) | **Zero source changes** — our API usage is on the stable subset that survived 3.x → 4.x. Phase 5 drill #27 re-run 9/9 PASS confirming no double-publish or message loss. |
+| **#59** | `kafka-streams` 3.9 → 4.2 (Liberty) | Bundled with #58. |
+| **#60** | `io.minio` 8.5.10 → 9 (Liberty) | Added explicit `okhttp3` dep — MinIO 9 dropped it from transitives. No source changes in `MinioStorageService`. |
+| **#61** | `flyway` 10.20.0 → **11.8.2** (substitute path) | Flyway 12 internally switched to Jackson 3 (`tools.jackson.*`) which conflicts with our Jackson 2 transitives. Jumped to 11.x — the last major on Jackson 2 — instead. Migration discovery + the build-gotchas item-6 marker files still work. |
+| **#62 pattern** | Bean Validation extended | Applied the same `@Valid` + `ConstraintViolationExceptionMapper` envelope to `PolicyRequest` and `PaymentRequest`. |
+| **#35 caveat** | Synthetic monitor data growth | `SYNMON` VIN prefix + daily prune timer (closed the "1,440 rows/day forever" footnote in chapter 31's earlier draft). |
+| **#63** | MinIO partial multipart cleanup | **Closed wontfix.** Three approaches tried — per-call cleanup (SDK v9 removed the public method), lifecycle policy via SDK (XML rejected by server), lifecycle policy via `mc ilm import` (server silently strips the `AbortIncompleteMultipartUpload` field on import). Root cause is the MinIO server build (`RELEASE.2025-09-07T16-13-09Z`); reopening requires a server image bump. |
+
+The most interesting outcome was **#58 / #59**. The deferral comment
+on those issues had forecast a 9-class breakage list with subtle
+wire-protocol concerns. The honest probe — bump the version, run `mvn
+verify`, count compile errors — came back **zero**, and the drill that
+exercises real Kafka client/broker behavior under failure (#27)
+re-ran clean. The lesson: a long deferral comment isn't a guarantee
+the bump is hard. **A five-minute compile probe is worth running
+before assuming a slice is a slice.**
+
+## How to read the GitHub project
+
+The eight phases each have a [Milestone](https://github.com/zeshaq/insurance-app/milestones?state=closed)
+with their named issues attached. The issues carry workstream labels
+(`qa:foundations`, `qa:security`, `qa:performance`, `qa:e2e`, etc.) so
+you can slice the work two ways:
+
+- **By milestone**: "what does Phase 0 ask me to do?" — open Milestone
+  1, work through five issues.
+- **By workstream**: "I'm the security person, what's on my plate
+  across all phases?" — filter by `qa:security` to see the full
+  cross-cutting view.
+
+This is the durable structure. The roadmap doc captures **what** and
+**why**; the issues capture **how** and **who** and **done**.
+
+## What this chapter is not
+
+It isn't a substitute for `docs/qa-roadmap.md`. The roadmap is the
+authoritative artifact and will move when phases open and close.
+**Treat this chapter as the orientation; the roadmap is the source of
+truth.**
+
+It also isn't a promise that the phases happen in calendar order. The
+*outputs* of Phase 1 are prerequisites for Phase 2; the *work* of
+Phase 4's pen-test booking should start during Phase 0 if you can
+manage it. The roadmap captures dependency order, not schedule order.
+
+## What you have
+
+- An eight-phase roadmap from teaching artifact to production-ready,
+  documented at [`docs/qa-roadmap.md`](https://github.com/zeshaq/insurance-app/blob/main/docs/qa-roadmap.md)
+  and **complete**. The doc carries a "Completion summary" section near
+  the bottom recording each phase's outcome and the post-roadmap
+  debt-fix closures.
+- [Eight GitHub Milestones](https://github.com/zeshaq/insurance-app/milestones?state=closed)
+  with 39 issues filed; **all closed** as of 2026-05-18.
+- **In `main`**: every artifact from every phase. Scanners, unit +
+  integration + contract + E2E + load + chaos test layers, three
+  compliance docs, seven Flyway rollback docs, the synthetic monitor
+  systemd units, the backup/restore scripts with the runbook, the SLO
+  register, and the SigNoz alert rules. The repo doubles as a curated
+  template for what a production-readiness layer looks like in
+  practice.
+- **In CI**: eleven workflows running on every PR (gitleaks, Trivy ×2,
+  Semgrep, maven-tests with JaCoCo gate, vitest with per-file gate,
+  schemathesis, pact, playwright-e2e, k6 baseline, auth-tests) plus
+  weekly ZAP baseline DAST and on-demand workflow_dispatch for k6
+  soak / k6 spike / chaos drills.
+- **On the VM**: a 60-second synthetic monitor under a user systemd
+  timer with a daily prune. The Phase 5 chaos drills are operator-run
+  on the VM (they need podman against live containers).
+- A top-four cheat sheet — SAST/SCA scanning, Playwright OIDC tests,
+  k6 load test, pen-test booking — all four shipped except the booking
+  itself, which is operator-driven (the prep doc is ready).
+- The mental model that production-ready is a **sequence** of phases,
+  not a checklist, and the order is load-bearing.
+
+### Lessons worth taking forward
+
+The roadmap surfaced three concrete bug-finding loops worth keeping
+named for the next project:
+
+* **Phase 0 / Phase 0.5**: the trivy-action tag-prefix gotcha (three
+  commits to settle). General lesson: **`uses:` refs resolve literally
+  against the action's git tags** — match the publisher's prefix
+  convention or pin to a digest. The 13 deferred Dependabot bumps from
+  Phase 0 plus their majority-merged Phase 0.5 resolution illustrate
+  the broader pattern of "tests in place before you take majors."
+* **Phase 2**: Schemathesis fuzz → five 500s → fixed in `4802850`. Three
+  reusable patterns from the fix: `@Provider` exception mappers auto-
+  register; `JsonbException` and `JsonException` are independent types;
+  `Map.of` cannot hold `null` values. The whole arc is the canonical
+  first iteration of the fuzz → fix → re-run loop.
+* **Phase 3**: k6 spike → VIN-length 500 → Bean Validation fix.
+  Reusable pattern: **annotate record fields, add `@Valid` on the
+  resource method, register a `ConstraintViolationExceptionMapper`**.
+  Same envelope as the Phase 2 mappers; the pattern later extended to
+  `PolicyRequest` and `PaymentRequest` for free.
+* **Phase 6**: `AuditCompletenessTest` → three services missing audit
+  emission → fixed in `bbf45f9`. Reusable pattern: **a test that walks
+  every state-changing operation and asserts the audit emission**
+  catches the regressions a code review wouldn't.
+* **Debt-fix**: a five-minute compile probe is worth running before
+  assuming a long-deferred bump is a slice. The Kafka 4 forecast was
+  9 file changes; the actual was 0.
+
+The track ends with one short chapter on what was deliberately not
+covered — separate tracks, separate concerns, separate cadences.
+
+Next: [32 — What's next →](/learn/openliberty/whats-next)

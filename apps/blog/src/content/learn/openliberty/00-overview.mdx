@@ -1,0 +1,130 @@
+---
+title: "Overview"
+sidebar_label: "00 — Overview"
+description: "What this track covers, who it's for, and how to use it."
+estimated_minutes: 10
+last_updated: 2026-05-18
+---
+
+This is a self-paced, opinionated track on building a real Java backend with **Open Liberty** — from an empty VM through to a fleet of containers running the stack a working insurance application would actually depend on: database, cache, event bus, identity provider, API gateway, and observability. By the end you will have provisioned a development host, written a Jakarta EE 10 / MicroProfile 6.1 service, and added every layer of the real-world ecosystem around it.
+
+The track is opinionated. It teaches the choices a Liberty team would make today — kernel-vs-full image, web profile vs full Jakarta EE, rootless podman, single-VM development, **WSO2 for ESB / identity / API management**, **SigNoz for observability**. Where alternatives exist, I name them and say why we didn't pick them.
+
+## Who this is for
+
+Engineers who:
+
+- Know Java — generics, annotations, lambdas, the basics of CDI or a DI container.
+- Have used Maven (or Gradle) for a project. We won't dwell on Maven fundamentals.
+- Are comfortable on a Unix shell — SSH, basic systemd, `ps`/`grep`/`curl`.
+- Are *not* trying to become a JVM internals expert or a Liberty performance tuner. This is the surface-area version.
+
+If you've never written a Java service that listens on a port, work through a Spring Boot or vanilla JAX-RS quickstart first. An hour; come back.
+
+## What you'll build
+
+A small REST service called `insurance-app`, surrounded by the services a real backend would lean on:
+
+- **Open Liberty** running a Jakarta EE 10 web profile + MicroProfile 6.1 application.
+- Backed by **PostgreSQL**, with **Flyway** versioning the schema.
+- Cached behind **Redis** for the hot read path.
+- Emitting and consuming events on **Kafka** (KRaft mode, no ZooKeeper).
+- Authenticated via **WSO2 Identity Server** (OpenID Connect + MicroProfile JWT).
+- Mediated by **WSO2 Micro Integrator** for outbound integrations.
+- Fronted by **WSO2 API Manager** as the public-facing API surface.
+- Instrumented with OpenTelemetry, every span and metric flowing into **SigNoz**.
+
+All of it runs as twenty-plus rootless `podman` containers on one VM, on one shared bridge network. By the end you'll have seen every layer of a real Java backend in motion — code, runtime, datastore, cache, event bus, identity, gateway, observability.
+
+## The 33-module map
+
+The track has four parts, layered so each one assumes the last.
+
+**Modules 01–12** are the **platform chapters** — one capability per chapter, introduced in isolation. By module 12 you have a Liberty service surrounded by persistence, cache, event bus, identity, an enterprise service bus, and an API gateway, plus full-stack observability.
+
+**Modules 13–22** are the **feature chapters** — they reuse those platforms to build the nine features of the demo insurance app (quote, policy bind, payment, notification fan-in, claim filing, the live claims feed over a WebSocket, reporting, audit trail, search) plus a browser-side **GUI tour** at module 22 that knits them together. Each feature chapter maps to one slice in the companion `insurance-app` git history, so the commit is the answer key when you get stuck.
+
+**Modules 23–30** are the **production-shape chapters** — two real user-facing portals (a SvelteKit customer portal in 23–26 and a React agent dashboard in 28), the real human OIDC handshake that ties them to a public hostname (27), demo credentials + SCIM provisioning (29), and a hardening pass that pins images and makes the setup script idempotent (30).
+
+**Modules 31–32** are the **production roadmap + closing** — an eight-phase plan for taking the teaching artifact to production, fully shipped and recorded (31), and a short closing chapter on what was deliberately not covered and where each piece lives next (32).
+
+### Platform chapters (01–12)
+
+| # | Module | What you build |
+| --- | --- | --- |
+| 00 | Overview *(this page)* | — |
+| 01 | Infrastructure: the development VM | A KVM guest on a private bridge, reachable via ProxyJump |
+| 02 | The toolchain | JDK 21, Maven, podman on the VM, with linger for long-running services |
+| 03 | Your first Liberty application | `pom.xml`, `server.xml`, a JAX-RS resource, `mvn package` |
+| 04 | Containerizing with podman | A `Containerfile`, the gotchas that trip first-timers, run + verify |
+| 05 | Source control and the VM as canonical workspace | GitHub, ADRs, why the VM owns the source |
+| 06 | Adding an enterprise service bus | WSO2 MI as a second container, a shared podman network, name-based routing |
+| 07 | Persistence | PostgreSQL + Flyway + Jakarta Persistence — replace `/api/ping` with a real entity |
+| 08 | Observability | SigNoz + OpenTelemetry — every signal in one pane, wired in early so the rest of the track has live traces |
+| 09 | Caching | Redis as the hot-path cache in front of Postgres |
+| 10 | Async messaging | Kafka in KRaft mode, MicroProfile Reactive Messaging, a producer + consumer in the app |
+| 11 | Identity | WSO2 IS as the OIDC provider, `mpJwt` verifying tokens in Liberty, `@RolesAllowed` on endpoints |
+| 12 | API gateway | WSO2 API Manager publishing the Liberty API, with throttling + a dev portal |
+
+### Feature chapters (13–22)
+
+Each feature chapter takes the platform layers and uses them to build one piece of the demo insurance app, pairing with the matching slice in the companion `insurance-app` repo's git history.
+
+- **13** Quote — POST /api/quotes with Redis cache + rate limit + Kafka emission + MI credit lookup
+- **14** Policy bind — Redlock distributed locking, idempotent bind, log-compacted policy-events topic
+- **15** Payment — Idempotency-Key header, `@Retry` against the simulated gateway, DLQ on persistent failure
+- **16** Notification — multi-topic fan-in via a single Kafka consumer, channel-routed mediation through MI
+- **17** Claim filing — multipart upload to MinIO, OCR via MI + WireMock, mTLS to a partner carrier API
+- **18** Live claims feed — Redis Pub/Sub + Streams behind a WebSocket; live updates + replay-on-connect
+- **19** Reporting — Kafka Streams windowed aggregation in Liberty + a scheduled MI synapse task
+- **20** Audit trail — the same domain event written to both a compacted and a retention topic; contrast view
+- **21** Search — Debezium CDC reads Postgres logical replication, a Liberty consumer indexes into OpenSearch
+- **22** GUI tour — vanilla HTML/JS pages served by Liberty with a server-side dev-token endpoint
+
+### Production-shape chapters (23–30)
+
+Real human-facing surfaces, on a different stack from the Liberty backend on purpose — so two architectures are visible side by side.
+
+- **23–26** Customer portal — SvelteKit + Auth.js BFF + WSO2 IS OIDC. Quote wizard with progressive enhancement (24), policies + bind + idempotent payment (25), claim filing through the BFF with polish (26).
+- **27** Real human OIDC end-to-end — Cloudflare DNS + HAProxy backend + the three load-bearing config bits (`ORIGIN` env, `/oauth2/token` issuer suffix, `X-Forwarded-*` headers) that derail every first OIDC integration.
+- **28** Agent dashboard — React + Vite SPA behind an Express BFF using `openid-client` + Redis-backed sessions, with one-click claim approval.
+- **29** Demo credentials + SCIM provisioning — the `student@comptech.com` user, the WSO2-admin-vs-portal-user split, the Carbon-internal-role gotcha that means SCIM alone isn't enough.
+- **30** Hardening pass — pin every image by digest, make the setup script idempotent, document the re-pin ritual.
+
+### Production roadmap + closing (31–32)
+
+- **31** Going to production — the QA roadmap — eight phases from teaching artifact to production-ready (scanners, unit + integration, contract + E2E, performance, deeper security, resilience, compliance + prod ops). All shipped; each phase's outcome and the three bug-finding loops it surfaced.
+- **32** What's next — what the track deliberately didn't cover and which adjacent course owns each piece.
+
+Each module assumes the previous ones. Expect 45–90 minutes per module if you do the steps on a real VM.
+
+## How to use this track
+
+Three patterns work:
+
+- **Sequential.** Start at 01, walk through to 32. The platform half (01–12) takes the most calendar time; the feature chapters move faster because each one reuses what came before. Best for first-timers.
+- **Reference.** Jump to the module you need from the sidebar. Best if you already have a Liberty app and want one specific layer.
+- **Pair-programming.** Open the track on one monitor, your shell on another, and execute as you go.
+
+## Prerequisites and setup
+
+- A **Linux host** you can run KVM / libvirt on. Module 01 walks through the install.
+- **SSH from your laptop** to that host. A jump host is fine — module 01 covers the ProxyJump pattern explicitly.
+- A **GitHub account**. You'll push the project from inside the VM in module 05.
+- **No Java or Open Liberty installed up front.** Module 02 installs everything on the VM.
+
+## A note on what's *not* here
+
+This track is deliberately focused on **core application development**. The following are out of scope and live in adjacent tracks:
+
+- **CI/CD pipelines.** Building, scanning, signing, and deploying artifacts gets its own course; this track stops at "image built locally on the VM."
+- **Cloud / OpenShift deployment.** Everything here runs on one VM. The OCP migration is a separate track.
+- **Secrets management at scale.** Vault, External Secrets Operator, sealed secrets — important, but a different conversation than building the app.
+- **Service mesh.** Istio / OSSM concerns the *network between services*, not the services themselves.
+- **Open Liberty performance tuning.** Use the official Liberty performance docs.
+
+The goal: get you fluent in the **full developer loop** for a Liberty service — and the services it talks to. Not the ops surface around them.
+
+Ready? Module 01 is the VM. Let's go.
+
+Next: [01 — Infrastructure: the development VM →](/learn/openliberty/infrastructure-the-vm)

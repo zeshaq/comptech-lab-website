@@ -1,0 +1,179 @@
+---
+title: "Installation Manual - 94 Gatekeeper preflight and dry-run design"
+sidebar_label: "94 Gatekeeper preflight and dry-run design"
+description: "Validate the Gatekeeper Operator package and dry-run the operator-only install shape before any admission-impacting Gatekeeper rollout."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-03` Gatekeeper preflight for the
+greenfield v7 clusters.
+
+The gate was dry-run only. It did not install Gatekeeper and did not change
+live cluster or GitOps desired state.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-03` / `#415` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-02` / `#414` |
+
+## Intent
+
+After catalog hygiene, Gatekeeper became the first candidate for the next
+platform operator. Because Gatekeeper can affect admission, the first step was
+to validate the package, namespace model, install mode, source pinning, and
+dry-run behavior before any live install.
+
+## Access Path
+
+Live checks used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+Kubeconfigs on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Baseline
+
+Both clusters were healthy during preflight:
+
+| Check | `hub-dc-v7` | `spoke-dc-v7` |
+| --- | --- | --- |
+| OpenShift | `4.20.18` | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready | `6/6` Ready |
+| ClusterOperators | steady | steady |
+| Non-running pods | none | none |
+| Pending CSRs | none | none |
+
+Argo applications were `Synced/Healthy` at:
+
+```text
+11e76f466ddcccee78e6ea59f06c55ad775b3c25
+```
+
+Both clusters had default operator sources disabled:
+
+```text
+OperatorHub/cluster.spec.disableAllDefaultSources=true
+```
+
+## Package Findings
+
+Gatekeeper resolved through the mirrored Red Hat catalog on both clusters:
+
+| Field | Value |
+| --- | --- |
+| Package | `gatekeeper-operator-product` |
+| Display | `Gatekeeper Operator` |
+| Provider | `Red Hat` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` |
+| CatalogSource namespace | `openshift-marketplace` |
+| Default channel | `stable` |
+| Current CSV | `gatekeeper-operator-product.v3.21.0` |
+| Version | `3.21.0` |
+| Supported install mode | `AllNamespaces=true` only |
+| Owned CRD | `gatekeepers.operator.gatekeeper.sh` |
+| Required CRDs/APIs | none reported |
+
+There was no suggested namespace annotation in the package metadata.
+
+No existing Gatekeeper namespace, Subscription, CSV, webhook, or Gatekeeper
+CRD was found. A broad `constraints` CRD search only matched the built-in
+OpenShift SCC CRD.
+
+## Dry-run Validation
+
+The first full intended server-side dry-run validated the target Namespace,
+then failed the namespaced OLM objects because the namespace did not exist:
+
+```text
+namespaces "openshift-gatekeeper-system" not found
+```
+
+That is expected behavior. A server-side dry-run Namespace is not persisted
+for later objects in the same manifest.
+
+The no-change validation was split into three checks:
+
+| Check | Result |
+| --- | --- |
+| Full intended manifest client dry-run | passed on both clusters |
+| Target Namespace server-side dry-run | passed on both clusters |
+| OperatorGroup and Subscription server-side dry-run in namespace `default` | passed on both clusters |
+
+After dry-run validation, the target Gatekeeper objects were still absent.
+
+## Operator-only Install Shape
+
+Use this as the first Gatekeeper GitOps install shape:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-gatekeeper-system
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: gatekeeper-system
+  namespace: openshift-gatekeeper-system
+spec: {}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: gatekeeper-operator-product
+  namespace: openshift-gatekeeper-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    operatorframework.io/bundle-unpack-timeout: 30m
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: gatekeeper-operator-product
+  source: cs-redhat-operator-index-v4-20
+  sourceNamespace: openshift-marketplace
+  startingCSV: gatekeeper-operator-product.v3.21.0
+```
+
+The empty OperatorGroup `spec: {}` is intentional because the CSV supports
+only the AllNamespaces install mode.
+
+## Boundary
+
+Do not include these in the first Gatekeeper install gate:
+
+- `Gatekeeper` custom resource;
+- validating or mutating webhook rollout;
+- constraint templates;
+- constraints.
+
+Those are admission-impacting and need later rollback-tested gates after the
+operator CSV is healthy.
+
+## Result
+
+Gatekeeper is suitable for the next operator gate only as an operator-only hub
+install first.
+
+The next gate is:
+
+```text
+OP-GF-OPERATORS-04: hub Gatekeeper operator-only GitOps install
+```
+
+That gate should install only the Namespace, OperatorGroup, and Subscription
+on `hub-dc-v7`, validate CSV success and cluster health, then stop before the
+Gatekeeper operand is created.

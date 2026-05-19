@@ -1,0 +1,168 @@
+---
+title: "Foundations: what 'disconnected' really means and the four supply chains"
+sidebar_label: "01 — Foundations"
+description: "What changes when you take the public internet off the install path. The four supply chains a disconnected cluster has to solve, the threat model that drives them, and the evidence trail you'll learn to produce."
+estimated_minutes: 40
+last_updated: 2026-05-19
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const stage = { background: "#fafafa", border: "1px solid #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+export const ctrl  = { background: "#e5e7eb", border: "1px solid #6b7280", borderRadius: 8, padding: 10, color: "#1f2937", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const gate  = { background: "#fee2e2", border: "1.5px solid #b91c1c", borderRadius: 8, padding: 8, color: "#7f1d1d", width: 170, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const ext   = { background: "#fef3c7", border: "1px solid #b45309", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+
+export const flow = { style: { stroke: "#1f2937", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1f2937" }, labelStyle: { fill: "#1f2937", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+export const block = { style: { stroke: "#dc2626", strokeWidth: 1.5, strokeDasharray: "4,3" }, markerEnd: { type: "arrowclosed", color: "#dc2626" }, labelStyle: { fill: "#b91c1c", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+
+export const chainNodes = [
+  { id: "ocp",     position: { x: 60,  y: 0   }, data: { label: "1. Release payload\nopenshift-install + RHCOS\n+ ClusterOperator images" }, style: ctrl },
+  { id: "ops",     position: { x: 280, y: 0   }, data: { label: "2. Operator catalog\nOLM index + bundles\n+ related operand images" }, style: ctrl },
+  { id: "add",     position: { x: 500, y: 0   }, data: { label: "3. Additional images\nubi9, golden images,\nplatform builds" }, style: ctrl },
+  { id: "in",      position: { x: 720, y: 0   }, data: { label: "4. Install-time inputs\npull-secret, SSH key,\nCA bundle, IPs" }, style: ctrl },
+
+  { id: "mirror",  position: { x: 280, y: 150 }, data: { label: "Mirror registry\n(Quay / Harbor)\nin-network, TLS via HAProxy" }, style: gate },
+  { id: "objstore",position: { x: 60,  y: 150 }, data: { label: "Object storage\n(MinIO)\nblobs + backups" }, style: gate },
+  { id: "vault",   position: { x: 500, y: 150 }, data: { label: "Secret custody\n(Vault)\npull-secret, robot tokens" }, style: gate },
+  { id: "git",     position: { x: 720, y: 150 }, data: { label: "Source control\n(GitLab CE)\nGitOps repo + ImageSet" }, style: gate },
+
+  { id: "cluster", position: { x: 380, y: 300 }, data: { label: "Cluster\n(installs + runs)" }, style: ctrl },
+  { id: "world",   position: { x: 60,  y: 300 }, data: { label: "registry.redhat.io\nquay.io\ncdn.redhat.com" }, style: ext },
+];
+
+export const chainEdges = [
+  { id: "e1", source: "ocp",      target: "mirror",   label: "oc mirror --v2", ...flow },
+  { id: "e2", source: "ops",      target: "mirror",   label: "oc mirror --v2", ...flow },
+  { id: "e3", source: "add",      target: "mirror",   label: "skopeo copy",    ...flow },
+  { id: "e4", source: "in",       target: "vault",    label: "Vault put",      ...flow },
+  { id: "e5", source: "mirror",   target: "objstore", label: "RadosGW blobs",  ...flow },
+  { id: "e6", source: "vault",    target: "cluster",  label: "render inputs",  ...flow },
+  { id: "e7", source: "git",      target: "cluster",  label: "GitOps pulls",   ...flow },
+  { id: "e8", source: "mirror",   target: "cluster",  label: "image pulls",    ...flow },
+  { id: "e9", source: "cluster",  target: "world",    label: "BLOCKED",        ...block },
+];
+
+Before you write your first `imageset-config.yaml`, it helps to be clear about what disconnected install actually changes and what it doesn't. The cluster's behaviour at runtime is mostly the same. The thing that changes is what the cluster is *allowed* to need from outside. This module sets the framing.
+
+## What "disconnected" means in practice
+
+A disconnected OpenShift cluster is one where the cluster nodes have **no route to the public internet** at install time or runtime. That's a stronger claim than it sounds:
+
+| Common interpretation | Whether it counts as disconnected |
+| --- | --- |
+| "We have a proxy to the internet" | No. Proxied still means the cluster eventually talks to `quay.io`. |
+| "Outbound is allowed from the bastion only" | Depends. If the cluster pulls through that bastion, no. If you mirror once on the bastion and the cluster never pulls externally, yes. |
+| "The cluster has an outbound allowlist" | No. Allowlisting `*.redhat.com` is still connected install. |
+| "The cluster is on an air-gapped fabric" | Yes. |
+| "The cluster is on a private VRF with no NAT" | Yes. |
+| "Workloads cannot reach the internet, but the cluster can" | No. The *cluster's* posture is what defines disconnected. |
+
+The acid test: **set a default deny egress firewall on the cluster's machine network. If the cluster installs and runs healthy through 30 days of operator upgrades, you're disconnected.**
+
+## Why the public internet drops off the install path
+
+Three reasons cover most engagements:
+
+1. **Regulatory** — BFSI, healthcare, defence, telecom, OT/ICS. PCI-DSS, HIPAA, NIS2, IEC 62443, FedRAMP-Moderate all have controls that disfavour or forbid cluster-side outbound from production workload subnets.
+2. **Operational** — air-gapped sites with intermittent, expensive, or untrusted uplinks. Submarines, ships, ports, mines, oil platforms, plant floors, edge stores in countries with adversarial CDN posture.
+3. **Defensive** — supply-chain-attack containment. If a malicious operator bundle hits `registry.redhat.io` for a few hours, a connected cluster pulling on schedule may import it; a disconnected cluster only imports what an operator put into the ImageSet and approved into the mirror.
+
+For most teams it's a mix — regulation requires the disconnected posture, defence-in-depth is the bonus, and the operational complexity is what you trade against the bonus.
+
+## The four supply chains
+
+The single most important framing in this track is that disconnected install isn't *one* supply chain to solve. It's four, each with its own source, transport, custody, and verification.
+
+<Whiteboard client:load data={{ nodes: chainNodes, edges: chainEdges }} height={420} />
+
+| # | Supply chain | What it contains | Tool | Lands in |
+| --- | --- | --- | --- | --- |
+| 1 | **Release payload** | The OpenShift release image, every ClusterOperator image, RHCOS, `openshift-install` itself. | `oc mirror --v2` | Mirror registry (Quay) |
+| 2 | **Operator catalog** | Red Hat operator-index + certified-operator-index, the bundles those indexes reference, every related operand image. | `oc mirror --v2` | Mirror registry (Quay) |
+| 3 | **Additional images** | UBI base images, in-house "golden" images, CI/CD utility images, helper images. | `skopeo copy` or `oc mirror`'s additional-images block | Mirror registry (Quay) |
+| 4 | **Install-time inputs** | The merged pull-secret, SSH key, CA trust bundle, custom CA certs, network plan. | Vault + a render host | Rendered `install-config.yaml` on the render host |
+
+A team that maps each line to "this script runs on this host, the output lands in this place, this artefact proves it" can install a disconnected cluster. A team that thinks "disconnected means mirror the registry" will get to bootstrap-complete and then watch `openshift-marketplace` fill with `ImagePullBackOff` catalog pods.
+
+## The supporting service stack
+
+The four supply chains depend on a small set of supporting services. The Day-0 question of any disconnected install is *do all of these exist and respond healthy?*
+
+| Role | Why it exists | What the lab uses |
+| --- | --- | --- |
+| **Private DNS** | Cluster API VIPs, ingress VIPs, master/worker hostnames must resolve in-network. The public internet is not consulted. | PowerDNS authoritative + recursor, on `gf-ocp-pdns-01`. |
+| **Edge ingress + TLS** | Wildcard cert termination for VM-hosted tools; routes between VMs. | HAProxy on `gf-ocp-haproxy-01`. |
+| **Object storage** | Blob backend for the registry, backup target for the registry, observability/log storage later. | MinIO. |
+| **Source control** | The GitOps repo. The ImageSet config under version control. Operator-bumps as MRs. | GitLab CE on `gf-ocp-gitlab-01`. |
+| **Secret custody** | Pull-secret, robot tokens, kubeconfigs, backup passphrases. Anything that's not in Git. | Vault three-node Raft on `gf-ocp-vault-r1-0[123]`. |
+| **CMDB / IPAM** | Authoritative IP/MAC/hostname assignment to prevent install-config collisions. | NetBox on `gf-ocp-netbox-01`. |
+| **Mirror registry** | The blob server every cluster image pull eventually hits. | Quay standalone on `gf-ocp-quay-01`. |
+| **Mirror runner** | The host that runs `oc mirror --v2` with internet access — the only path internet content takes in. | The hypervisor itself (`dl385-2`) or a dedicated VM. |
+| **Render / operator host** | Holds the merged pull-secret, runs `openshift-install`, produces the agent ISO. | `gf-ocp-bootstrap-01` (a small Ubuntu VM). |
+
+The track's Module 02 walks through each of these in the order you'd stand them up. The order matters: object storage before registry, DNS before TLS, source control before GitOps, secret custody before anything that has a secret.
+
+## The threat model that drives the design
+
+If you skim the lab manifests, three patterns will keep showing up. They all come from the same threat model:
+
+1. **The cluster cannot pull from a host you didn't intend it to.** That's why IDMS/ITMS rewrite every upstream registry reference to the mirror at the node level. That's why default `OperatorHub` sources are disabled. That's why built-in OLM v1 `ClusterCatalog` objects are set to `availabilityMode: Unavailable`. The cluster *cannot* pull from `registry.redhat.io` even if a workload manifest says it should.
+2. **A compromised mirror can poison the cluster.** That's why the install path verifies release signatures via signature ConfigMaps. That's why operator catalogs ship as digest-pinned indexes. That's why `Subscription`s carry `startingCSV` — to prevent a re-mirror from silently advancing the cluster onto a digest nobody reviewed.
+3. **A compromised operator workstation can poison the mirror.** That's why pull-secrets live in Vault, never on disk where shell history can leak them. That's why backup passphrases live in Vault. That's why `oc mirror` runs from a dedicated host, not the operator's daily laptop. That's why the GitOps repo, not a console UI, is the change interface.
+
+The disconnected posture isn't paranoia — it's an attempt to make the supply chain inspectable. Every artefact that lands in the cluster has a paper trail back to a reviewed change in Git.
+
+## The evidence trail
+
+A useful litmus test for a disconnected install: pick any image running on the cluster — say, `cluster-version-operator` — and trace it back through six artefacts:
+
+1. The running pod's `spec.containers[].image` — a digest pin on `quay.v7.comptech-lab.com/openshift-release/openshift/release-images@sha256:...`.
+2. The IDMS that rewrote it from `quay.io/openshift-release-dev/ocp-release@sha256:...` to the mirror path.
+3. The `oc-mirror` `mapping.txt` entry from the most recent mirror pass.
+4. The `imageset-config.yaml` in Git that asked for that release.
+5. The merge request that bumped the ImageSet to its current commit, with the reviewer's name.
+6. The `oc adm release info` digest match against the upstream release.
+
+A team that can produce that chain for any image has a healthy disconnected install. A team that can't is one re-mirror away from a surprise. Module 10 (Day-2 mirror ops) builds the tooling that makes this chain inspectable in seconds.
+
+## What changes vs a connected install
+
+| Stage | Connected | Disconnected |
+| --- | --- | --- |
+| Get installer | `curl mirror.openshift.com/.../openshift-install-linux.tar.gz` | Same, *once*, on the mirror runner. The cluster never reaches it. |
+| Pull secret | Red Hat customer pull-secret only | **Merged** pull-secret: customer + mirror-registry credential |
+| `install-config.yaml` | No `imageDigestSources` | `imageDigestSources` rewrites every release path |
+| `agent-config.yaml` (or platform `baremetal:`) | Optional cosmetics | Per-interface IP + DNS + IPv6 stance; the cluster gets no DHCP |
+| Bootstrap | Online assisted-service or installer-provisioned | Agent-based; ISO contains the embedded payload reference |
+| Day-1 baseline | Default OperatorHub works | IDMS/ITMS, signature ConfigMaps, CatalogSources, OperatorHub disable |
+| Operator install | Sub picks latest from OperatorHub | Sub picks `startingCSV` from your mirrored CatalogSource |
+| Operator upgrade | Auto on channel | Auto on channel within mirrored versions only; you control what's mirrored |
+| Pull secret rotation | Update one Secret | Update Vault, re-render merged pull-secret on render host, push as `Secret/pull-secret` in `openshift-config` |
+| Image registry | Default operator-managed | Often `Removed` on management clusters; tenants use the mirror |
+
+The cluster *runs* the same. The supply chain that feeds it is rebuilt from scratch with you as the responsible party.
+
+## The mental model
+
+Carry these three sentences through the rest of the track:
+
+- **Disconnected install isn't an install option, it's an operating model.** The install is two days. The model is forever.
+- **The mirror is the contract, the ImageSet is the spec, GitOps is the witness.** Every image the cluster runs must be in the mirror; the mirror must reflect the ImageSet; the ImageSet must be in Git.
+- **Disconnected fails closed.** A mistake produces `ImagePullBackOff`, which is loud. A connected install fails open — you only notice the surprise on the day a new digest lands you didn't ask for.
+
+## Exercise
+
+Pick a connected OpenShift cluster you have access to (a dev cluster, CodeReady Containers, anything). Run:
+
+```bash
+oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+  | head -1 \
+  | xargs -I{} oc debug node/{} -- chroot /host cat /etc/containers/registries.conf.d/*.conf 2>/dev/null
+```
+
+What you see is the file IDMS/ITMS rewrites on a disconnected cluster — empty or default on a connected one, fully populated on a disconnected one. By Module 06 you'll know exactly what to expect there, and you'll be the person writing the IDMS that produces it.
+
+## What's next
+
+[Module 02 — Supporting services](/learn/openshift-disconnected-deployment/supporting-services) walks through DNS, MinIO, GitLab, Vault, HAProxy, and NetBox — the stack a disconnected cluster leans on, in the order you stand it up.

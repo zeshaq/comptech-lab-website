@@ -1,0 +1,242 @@
+---
+title: "Supporting services: the stack a disconnected cluster leans on"
+sidebar_label: "02 — Supporting services"
+description: "Private DNS, edge TLS, object storage, source control, secret custody, IPAM/CMDB. Why each one exists, what it does for a disconnected install, and the order you stand them up."
+estimated_minutes: 50
+last_updated: 2026-05-19
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const vm   = { background: "#fef3c7", border: "1px solid #b45309", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+export const ctrl = { background: "#e5e7eb", border: "1px solid #6b7280", borderRadius: 8, padding: 10, color: "#1f2937", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const ext  = { background: "#fafafa", border: "1.5px dashed #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 160, textAlign: "center", fontSize: 12 };
+
+export const flow = { style: { stroke: "#1f2937", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1f2937" }, labelStyle: { fill: "#1f2937", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+
+export const stackNodes = [
+  { id: "hv",    position: { x: 380, y: 0   }, data: { label: "Hypervisor\ndl385-2 (KVM)\nbr33 → 30.30.200.0/24" }, style: ctrl },
+
+  { id: "dns",   position: { x: 0,   y: 130 }, data: { label: "PowerDNS\ngf-ocp-pdns-01\nauth + recursor" }, style: vm },
+  { id: "ha",    position: { x: 190, y: 130 }, data: { label: "HAProxy\ngf-ocp-haproxy-01\nedge TLS + L7" }, style: vm },
+  { id: "minio", position: { x: 380, y: 130 }, data: { label: "MinIO\nobject storage\nblobs + backups" }, style: vm },
+  { id: "git",   position: { x: 570, y: 130 }, data: { label: "GitLab CE\ngf-ocp-gitlab-01\nGitOps + ImageSet" }, style: vm },
+  { id: "vault", position: { x: 760, y: 130 }, data: { label: "Vault 3-node\ngf-ocp-vault-r1-01..03\nKV-v2 + Raft" }, style: vm },
+
+  { id: "nb",    position: { x: 0,   y: 260 }, data: { label: "NetBox\ngf-ocp-netbox-01\nIPAM + CMDB" }, style: vm },
+  { id: "quay",  position: { x: 380, y: 260 }, data: { label: "Quay standalone\ngf-ocp-quay-01\nmirror registry" }, style: vm },
+  { id: "bs",    position: { x: 760, y: 260 }, data: { label: "Bootstrap host\ngf-ocp-bootstrap-01\nrender + ISO + oc-mirror" }, style: vm },
+];
+
+export const stackEdges = [
+  { id: "e1", source: "hv", target: "dns",   ...flow },
+  { id: "e2", source: "hv", target: "ha",    ...flow },
+  { id: "e3", source: "hv", target: "minio", ...flow },
+  { id: "e4", source: "hv", target: "git",   ...flow },
+  { id: "e5", source: "hv", target: "vault", ...flow },
+  { id: "e6", source: "hv", target: "nb",    ...flow },
+  { id: "e7", source: "hv", target: "quay",  ...flow },
+  { id: "e8", source: "hv", target: "bs",    ...flow },
+
+  { id: "f1", source: "quay",  target: "minio", label: "blobs → bucket", ...flow },
+  { id: "f2", source: "ha",    target: "quay",  label: "TLS → :8080",    ...flow },
+  { id: "f3", source: "ha",    target: "git",   label: "TLS → :80",      ...flow },
+  { id: "f4", source: "ha",    target: "minio", label: "TLS → :9000",    ...flow },
+  { id: "f5", source: "bs",    target: "vault", label: "render secrets", ...flow },
+  { id: "f6", source: "bs",    target: "quay",  label: "oc adm release info", ...flow },
+];
+
+A disconnected cluster doesn't run in a vacuum. It leans on a small set of supporting services that all have to exist before bootstrap-complete returns happy. This module walks the stack in the order you'd stand it up, and shows the v7 lab layout you can copy.
+
+## The stack at a glance
+
+<Whiteboard client:load data={{ nodes: stackNodes, edges: stackEdges }} height={420} />
+
+Eight VMs on one hypervisor. Some teams collapse this to fewer (e.g. running MinIO inside Quay's PVCs, or skipping NetBox for a small fleet). Some teams expand it (separate authoritative and recursive DNS, dedicated TLS terminator vs L7 router). The roles are what matter; the physical packaging is taste.
+
+## The stand-up order
+
+Stand them up in this order. Each one's preconditions are met by the ones above it.
+
+1. **Hypervisor** — libvirt/KVM, the bridges (`br33` for the 30.30.200.0/24 lab network in this example), the base image (`ubuntu-24.04-base.qcow2`), and a small "operator workspace" repo on the host that holds the `gfctl.sh` driver and cloud-init artefacts.
+2. **DNS** — until DNS is healthy, nothing else can be addressed by name. Stand up before the registry.
+3. **HAProxy** — TLS termination + L7 routing for the VM-hosted tools. Stand up before any VM that needs a wildcard cert.
+4. **MinIO** — object storage. Stand up before Quay (Quay's blob backend) and before GitLab (GitLab's backup target).
+5. **GitLab CE** — source control. Stand up before any GitOps work.
+6. **Vault** — secret custody. Stand up before anything that has a secret leaves a developer's laptop.
+7. **NetBox** — IPAM + CMDB. Optional for very small fleets; mandatory once you have more than ~10 hostnames to keep straight.
+8. **Quay** — the mirror registry. Stand up before `oc mirror`.
+9. **Bootstrap host** — the operator's render host where the pull-secret merges, `install-config.yaml` renders, and the agent ISO generates.
+
+## DNS — PowerDNS auth + recursor
+
+Disconnected DNS has one job: every name the cluster needs has to resolve in-network without consulting the public internet. That includes:
+
+- **Cluster** — `api.<cluster>.<domain>`, `api-int.<cluster>.<domain>`, `*.apps.<cluster>.<domain>`, each master/worker hostname.
+- **Supporting services** — `quay.v7.comptech-lab.com`, `gitlab.v7.comptech-lab.com`, `minio.v7.comptech-lab.com`, `vault.v7.comptech-lab.com`.
+- **Public** — anything outside the lab zone, forwarded upstream from the recursor (only used by the hypervisor and the bootstrap host, never by cluster nodes).
+
+The lab uses **PowerDNS** running both the authoritative server and the recursor on the same VM. The authoritative server holds the `v7.comptech-lab.com` zone; the recursor is the resolver every other VM and cluster points at. PowerDNS over BIND because the API for record automation is friendlier — the lab adds records via REST instead of editing zone files.
+
+Quick sanity check on a fresh disconnected install:
+
+```bash
+for r in api api-int "test.apps"; do
+  dig @30.30.200.53 "$r.gf-ocp-hub-dc-v7.v7.comptech-lab.com" +short
+done
+```
+
+You should see static IPs back, not NXDOMAIN, not the public DNS suffix-search default.
+
+## HAProxy — edge TLS termination
+
+Most disconnected labs put **HAProxy** in front of the VM-hosted tools so each tool can speak plain HTTP internally and HAProxy handles TLS at the edge with a single wildcard cert. The lab has a `*.v7.comptech-lab.com` cert on HAProxy that fronts:
+
+| Frontend | Backend | Why |
+| --- | --- | --- |
+| `quay.v7.comptech-lab.com:443` | `30.30.200.40:8080` | Quay listens HTTP; TLS terminated here |
+| `gitlab.v7.comptech-lab.com:443` | `30.30.200.10:80` | GitLab nginx behind HAProxy |
+| `minio.v7.comptech-lab.com:443` | `30.30.200.30:9000` | S3 API |
+| `console.minio.v7.comptech-lab.com:443` | `30.30.200.30:9001` | MinIO web console |
+| `vault.v7.comptech-lab.com:443` | `30.30.200.50-52:8200` | Vault's own TLS could be at the listener; some labs front it for the wildcard cert |
+
+The **cluster does not go through HAProxy**. OpenShift's ingress operator answers `*.apps.<cluster>.v7.comptech-lab.com` directly on the cluster's ingress VIP — HAProxy is for the supporting VMs, not the cluster routes.
+
+## MinIO — object storage
+
+You need an S3-compatible object store before you stand the registry up, because Quay-standalone stores blobs on `RadosGWStorage` pointed at MinIO. **MinIO** is the usual choice for a single-VM lab; in production with three workers + dedicated NICs it scales. The minimum viable setup:
+
+- A bucket per consumer: `quay-storage`, `quay-backups`, `gitlab-backups`, plus whatever observability later wants (`loki`, `tempo`, `velero`).
+- A user per consumer with a scoped policy. **No shared root credentials past the bootstrap minute.**
+- Lifecycle rules where appropriate — backups expire after 90 days, noncurrent versions expire after 90 days, delete markers expire on their own.
+
+Custody pattern (every credential, no exceptions):
+
+```text
+secret/greenfield/object-storage/minio/users/quay-storage
+secret/greenfield/object-storage/minio/users/quay-backup
+secret/greenfield/object-storage/minio/users/gitlab-backup
+```
+
+A handy `mc` smoke test once the bucket and user exist:
+
+```bash
+mc alias set quay-storage https://minio.v7.comptech-lab.com $ACCESS $SECRET
+mc ls quay-storage/quay-storage
+mc admin user info quay-storage quay-storage-user
+```
+
+## GitLab CE — source control
+
+The GitOps repo is the source of truth for everything the cluster reconciles. Module 08 covers what's in it; for now what matters is that it's reachable in-network *before* you have a cluster to consume it.
+
+The lab uses **GitLab CE 18** on `gf-ocp-gitlab-01` with the standard Omnibus install, fronted by HAProxy. Two things to set up early:
+
+- A `comptech-platform/` group that the GitOps repo lives under.
+- A bot account (or a Personal Access Token on the operator account) that Argo CD will use to clone. Token stored in Vault at `secret/greenfield/gitlab/operator-pat`.
+
+The `oc-mirror` ImageSet also lives in GitLab — typically in a separate repo `comptech-platform/openshift-ops/mirror-config` — so that mirror changes go through MR review.
+
+## Vault — secret custody
+
+Every secret in the disconnected install lives in **Vault**. The lab runs a three-node Vault Raft cluster (`gf-ocp-vault-r1-01..03`) for HA, with a seed/operator VM (`gf-ocp-vault-r1-seed-01`) used for initialization. Auto-unseal can be configured via transit, but for a lab the operator's `vault operator unseal` flow is fine.
+
+Custody paths the rest of this track will reference:
+
+```text
+secret/greenfield/redhat/pull-secret-customer            # the original Red Hat pull-secret
+secret/greenfield/quay/application/gf-ocp-quay-01        # the merged install-time pull-secret blob
+secret/greenfield/quay/users/ocp_cluster_pull            # cluster pull credential (a normal user, not a robot)
+secret/greenfield/quay/robots/openshift-release/ocp_mirror   # release mirror robot
+secret/greenfield/quay/robots/openshift-operators/ocp_mirror # operator mirror robot
+secret/greenfield/object-storage/minio/users/quay-storage    # Quay → MinIO blob credential
+secret/greenfield/object-storage/minio/users/quay-backup     # Quay backup credential
+secret/greenfield/clusters/<cluster>/kubeconfig          # post-install kubeconfig
+secret/greenfield/clusters/<cluster>/kubeadmin-password  # post-install kubeadmin password
+```
+
+The single most important Vault habit: **secrets land in Vault first and only Vault has the canonical copy.** Render hosts read Vault to produce in-memory inputs; they do not maintain a separate on-disk copy that can drift.
+
+## NetBox — IPAM and CMDB
+
+Not strictly required, but disconnected labs that skip it tend to end up with collisions. The lab keeps NetBox (`gf-ocp-netbox-01`) authoritative for:
+
+- **IP allocations** — every `30.30.200.0/24` and `30.30.75.0/24` (or your equivalent) address has an owner.
+- **MAC reservations** — every VM and physical worker MAC.
+- **VLAN/bridge mapping** — which libvirt bridge a VM should attach to.
+- **DNS source** — the lab uses a NetBox-driven script to push records to PowerDNS, so NetBox is the only place an IP/hostname pair gets typed by hand.
+
+Even without NetBox you need a flat-file "allocation table" — `plans/allocation-table.md` or equivalent — that the team treats as canonical. Without it, two engineers will assign the same IP to two VMs on different days.
+
+## Quay (standalone) — the mirror registry
+
+The headline service. Module 03 dives in; the one-paragraph version: a single VM running **Project Quay** in a podman container, with PostgreSQL and Redis co-located, **`RadosGWStorage`** pointed at the MinIO `quay-storage` bucket, HAProxy fronting TLS, and `FEATURE_EXTENDED_REPOSITORY_NAMES: true` so `oc-mirror`'s nested paths (`openshift-release/openshift/release-images`, `openshift-operators/appcafe/open-liberty/...`) work.
+
+Repository model out of the box:
+
+| Org | Purpose |
+| --- | --- |
+| `openshift-release` | release payloads (`release-images`, nested `openshift/release-images`, `release-metadata`) |
+| `openshift-operators` | catalogs (`redhat-operator-index`, `certified-operator-index`) and their bundles |
+| `platform` | CI utility images, smoke-test images |
+| `golden-images` | approved base images (`ubi9`) |
+| `tenants` | future app-team namespace parent |
+
+## Bootstrap host — the render host
+
+A small Ubuntu VM (or the operator's workstation, less safely) where:
+
+- The merged pull-secret lands as a file, briefly. Vault → in-memory render → `install-config.yaml`, then the file disappears.
+- `openshift-install` runs to produce the agent ISO.
+- `oc-mirror` may run from here too, if you don't have a dedicated mirror runner.
+- `oc` lives, the kubeconfigs land in `~/.kube/configs/<cluster>.kubeconfig`, and the rendered inputs live under `~/ocp-clusters/<cluster>/`.
+
+The bootstrap host has the only outbound internet that matters during a mirror pass. After install-complete it has internal-only access; it's never on a path the cluster traverses.
+
+## A standing-up checklist
+
+Once the eight services are up, the **Day-0 sanity board** is:
+
+```bash
+# DNS
+dig @30.30.200.53 api.gf-ocp-hub-dc-v7.v7.comptech-lab.com +short
+dig @30.30.200.53 quay.v7.comptech-lab.com +short
+
+# Edge TLS
+curl -sI https://quay.v7.comptech-lab.com/api/v1/discovery
+curl -sI https://gitlab.v7.comptech-lab.com/users/sign_in
+curl -sI https://minio.v7.comptech-lab.com/minio/health/ready
+
+# MinIO buckets exist with their owner users
+mc admin user list quay-storage    # quay-storage-user, quay-backup-user
+
+# Vault paths exist (no secret values printed)
+vault kv list secret/greenfield/object-storage/minio/users
+vault kv list secret/greenfield/quay
+
+# GitLab reachable + the right groups
+curl -sI https://gitlab.v7.comptech-lab.com/comptech-platform
+
+# Quay reachable
+curl -fsS https://quay.v7.comptech-lab.com/api/v1/discovery | jq '.title // .info.title // empty'
+```
+
+A team that can run that script and get all green checkmarks has cleared the supporting-services hurdle. From here, Module 03 dives into the registry itself.
+
+## What's *not* in the stack
+
+A few things deliberately not part of the v7 stack:
+
+- **A public CA** — the wildcard cert is internal CA-signed and pinned in the cluster's `additional-trust-bundle`. No Let's Encrypt callouts at install time.
+- **An NTP service** — the lab uses `chrony` against an internal NTP source on each VM via cloud-init. Time skew breaks etcd, so this is mandatory; it's just packaged with each VM, not a separate service.
+- **A separate "registry mirror" container** — `oc-mirror`'s built-in `mirror-registry` is a docker-distribution registry suitable for very small environments. The lab uses Quay because it handles the volume, has a UI, has a proper auth and team model, and is the registry the cluster already uses for its OpenShift pulls in connected mode (so the pattern is familiar).
+
+## Exercise
+
+If you can: stand up Quay-standalone on a single Ubuntu 24.04 VM with a local PostgreSQL, a local Redis, and an S3-compatible blob backend pointing at a local MinIO. You don't have to wire HAProxy yet — port 8080 in the clear is fine for the exercise.
+
+Then `podman pull` a tiny image and `podman push` it under a new namespace. If you get a `manifest unknown` or `unauthorized` error, the most common cause in disconnected setups is `FEATURE_EXTENDED_REPOSITORY_NAMES` defaulting to `false`. Toggle it; try again.
+
+## What's next
+
+[Module 03 — The mirror registry](/learn/openshift-disconnected-deployment/the-mirror-registry) is the deep dive on Quay standalone: the config that makes it `oc-mirror`-friendly, the bootstrap-model that organises namespaces and robots, the backup design, and why the cluster pull credential is a normal user instead of a robot.

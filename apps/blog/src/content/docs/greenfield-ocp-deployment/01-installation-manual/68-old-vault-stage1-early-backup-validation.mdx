@@ -1,0 +1,157 @@
+---
+title: "Installation Manual - 68 Old Vault stage 1 early backup validation"
+sidebar_label: "68 Old Vault stage 1 early backup validation"
+description: "Temporary OADP schedule acceleration and validation after old Vault stage 1 retirement cleanup."
+---
+
+This chapter records the post-stage-1 backup validation after old main Vault
+DNS and External Secrets egress references were removed.
+
+The schedules were temporarily accelerated, the scheduled backups completed,
+and the normal daily schedule was restored in GitOps.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Temporary Schedule Acceleration
+
+Temporary GitOps commit:
+
+```text
+3f7f357 Temporarily accelerate OADP schedules
+```
+
+Temporary schedule values:
+
+| Cluster | Temporary schedule |
+| --- | --- |
+| `hub-dc-v7` | `17 1 * * *` |
+| `spoke-dc-v7` | `18 1 * * *` |
+
+Validation before live reconciliation:
+
+- local `oc kustomize` render passed for hub and spoke;
+- `git diff --check` passed;
+- server-side dry-run accepted both rendered overlays.
+
+Argo CD converged to temporary commit
+`3f7f357419a8088731cee48cb0229099e7d9b46e`, and live schedules matched the
+temporary values before the backup windows.
+
+## Early Backup Results
+
+| Cluster | Backup | Result |
+| --- | --- | --- |
+| `hub-dc-v7` | `platform-resource-daily-20260518011746` | Completed, `10432/10432`, warnings `0`, errors `0` |
+| `spoke-dc-v7` | `platform-resource-daily-20260518011823` | Completed, `15877/15877`, warnings `0`, errors `0` |
+
+The first watch query was discarded because it used a brittle epoch conversion
+and matched older backup CRs. The accepted watch used ISO timestamp filtering
+for backups created after `2026-05-18T01:16:00Z`.
+
+## Normal Schedule Restore
+
+Restore GitOps commit:
+
+```text
+c138c6c Restore OADP daily schedules
+```
+
+Restored schedule values:
+
+| Cluster | Restored schedule | Last backup |
+| --- | --- | --- |
+| `hub-dc-v7` | `15 2 * * *` | `2026-05-18T01:17:46Z` |
+| `spoke-dc-v7` | `45 2 * * *` | `2026-05-18T01:18:23Z` |
+
+Server-side dry-run accepted both restore overlays before Argo reconciliation.
+
+Final Argo CD state:
+
+| Cluster context | Application | Sync | Health | Revision |
+| --- | --- | --- | --- | --- |
+| hub | `hub-dc-v7-bootstrap` | Synced | Healthy | `c138c6cebba560de4298c4189b7028fef50c7f02` |
+| hub | `spoke-dc-v7-cluster-config` | Synced | Healthy | `c138c6cebba560de4298c4189b7028fef50c7f02` |
+| spoke | `spoke-dc-v7-cluster-config` | Synced | Healthy | `c138c6cebba560de4298c4189b7028fef50c7f02` |
+
+## Post-Backup Health Snapshot
+
+OADP:
+
+| Cluster | DPA | BSL | Schedule |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | `15 2 * * *` |
+| `spoke-dc-v7` | Reconciled | Available | `45 2 * * *` |
+
+External Secrets:
+
+| Cluster | Total ExternalSecrets | Ready ExternalSecrets |
+| --- | ---: | ---: |
+| `hub-dc-v7` | 6 | 6 |
+| `spoke-dc-v7` | 6 | 6 |
+
+Vault egress policies still allow only R1 Vault CIDRs:
+
+```text
+30.30.200.35/32,30.30.200.36/32,30.30.200.37/32
+```
+
+ClusterOperators:
+
+- no hub exceptions;
+- no spoke exceptions.
+
+RHACS:
+
+- hub Central remains Available;
+- no non-running StackRox pods were reported on hub or spoke.
+
+Vault R1 health:
+
+| Endpoint | Health HTTP code |
+| --- | ---: |
+| `30.30.200.35:8200` | 200 |
+| `30.30.200.36:8200` | 200 |
+| `30.30.200.37:8200` | 200 |
+
+## Stage 1 Cleanup Preservation Check
+
+DNS state through the private resolver:
+
+| Name | Result |
+| --- | --- |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+
+PowerDNS zone serial remained:
+
+```text
+44
+```
+
+All old and replacement Vault VMs remained running on `dl385-2`.
+
+Old Vault direct health still returned HTTP `200` for:
+
+- `30.30.200.30`
+- `30.30.200.31`
+- `30.30.200.32`
+- `30.30.200.33`
+
+No Vault VM was stopped and no disk image was deleted.
+
+## Result
+
+The post-stage-1 early scheduled backup validation passed.
+
+The next governed gate can decide whether to power off the old Vault VMs. Disk
+deletion remains a separate final retention decision.

@@ -1,0 +1,144 @@
+---
+title: "Installation Manual - 79 Hub NetworkPolicy remediation preflight"
+sidebar_label: "79 Hub NetworkPolicy remediation preflight"
+description: "Preflight proposal for the first hub-dc-v7 NetworkPolicy remediation set."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` NetworkPolicy remediation preflight.
+
+The gate did not apply NetworkPolicies. It converted the namespace
+classification from the previous gate into a first apply proposal.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-8` / `#400` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-7` / `#399` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Live Health
+
+Read-only validation at `2026-05-19T11:31:00Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Network type | `OVNKubernetes` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `d6688ad` |
+| Target CIS check | FAIL |
+
+All-object ComplianceCheckResult counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+## First Apply Candidates
+
+The first candidate namespaces had no application controller workloads, no
+pods, no routes, no existing NetworkPolicies, and no service endpoints.
+
+| Namespace | Decision |
+| --- | --- |
+| `default` | ingress-only default-deny candidate |
+| `local-cluster` | ingress-only default-deny candidate |
+| `open-cluster-management-global-set` | ingress-only default-deny candidate |
+| `open-cluster-management-policies` | ingress-only default-deny candidate |
+| `spoke-dc-v7` | ingress-only default-deny candidate |
+
+The `default` namespace has the Kubernetes API service and endpoints, but
+NetworkPolicy selects pods, and there are no pods in `default`.
+
+## Deferred Operator Namespaces
+
+These namespaces have running controllers or metrics-service considerations
+and should not be included in the first apply set:
+
+| Namespace | Reason |
+| --- | --- |
+| `cert-manager-operator` | controller deployment exists; metrics service currently had no endpoint from selector evidence |
+| `external-secrets-operator` | controller metrics service has live endpoints on `8080` and `8443` |
+| `rhacs-operator` | controller metrics service has a live endpoint on `8443` |
+
+Design explicit policies for these later with monitoring ingress allows.
+
+## Proposed GitOps Path
+
+Recommended path for the apply gate:
+
+```text
+clusters/hub-dc-v7/platform/networkpolicy/
+```
+
+Recommended parent reference:
+
+```yaml
+resources:
+  - platform/networkpolicy
+```
+
+## Proposed Policy Shape
+
+Use the existing hub `platform-bootstrap` pattern: ingress-only default deny.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: <candidate-namespace>
+  labels:
+    app.kubernetes.io/name: hub-networkpolicy-baseline
+    app.kubernetes.io/part-of: hub-dc-v7-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+```
+
+Do not add egress default-deny in the first apply set. The goal is a
+low-blast-radius namespace baseline, not a full traffic lockdown.
+
+## Apply-Gate Plan
+
+The next gate should:
+
+1. Revalidate hub health.
+2. Reconfirm the five candidate namespaces still have no pods and no services
+   except `default/kubernetes`.
+3. Add the GitOps manifests under `clusters/hub-dc-v7/platform/networkpolicy/`.
+4. Render `kubectl kustomize clusters/hub-dc-v7`.
+5. Push platform GitOps and refresh `hub-dc-v7-bootstrap`.
+6. Wait for Argo CD `Synced/Healthy`.
+7. Confirm the five policies exist.
+8. Confirm hub health remains steady.
+9. Trigger a controlled `ocp4-cis` rescan only after health is steady.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-9: apply hub low-risk NetworkPolicy set
+```

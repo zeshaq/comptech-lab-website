@@ -1,0 +1,198 @@
+---
+title: "Installation Manual - 37 Spoke worker-2 live drain validation"
+sidebar_label: "37 Spoke worker-2 live drain validation"
+description: "How the spoke-dc-v7 worker-2 live drain and uncordon gate was validated after moving the NooBaa database primary."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the controlled live drain validation for
+`spoke-dc-v7-worker-2`. The previous NooBaa primary relocation gate moved the
+protected NooBaa DB primary away from worker-2. This gate proved worker-2 could
+be voluntarily drained and immediately uncordoned while ODF, Ceph, NooBaa, and
+the rest of the cluster recovered to steady state.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-25`, issue `#375` |
+| Cluster | `spoke-dc-v7` |
+| Live node operation | Drain and uncordon `spoke-dc-v7-worker-2` |
+| Required precondition | worker-2 passes server-side dry-run drain |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker2-live-drain-gate.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Safety Rules
+
+- Run this only under a tracked maintenance gate with explicit approval.
+- Confirm the current NooBaa DB primary is not on the worker being drained.
+- Confirm the worker passes server-side dry-run drain immediately before the
+  live operation.
+- Do not patch `PDB/noobaa-db-pg-cluster-primary`.
+- Do not continue to other maintenance until the worker is uncordoned and
+  Ceph returns to `HEALTH_OK`.
+
+## Preflight
+
+Validate GitOps, cluster, node, MCP, and storage health.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io hub-dc-v7-bootstrap spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+```
+
+Validate ODF, Ceph, NooBaa, and NooBaa DB placement.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa -o jsonpath='phase={.status.phase}{"\n"}available={.status.conditions[?(@.type=="Available")].status}{"\n"}degraded={.status.conditions[?(@.type=="Degraded")].status}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get storagecluster ocs-storagecluster -o jsonpath='phase={.status.phase}{"\n"}available={.status.conditions[?(@.type=="Available")].status}{"\n"}degraded={.status.conditions[?(@.type=="Degraded")].status}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cephcluster ocs-storagecluster-cephcluster -o jsonpath='phase={.status.phase}{"\n"}health={.status.ceph.health}{"\n"}message={.status.message}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster -o jsonpath='currentPrimary={.status.currentPrimary}{"\n"}targetPrimary={.status.targetPrimary}{"\n"}readyInstances={.status.readyInstances}{"\n"}phase={.status.phase}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -l cnpg.io/cluster=noobaa-db-pg-cluster \
+  -o custom-columns=POD:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,READY:.status.containerStatuses[0].ready,ROLE:.metadata.labels.role
+```
+
+Observed preflight:
+
+```text
+currentPrimary=noobaa-db-pg-cluster-2
+targetPrimary=noobaa-db-pg-cluster-2
+readyInstances=2
+phase=Cluster in healthy state
+
+noobaa-db-pg-cluster-1  spoke-dc-v7-worker-2  Running  True  replica
+noobaa-db-pg-cluster-2  spoke-dc-v7-worker-1  Running  True  primary
+```
+
+Confirm the server-side dry-run before live drain.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain spoke-dc-v7-worker-2 \
+  --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=90s
+```
+
+Observed dry-run result:
+
+```text
+node/spoke-dc-v7-worker-2 drained (server dry run)
+```
+
+## Live Drain And Uncordon
+
+Run the live drain only after the preflight passes.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain spoke-dc-v7-worker-2 \
+  --ignore-daemonsets --delete-emptydir-data --timeout=10m
+```
+
+Observed result:
+
+```text
+live_drain_rc=0
+node/spoke-dc-v7-worker-2 cordoned
+node/spoke-dc-v7-worker-2 drained
+```
+
+Immediately uncordon worker-2.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm uncordon spoke-dc-v7-worker-2
+```
+
+Observed result:
+
+```text
+uncordon_rc=0
+node/spoke-dc-v7-worker-2 uncordoned
+```
+
+## Recovery Watch
+
+After uncordon, wait until all of these are true:
+
+- node `spoke-dc-v7-worker-2` is `Ready` and schedulable;
+- CNPG reports `readyInstances=2` and `Cluster in healthy state`;
+- `NooBaa/noobaa` reports `Ready`;
+- `StorageCluster/ocs-storagecluster` reports `Ready`;
+- `CephCluster/ocs-storagecluster-cephcluster` reports `HEALTH_OK`.
+
+In this gate, Ceph briefly reported `HEALTH_WARN` during recovery and returned
+to `HEALTH_OK` on watch attempt 8.
+
+Final recovery state:
+
+```text
+node=spoke-dc-v7-worker-2 ready=True unschedulable=false
+cnpg currentPrimary=noobaa-db-pg-cluster-2 targetPrimary=noobaa-db-pg-cluster-2 readyInstances=2 phase=Cluster in healthy state
+noobaa phase=Ready
+storagecluster phase=Ready
+cephcluster phase=Ready cephHealth=HEALTH_OK
+```
+
+## Final Validation
+
+Final cluster state:
+
+```text
+OpenShift version=4.20.18
+ClusterVersion Available=True Progressing=False Failing=False
+ClusterOperators=no non-steady operators reported
+Nodes=six Ready nodes, all schedulable
+MCP master=Updated=True Updating=False Degraded=False
+MCP worker=Updated=True Updating=False Degraded=False
+NooBaa=Ready Available=True Degraded=False
+StorageCluster=Ready Available=True Degraded=False
+CephCluster=Ready HEALTH_OK
+```
+
+Final NooBaa DB placement:
+
+```text
+noobaa-db-pg-cluster-1  spoke-dc-v7-worker-0  Running  True  replica
+noobaa-db-pg-cluster-2  spoke-dc-v7-worker-1  Running  True  primary
+```
+
+The replica moved to worker-0 during drain recovery. Worker-1 remains the
+protected voluntary drain target while it hosts the NooBaa DB primary.
+
+## Operating Decision
+
+Worker-2 passed the controlled live drain and uncordon validation. The cluster
+returned to steady state with Ceph `HEALTH_OK`, NooBaa ready, StorageCluster
+ready, and both MCPs stable.
+
+This does not make all workers simultaneously drainable. Before any future
+live drain, revalidate current NooBaa DB primary placement and storage health,
+then run a server-side dry-run drain for the exact target worker.

@@ -1,0 +1,104 @@
+---
+title: "Installation Manual - 85 Hub CIS manual check classification"
+sidebar_label: "85 Hub CIS manual check classification"
+description: "Read-only classification of the remaining hub-dc-v7 CIS MANUAL compliance checks."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` read-only classification gate for the
+remaining `MANUAL` CIS compliance checks after the hub reached zero failing
+checks.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-14` / `#406` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-13` / `#405` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Current Compliance State
+
+Read-only validation at `2026-05-19T13:04:02Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `ComplianceScan/ocp4-cis` | `DONE / COMPLIANT` |
+| `ComplianceScan/ocp4-cis-node-master` | `DONE / COMPLIANT` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Evidence Snapshot
+
+| Evidence | Result |
+| --- | --- |
+| `default` namespace | only `service/kubernetes` and `service/openshift` |
+| Non-system pod use of `default` service account | none |
+| Vault R1 ClusterSecretStores | all `Ready=True`, reason `Valid` |
+| ExternalSecrets | `7/7` Ready |
+| Secret env-var references in non-system pods | `stackrox/sensor`, container `crs` |
+| Non-system SCC usage | `restricted-v2=103`, `nonroot-v2=9`, `privileged=3`, `anyuid=1` |
+| Privileged SCC pods | `stackrox/collector-*` |
+| Anyuid SCC pod | `rhacs-operator/rhacs-operator-controller-manager-*` |
+
+Local cluster-admin subjects include:
+
+- `User::ze`
+- `ServiceAccount:openshift-gitops:openshift-gitops-argocd-application-controller`
+
+Those are in addition to OpenShift system bindings and were not modified in
+this gate.
+
+## Manual Check Classification
+
+| Group | Checks | Decision |
+| --- | --- | --- |
+| Evidence-ready attestations | unique service accounts, default namespace use, namespace inventory, external secret storage | Current evidence is ready to include in an audit pack. |
+| Operational/vendor attestations | service-account token posture, SCC/default seccomp posture, StackRox secret env-var use | Record current state and vendor/platform rationale. |
+| Future RBAC audit | least privilege, cluster-admin, secret access, pod creation, wildcard use | Needs a dedicated RBAC review before any changes. |
+| SCC exception register | capabilities, host IPC, NET_RAW, host network, privilege escalation, privileged containers, host PID, root/anyuid containers | Build an explicit exception register before tightening SCC use. |
+
+## Decision
+
+The remaining `MANUAL` checks are not a single remediation backlog. They are an
+evidence and exception-management queue.
+
+Do not bulk-reduce RBAC or SCC privileges. The next step should create an
+auditable evidence pack and exception register, then choose any real
+remediation gates from that evidence.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-15: hub CIS manual evidence pack and exception register
+```
+
+The evidence pack should explicitly track:
+
+- RHACS collector privileged SCC use
+- RHACS operator anyuid SCC use
+- StackRox sensor secret env-var use
+- Argo CD application-controller cluster-admin access
+- local human break-glass cluster-admin access for `ze`

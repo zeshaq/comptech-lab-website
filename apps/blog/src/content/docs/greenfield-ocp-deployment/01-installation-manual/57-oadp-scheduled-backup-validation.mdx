@@ -1,0 +1,112 @@
+---
+title: "Installation Manual - 57 OADP scheduled backup validation"
+sidebar_label: "57 OADP scheduled backup validation"
+description: "Accelerated scheduled OADP backup validation for hub-dc-v7 and spoke-dc-v7, followed by schedule restoration."
+---
+
+This chapter records the scheduled OADP backup validation for `hub-dc-v7` and
+`spoke-dc-v7`. The original first daily backup windows were still several
+hours away, so the schedules were temporarily moved forward through GitOps,
+validated, and restored immediately after the backups completed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Temporary Schedule Change
+
+The bootstrap VM clock was used to choose near-future UTC schedule windows:
+
+| Cluster | Temporary cron | Expected run |
+| --- | --- | --- |
+| `hub-dc-v7` | `35 22 * * *` | `2026-05-17T22:35:00Z` |
+| `spoke-dc-v7` | `45 22 * * *` | `2026-05-17T22:45:00Z` |
+
+GitOps commit:
+
+```text
+03ef274 Temporarily accelerate v7 OADP schedules
+```
+
+The bootstrap clone was fast-forwarded and Argo CD was hard-refreshed. The
+hub bootstrap app, hub-side spoke app, and spoke-local app all reached
+`Synced/Healthy` at `03ef274` before the scheduled runs.
+
+## Backup Results
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `platform-resource-daily-20260517223546` | Completed | `10263/10263` | none | none |
+| `spoke-dc-v7` | `platform-resource-daily-20260517224523` | Completed | `15876/15876` | none | none |
+
+The backup timestamps were:
+
+| Cluster | Started | Completed |
+| --- | --- | --- |
+| `hub-dc-v7` | `2026-05-17T22:35:46Z` | `2026-05-17T22:36:14Z` |
+| `spoke-dc-v7` | `2026-05-17T22:45:23Z` | `2026-05-17T22:45:54Z` |
+
+## Object Store Validation
+
+MinIO validation used the stored OADP backup user credential without printing
+secret values.
+
+| Cluster | Prefix | Objects |
+| --- | --- | --- |
+| `hub-dc-v7` | `hub-dc-v7/general/backups/platform-resource-daily-20260517223546` | `12` |
+| `spoke-dc-v7` | `spoke-dc-v7/general/backups/platform-resource-daily-20260517224523` | `12` |
+
+Both backup prefixes contained the Velero backup archive and
+`velero-backup.json`.
+
+## Schedule Restoration
+
+The temporary change was reverted immediately after validation.
+
+GitOps commit:
+
+```text
+9fa0424 Restore v7 OADP daily schedules
+```
+
+Final live schedules:
+
+| Cluster | Restored cron |
+| --- | --- |
+| `hub-dc-v7` | `15 2 * * *` |
+| `spoke-dc-v7` | `45 2 * * *` |
+
+Argo CD reached `Synced/Healthy` at `9fa0424` for the same three checked apps.
+
+## Final State
+
+| Cluster | OpenShift | ClusterOperators | BSL | Velero | Restores | DeleteBackupRequests |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | Available | `1/1` | none | none |
+| `spoke-dc-v7` | `4.20.18` | steady | Available | `1/1` | none | none |
+
+## Operational Notes
+
+The scheduled backups are broad resource-only backups across all namespaces.
+Do not run an uncontrolled full-cluster restore from these backups on the live
+clusters. The next validation should use a controlled namespace-scoped restore
+pattern.
+
+## Actions Not Taken
+
+- No Restore object was created.
+- No Backup object was manually created.
+- No Backup object or MinIO prefix was deleted.
+- No stable Vault DNS cutover was made.
+- No old Vault mutation was made.
+- No secret values were printed.
+
+## Next Action
+
+Run a governed restore validation drill using a controlled namespace-scoped
+restore.

@@ -1,0 +1,414 @@
+---
+title: "Agent dashboard: React + Express BFF + Redis sessions"
+sidebar_label: "28 — Agent dashboard (React + Redis sessions)"
+description: "A second portal — same BFF idea, different stack. React + Vite + TanStack Query in the browser, Express + openid-client + connect-redis on the server. Why two stacks instead of one. Slice 24 + the Redis session refactor (f89e7734) in the insurance-app repo."
+estimated_minutes: 70
+last_updated: 2026-05-18
+prereqs: ["27 — Real human OIDC end-to-end"]
+---
+
+The customer portal in chapters 23–27 is a SvelteKit app with
+`@auth/sveltekit`. The operations team — agents who approve claims
+and look at policy lists — gets a separate React SPA fronted by an
+Express BFF. Same OIDC pattern, same WSO2 IS, different stack.
+
+The point of building both is not to evangelize either framework. It's
+to show that the **BFF pattern is independent of the framework** — what
+matters is HttpOnly session cookies and server-held tokens, not whose
+package.json owns the routing. This chapter also fills in two
+operational details the SvelteKit one glossed over: a **Redis-backed
+session store** (so sessions survive a restart) and **`openid-client`**
+as the OIDC library when there's no Auth.js-equivalent.
+
+Companion commits: `f97fdde9` (slice 24 — agent dashboard) and
+`f89e7734` (Redis-backed session store refactor).
+
+## Why two portals, not one
+
+A pragmatic answer: agents and customers are different audiences with
+different needs, different design constraints, and probably different
+deploy cadences. Forcing them into one app couples two release
+schedules that don't need to be coupled.
+
+A pedagogical answer: this is a teaching artifact, and the curriculum
+benefits from showing the BFF pattern in two stacks. The contrast
+makes the *pattern* visible — what's incidental to SvelteKit (form
+actions, `load()`, `+page.server.ts`) versus what's load-bearing
+(server-held tokens, HttpOnly cookies, service-account JWT to Liberty).
+
+Both portals talk to the same Liberty backend, the same WSO2 IS, the
+same Redis. They share a network, a cluster of `@RolesAllowed`-gated
+endpoints, and the same `Idempotency-Key` contracts. They do not share
+a session cookie — each portal has its own, scoped to its own
+hostname.
+
+## Architecture, side by side
+
+```
+Browser ──► customer-app (SvelteKit)  ──► Liberty (insurance-app)
+            ▲   HttpOnly cookie             ▲   service JWT + X-User-*
+            │                                 │
+            └─ @auth/sveltekit                 │
+               OIDC code+PKCE                  │
+                                                │
+Browser ──► agent-app    (React + Express) ────┘
+            ▲   HttpOnly cookie
+            │
+            └─ openid-client
+               OIDC code+PKCE
+               connect-redis session store
+```
+
+Every Liberty call still goes through a cached service-account JWT;
+the user identity rides along as `X-User-Id` + `X-User-Email`. Nothing
+in Liberty needs to know there are two BFFs.
+
+## The Express BFF
+
+The whole BFF is ~200 lines of TypeScript in `gui/agent-app/server/index.ts`.
+The interesting half:
+
+```ts
+import express, { type Request, type Response, type NextFunction } from 'express';
+import session from 'express-session';
+import { RedisStore } from 'connect-redis';
+import { createClient } from 'redis';
+import * as oidc from 'openid-client';
+
+const PORT = parseInt(process.env.PORT ?? '3001', 10);
+const ORIGIN = process.env.ORIGIN ?? `http://localhost:${PORT}`;
+const OIDC_ISSUER = process.env.AGENT_OIDC_ISSUER
+  ?? 'https://is.insurance-app.comptech-lab.com/oauth2/token';
+
+// openid-client v6 replaces the v5 `new Issuer.Client(...)` flow with a
+// top-level `discovery()` call that returns a `Configuration` value.
+// The Configuration is then passed into the per-request helpers
+// (`buildAuthorizationUrl`, `authorizationCodeGrant`, ...).
+let _config: oidc.Configuration | null = null;
+async function oidcConfig(): Promise<oidc.Configuration> {
+  if (_config) return _config;
+  _config = await oidc.discovery(
+    new URL(OIDC_ISSUER),
+    OIDC_CLIENT_ID,
+    { client_secret: OIDC_CLIENT_SECRET },
+    oidc.ClientSecretBasic(OIDC_CLIENT_SECRET),
+  );
+  return _config;
+}
+```
+
+Two things to point out:
+
+- The same `/oauth2/token` suffix on the issuer URL that bit us in
+  [chapter 27](/learn/openliberty/real-human-oidc). `oidc.discovery()`
+  fetches `<issuer>/.well-known/openid-configuration` and the same
+  validation rule applies. Get it wrong here and you'll see
+  `unexpected HTTP status code 302` from openid-client.
+- `oidc.discovery()` is **once per process** thanks to the `_config`
+  cache. It hits WSO2 IS over the network on cold start and caches the
+  Configuration value for the lifetime of the container. A restart
+  re-runs discovery, which is the right cadence — IS endpoint URLs
+  don't move during a session, only across deploys.
+
+> **openid-client v6 vs v5.** The agent-app uses
+> `openid-client@^6.8.4`. v6 collapsed the v5 `Issuer` + `Issuer.Client`
+> class pair into top-level helpers (`discovery`,
+> `buildAuthorizationUrl`, `authorizationCodeGrant`). PKCE/state
+> generators moved too: `generators.codeVerifier()` →
+> `randomPKCECodeVerifier()`, `generators.codeChallenge()` →
+> `calculatePKCECodeChallenge()`, `generators.state()` →
+> `randomState()`. If you have v5 examples open in another tab, the
+> *flow* is identical; the *call sites* are flatter.
+
+## OIDC handshake — three routes
+
+```ts
+app.post('/auth/signin', async (req, res, next) => {
+  try {
+    const cfg = await oidcConfig();
+    const code_verifier = oidc.randomPKCECodeVerifier();
+    const code_challenge = await oidc.calculatePKCECodeChallenge(code_verifier);
+    const state = oidc.randomState();
+    (req.session as any).codeVerifier = code_verifier;
+    (req.session as any).state = state;
+    const url = oidc.buildAuthorizationUrl(cfg, {
+      redirect_uri: REDIRECT_URI,
+      scope: 'openid profile email',
+      code_challenge,
+      code_challenge_method: 'S256',
+      state,
+    });
+    res.redirect(url.href);
+  } catch (e) { next(e); }
+});
+
+app.get('/auth/callback/wso2is', async (req, res, next) => {
+  try {
+    const cfg = await oidcConfig();
+    // v6 wants the full current request URL (including the query
+    // string carrying `code` + `state`) so it can validate the
+    // response itself. We reconstruct it from ORIGIN + req.originalUrl
+    // because the BFF sits behind HAProxy and Express's req.protocol
+    // alone is not always trustworthy.
+    const currentUrl = new URL(req.originalUrl, ORIGIN);
+    const tokens = await oidc.authorizationCodeGrant(cfg, currentUrl, {
+      pkceCodeVerifier: (req.session as any).codeVerifier,
+      expectedState: (req.session as any).state,
+    });
+    // v6 types `claims()` as `IDToken | undefined`. IDToken does NOT
+    // index by arbitrary string, so we widen to a record before
+    // plucking custom claims (`name`, `given_name`, `email`).
+    const claims = (tokens.claims() ?? {}) as Record<string, unknown>;
+    req.session.user = {
+      id: String(claims.sub ?? ''),
+      name: (claims.name as string | undefined) ?? (claims.given_name as string | undefined),
+      email: claims.email as string | undefined,
+    };
+    delete (req.session as any).codeVerifier;
+    delete (req.session as any).state;
+    res.redirect('/');
+  } catch (e) { next(e); }
+});
+
+app.post('/auth/signout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+```
+
+The `codeVerifier` and `state` get stashed in the session **before**
+the redirect to WSO2 IS, and pulled back out in the callback to
+validate the response. That's a four-step state machine: stash → redirect
+out → return with code → validate against the stashed state. Without
+the session store working across requests, the dance fails on every
+callback because the verifier isn't there.
+
+Note the explicit `delete (req.session as any).codeVerifier` after
+success — a stale verifier in the session blob is one of those
+quiet bugs that surfaces only on a re-login after a partial flow.
+
+## The Redis session store
+
+The first version of the BFF used `express-session`'s default
+**MemoryStore**. It works in dev. It also (a) leaks memory by design
+(no TTL eviction without external bookkeeping), (b) doesn't survive a
+container restart, and (c) loudly warns at startup that you should not
+ship it. Three reasons, one fix.
+
+`connect-redis` v8 takes a `redis` v4 client directly:
+
+```ts
+const redisClient = createClient({ url: REDIS_URL });
+redisClient.on('error', (err) => console.error('redis error', err));
+await redisClient.connect();
+const redisStore = new RedisStore({ client: redisClient, prefix: 'agent:sess:' });
+
+app.use(session({
+  store: redisStore,
+  name: 'agent_sid',
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: ORIGIN.startsWith('https://'),
+    maxAge: 8 * 60 * 60 * 1000,
+  },
+}));
+```
+
+Three load-bearing details:
+
+- **`prefix: 'agent:sess:'`** — every session key lives under that
+  namespace. The same Redis instance hosts the slice-9 quote cache,
+  the slice-11 dashboard stream, the policy lookup keys, and now
+  agent sessions. The prefix is what keeps them disjoint at the
+  RedisInsight level. `KEYS agent:sess:*` enumerates active sessions
+  cleanly.
+- **`await redisClient.connect()`** runs at process start — a Redis
+  outage at boot surfaces in the container logs immediately rather
+  than on the first signin attempt. Boot-time failures are easier to
+  diagnose than mid-flow failures.
+- **`secure: ORIGIN.startsWith('https://')`** — the cookie's Secure
+  flag follows the ORIGIN env var, which itself depends on HAProxy
+  setting `X-Forwarded-Proto`. The whole chain from chapter 27
+  applies here unchanged.
+
+After the refactor, you can restart the agent-app container and
+existing logged-in users stay signed in. Run `KEYS agent:sess:*` in
+RedisInsight to see them.
+
+## The `/api/*` proxy
+
+```ts
+function requireUser(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.user) return res.status(401).json({ error: 'not signed in' });
+  next();
+}
+
+app.use('/api', requireUser, express.json(), async (req, res) => {
+  const token = await svcToken();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'X-User-Id': req.session.user!.id,
+  };
+  if (req.session.user!.email) headers['X-User-Email'] = req.session.user!.email;
+  if (req.is('application/json') && req.body && Object.keys(req.body).length > 0) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const upstreamUrl = `${LIBERTY_BASE}/api${req.url}`;
+  const upstream = await fetch(upstreamUrl, {
+    method: req.method,
+    headers,
+    body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body ?? {}),
+  });
+  res.status(upstream.status);
+  upstream.headers.forEach((v, k) => {
+    if (k.toLowerCase() !== 'transfer-encoding') res.setHeader(k, v);
+  });
+  res.send(Buffer.from(await upstream.arrayBuffer()));
+});
+```
+
+Same shape as the SvelteKit BFF's `liberty()` helper:
+service-account JWT in `Authorization`, user identity in
+`X-User-Id` / `X-User-Email`. The headers forward loop deliberately
+**drops `transfer-encoding`** — fetch's response stream is already
+buffered, re-emitting chunked-encoding headers downstream confuses
+some clients. Everything else passes through, including
+`Content-Type` and any custom headers Liberty sets.
+
+## The React side
+
+The browser app is React 19 + Vite + TanStack Query + React Router 7.
+The interesting code is in three places:
+
+**`api.ts`** — a tiny fetch wrapper around `/api/...`. Same cookies
+as the OIDC routes (`credentials: 'include'` is implicit when same-
+origin). No tokens, no auth state in JS — the session cookie does it
+all.
+
+**`App.tsx`** — wraps everything in a `useQuery(['session'])` and
+redirects to `/login` if no user. The session is just the BFF's
+`GET /auth/session` response — `{ user: {...} }` or `{}`:
+
+```tsx
+const { data: session, isLoading } = useQuery<Session | null>({
+  queryKey: ['session'],
+  queryFn: fetchSession,
+  retry: false,
+});
+
+useEffect(() => {
+  if (!isLoading && !session?.user)
+    navigate('/login', { replace: true, state: { from: location.pathname } });
+}, [isLoading, session, navigate, location]);
+```
+
+**`routes/Dashboard.tsx`** — the actual operator view, two TanStack
+Query calls, four stat cards:
+
+```tsx
+const policies = useQuery({ queryKey: ['policies'], queryFn: fetchPolicies });
+const claims   = useQuery({ queryKey: ['claims'],   queryFn: fetchClaims });
+
+const claimsPending  = claims.data?.filter((c) => c.status === 'FILED').length ?? 0;
+const claimsApproved = claims.data?.filter((c) => c.status === 'APPROVED').length ?? 0;
+
+return (
+  <>
+    <StatCard label="Total policies"  value={policies.data?.length ?? '—'} />
+    <StatCard label="Total claims"    value={claims.data?.length ?? '—'} />
+    <StatCard label="Pending claims"  value={claimsPending} />
+    <StatCard label="Approved claims" value={claimsApproved} />
+  </>
+);
+```
+
+One-click claim approval is a `react-query` `useMutation` that POSTs
+`/api/claims/:id/approve` and invalidates `['claims']` on success.
+Click the button, watch the FILED → APPROVED counter flip without a
+reload.
+
+## Build + ship
+
+`gui/agent-app/Containerfile` is a two-stage Node 22 image like the
+customer-app's. The runtime stage runs the compiled Express server,
+which serves the React `dist/ui/` directory:
+
+```ts
+const uiDir = path.resolve(__dirname, '../ui');
+if (fs.existsSync(uiDir)) {
+  app.use(express.static(uiDir));
+  app.get('*', (_req, res) => res.sendFile(path.join(uiDir, 'index.html')));
+}
+```
+
+One process serves both the auth routes and the static SPA — no
+nginx, no separate static host. The `app.get('*')` SPA fallback is
+the React Router idiom: any URL the SPA owns falls through to
+`index.html` and React Router renders it.
+
+Launch alongside the rest of the stack:
+
+```bash
+source ~/insurance-app/.agent-app-oidc-creds
+podman run -d --replace --name agent-app --network insurance-net \
+  -e AUTH_SECRET -e AGENT_OIDC_CLIENT_ID -e AGENT_OIDC_CLIENT_SECRET \
+  -e WSO2IS_CLIENT_ID -e WSO2IS_CLIENT_SECRET \
+  -e ORIGIN=https://agent.insurance-app.comptech-lab.com \
+  -e REDIS_URL=redis://redis:6379 \
+  -e LIBERTY_BASE=http://insurance-app:9080 \
+  -p 3001:3001 agent-app:dev
+```
+
+Add an HAProxy backend + DNS record for `agent.insurance-app.comptech-lab.com`
+following the chapter-27 recipe — same three load-bearing config bits
+apply unchanged.
+
+## Verify
+
+```bash
+# Session endpoint returns the empty session anonymously
+curl -s https://agent.insurance-app.comptech-lab.com/auth/session
+# {}
+
+# Sign in redirects with PKCE/state
+curl -sI -X POST https://agent.insurance-app.comptech-lab.com/auth/signin | grep -i location
+
+# After click-through-login, the cookie shows up
+curl -sI -b cookies.txt https://agent.insurance-app.comptech-lab.com/auth/session
+#  ... set-cookie: agent_sid=...; HttpOnly; Secure; SameSite=Lax
+
+# Restart the container; the session survives
+podman restart agent-app
+curl -s -b cookies.txt https://agent.insurance-app.comptech-lab.com/auth/session
+# {"user":{"id":"...","email":"student@comptech.com"}}
+
+# RedisInsight: keys agent:sess:*
+podman exec redis redis-cli KEYS 'agent:sess:*'
+```
+
+That last command is the demonstration of why we did the Redis
+refactor. Pre-refactor: the restart wiped the session, the user got
+bounced to `/login`. Post-refactor: the session is in Redis, the
+restart is invisible to the user.
+
+## What you have
+
+- A second portal in a second stack, demonstrating that the BFF
+  pattern transfers cleanly.
+- `openid-client` as the Auth.js-equivalent when Auth.js isn't
+  available for your framework.
+- A Redis-backed session store that survives restarts and shares the
+  same Redis with the rest of the stack via a `agent:sess:` prefix.
+- A React/Vite SPA served by the BFF that proxies it.
+- One-click claim approval — a real operations action, not a demo
+  trick.
+
+The application surface is now feature-complete on both customer and
+operator sides. Two short cross-cutting chapters wrap up the track:
+the demo credentials + SCIM provisioning we used for the live demo,
+and a hardening pass on the original 14 slices.
+
+Next: [29 — Demo credentials + SCIM provisioning →](/learn/openliberty/demo-credentials-scim)

@@ -1,0 +1,179 @@
+---
+title: "Installation Manual - 71 OADP post-Vault-poweroff backup validation"
+sidebar_label: "71 OADP post-Vault-poweroff backup validation"
+description: "Post-power-off OADP backup validation while the old lost-custody Vault VMs remained off."
+---
+
+This chapter records the post-power-off OADP backup validation gate for
+`hub-dc-v7` and `spoke-dc-v7`.
+
+The old lost-custody Vault VMs remained powered off for the whole gate. The
+only intended live change was a temporary GitOps schedule acceleration,
+followed by restoration to the normal daily schedules.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+Before changing the schedules:
+
+- `hub-dc-v7` and `spoke-dc-v7` were on OpenShift `4.20.18`;
+- all nodes were Ready;
+- no ClusterOperator exceptions were reported;
+- old Vault VMs were `shut off` and autostart disabled;
+- R1 Vault VMs were running and autostart enabled;
+- R1 Vault health with `standbyok=true` returned HTTP `200` on
+  `30.30.200.35-.37`;
+- hub/spoke ExternalSecrets were `6/6` Ready;
+- OADP DPAs were Reconciled and BSLs were Available;
+- live schedules were at the normal values:
+  - hub `15 2 * * *`;
+  - spoke `45 2 * * *`.
+
+## Temporary Schedule Acceleration
+
+Temporary GitOps commit:
+
+```text
+2d368c3 Temporarily accelerate post-poweroff OADP schedules
+```
+
+Temporary schedule values:
+
+| Cluster | Temporary cron |
+| --- | --- |
+| `hub-dc-v7` | `33 6 * * *` |
+| `spoke-dc-v7` | `34 6 * * *` |
+
+Validation before reconcile:
+
+- local render passed for both OADP overlays;
+- server-side dry-run accepted both overlays using force-conflicts because
+  Argo CD owns `.spec.schedule`;
+- bootstrap clone on `gf-ocp-bootstrap-01` fast-forwarded to
+  `2d368c333b241c2b8ec6d2ac6e0f9aa3433bc04c`;
+- Argo CD hard-refresh was requested.
+
+Argo CD converged to `Synced/Healthy` at `2d368c3`, and live schedules showed
+the temporary values before the backup windows.
+
+## Backup Results
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | `platform-resource-daily-20260518063347` | Completed | `10122/10122` | 0 | 0 |
+| `spoke-dc-v7` | `platform-resource-daily-20260518063423` | Completed | `16808/16808` | 0 | 0 |
+
+Backup timestamps:
+
+| Cluster | Started | Completed |
+| --- | --- | --- |
+| `hub-dc-v7` | `2026-05-18T06:33:47Z` | `2026-05-18T06:34:14Z` |
+| `spoke-dc-v7` | `2026-05-18T06:34:23Z` | `2026-05-18T06:34:55Z` |
+
+## MinIO Object Validation
+
+Object validation used the stored OADP backup user credential without printing
+credential values.
+
+| Cluster | Prefix | Objects | `velero-backup.json` |
+| --- | --- | ---: | ---: |
+| `hub-dc-v7` | `hub-dc-v7/general/backups/platform-resource-daily-20260518063347` | 12 | 1 |
+| `spoke-dc-v7` | `spoke-dc-v7/general/backups/platform-resource-daily-20260518063423` | 12 | 1 |
+
+## Schedule Restoration
+
+Restore GitOps commit:
+
+```text
+0bb0cca Restore post-poweroff OADP schedules
+```
+
+Restored schedule values:
+
+| Cluster | Restored cron |
+| --- | --- |
+| `hub-dc-v7` | `15 2 * * *` |
+| `spoke-dc-v7` | `45 2 * * *` |
+
+Argo CD final state:
+
+| Context | Application | Sync | Health | Revision |
+| --- | --- | --- | --- | --- |
+| hub | `hub-dc-v7-bootstrap` | Synced | Healthy | `0bb0cca` |
+| hub | `spoke-dc-v7-cluster-config` | Synced | Healthy | `0bb0cca` |
+| spoke | `spoke-dc-v7-cluster-config` | Synced | Healthy | `0bb0cca` |
+
+Final OADP state:
+
+| Cluster | DPA | BSL | Schedule | Last backup |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | `15 2 * * *` | `platform-resource-daily-20260518063347` |
+| `spoke-dc-v7` | Reconciled | Available | `45 2 * * *` | `platform-resource-daily-20260518063423` |
+
+## Post-Gate Health
+
+Cluster state:
+
+| Cluster | OpenShift | Nodes | ClusterOperators |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady |
+
+External Secrets:
+
+| Cluster | Result |
+| --- | --- |
+| hub | `6/6` ExternalSecrets Ready |
+| spoke | `6/6` ExternalSecrets Ready |
+
+R1-backed ClusterSecretStores remained Ready/Valid on both clusters:
+
+- `vault-r1-eso-smoke`;
+- `vault-r1-oadp`;
+- `vault-r1-rhacs`.
+
+Vault egress policies still allowed only R1 Vault CIDRs:
+
+```text
+30.30.200.35/32
+30.30.200.36/32
+30.30.200.37/32
+```
+
+Vault VM and health state:
+
+| Area | Result |
+| --- | --- |
+| old Vault VMs | `shut off`, autostart disabled |
+| R1 Vault VMs | running, autostart enabled |
+| old Vault health | HTTP `000` on `30.30.200.30-.33` |
+| R1 Vault health | HTTP `200` on `30.30.200.35-.37` with `standbyok=true` |
+
+RHACS:
+
+- hub Central reported Available and Deployed;
+- no non-running StackRox pods were found on hub or spoke.
+
+OCM report:
+
+```text
+clusters=1 synced=1 healthy=1 inProgress=0 notHealthy=0 notSynced=0
+```
+
+## Result
+
+The post-power-off OADP backup validation passed.
+
+Both clusters created and completed new backups while the old Vault VMs stayed
+off. The corresponding MinIO object prefixes were present, normal schedules
+were restored, and platform health remained steady.
+
+Disk deletion remains a separate final explicit retention decision.

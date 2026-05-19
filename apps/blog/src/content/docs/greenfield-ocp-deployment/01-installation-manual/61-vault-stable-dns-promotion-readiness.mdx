@@ -1,0 +1,120 @@
+---
+title: "Installation Manual - 61 Vault stable DNS promotion readiness"
+sidebar_label: "61 Vault DNS readiness"
+description: "Readiness gate before promoting the stable v7 Vault DNS name to replacement Vault R1."
+---
+
+This chapter records the read-only readiness gate before changing
+`vault.v7.comptech-lab.com` from the old locked Vault to replacement Vault R1.
+No DNS, Vault, OpenShift, or GitOps state was changed in this gate.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Inventory
+
+The old `ClusterSecretStore/vault-platform` resources still exist on
+`hub-dc-v7` and `spoke-dc-v7`, and still point at
+`https://vault.v7.comptech-lab.com:8200`.
+
+No GitOps-managed or live `ExternalSecret` currently references
+`vault-platform`.
+
+| Cluster | Consumer | Store |
+| --- | --- | --- |
+| `hub-dc-v7` | ESO smoke | `vault-r1-eso-smoke` |
+| `hub-dc-v7` | OADP cloud credentials | `vault-r1-oadp` |
+| `hub-dc-v7` | RHACS | `vault-r1-rhacs` |
+| `spoke-dc-v7` | ESO smoke | `vault-r1-eso-smoke` |
+| `spoke-dc-v7` | OADP cloud credentials | `vault-r1-oadp` |
+| `spoke-dc-v7` | RHACS | `vault-r1-rhacs` |
+| `spoke-dc-v7` | Logging S3 secret | `logging-local` |
+
+## Live Check
+
+Read-only checks used the required path:
+
+```text
+local coordinator -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+| Cluster | OpenShift | ClusterOperators | Nodes | Argo |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | `Synced/Healthy` at `93daa29` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | `Synced/Healthy` at `93daa29` |
+
+Live stores:
+
+| Cluster | Store | Status |
+| --- | --- | --- |
+| `hub-dc-v7` | `vault-platform` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-eso-smoke` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-oadp` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-rhacs` | `True/Valid` |
+| `spoke-dc-v7` | `vault-platform` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-eso-smoke` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-oadp` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-rhacs` | `True/Valid` |
+| `spoke-dc-v7` | `logging-local` | `True/Valid` |
+
+All active ExternalSecrets were Ready / `SecretSynced`.
+
+OADP remained healthy on both clusters:
+
+| Cluster | DPA | BSL | Schedule |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | Enabled |
+| `spoke-dc-v7` | Reconciled | Available | Enabled |
+
+StackRox pods remained acceptable: hub `18/18`, spoke `16/16`.
+
+## DNS And R1 Health
+
+DNS from both `dl385-2` and `gf-ocp-bootstrap-01` still resolves
+`vault.v7.comptech-lab.com` to the old Vault nodes:
+
+- `30.30.200.31`
+- `30.30.200.32`
+- `30.30.200.33`
+
+`vault-r1.v7.comptech-lab.com` has no A record.
+
+Unauthenticated health checks showed replacement Vault R1 is initialized and
+unsealed:
+
+| Endpoint | Result |
+| --- | --- |
+| `30.30.200.35:8200` | active |
+| `30.30.200.36:8200` | standby |
+| `30.30.200.37:8200` | standby |
+
+## Readiness Result
+
+Result: **pass with HA caveat**.
+
+The active OpenShift consumers no longer depend on the old stable Vault DNS
+name. However, the current ExternalSecrets egress policy allows only R1 IP
+`30.30.200.35/32`; it does not yet allow `30.30.200.36/32` or
+`30.30.200.37/32`.
+
+## Recommendation
+
+Use a separate implementation gate for the DNS change.
+
+Preferred HA path:
+
+1. Add `30.30.200.36/32` and `30.30.200.37/32` to the hub and spoke
+   ExternalSecrets egress policy.
+2. Validate Argo reconcile and live NetworkPolicy CIDRs.
+3. Promote `vault.v7.comptech-lab.com` from the old Vault IPs to the R1 IPs.
+4. Validate DNS from `dl385-2`, `gf-ocp-bootstrap-01`, and the clusters.
+5. Re-check all active ExternalSecrets, OADP, RHACS, and Argo.
+
+The minimal single-IP option is to point stable DNS only at `30.30.200.35`,
+but that is not a durable HA endpoint.

@@ -1,0 +1,184 @@
+---
+title: "Installation Manual - 75 Hub CIS API/config hardening"
+sidebar_label: "75 Hub CIS API/config hardening"
+description: "Hub-dc-v7 CIS API/config remediation gate: APIServer encryption, audit profile, image registry allow lists, ingress TLS, kubeadmin removal, and post-change Compliance Operator evidence."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` CIS API/config hardening gate.
+
+The gate remediated the hub-only controls that do not require worker drain:
+APIServer encryption, APIServer audit profile, image registry allow lists,
+IngressController TLS profile, and `kubeadmin` removal.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-4` / `#396` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Preflight | `OP-GF-COMPLIANCE-3` / `#395` |
+| Platform GitOps commit | `92198cc` |
+
+## Safety Checkpoint
+
+Before APIServer encryption was applied, an etcd rollback checkpoint was
+taken from `hub-dc-v7-master-0`:
+
+```text
+/home/core/cluster-backups/20260519-084914-op-gf-compliance-4
+```
+
+That directory contains the etcd snapshot and static Kubernetes resource
+archive created by OpenShift's `cluster-backup.sh`. Do not copy or publish the
+backup artifacts as documentation; they contain sensitive cluster state.
+
+## GitOps Desired State
+
+The hub security layer was added under:
+
+```text
+clusters/hub-dc-v7/security/
+```
+
+The root hub kustomization now points at `security` instead of only
+`security/rhacs`, so RHACS and the hub API/config security resources share one
+entry point.
+
+The committed resources set:
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: APIServer
+metadata:
+  name: cluster
+spec:
+  encryption:
+    type: aesgcm
+  audit:
+    profile: WriteRequestBodies
+```
+
+Image runtime and import allow lists include the platform mirror, internal
+OpenShift image registry service names, Red Hat registries, and approved
+external registries:
+
+```text
+quay.v7.comptech-lab.com
+image-registry.openshift-image-registry.svc:5000
+image-registry.openshift-image-registry.svc.cluster.local:5000
+registry.redhat.io
+registry.connect.redhat.com
+registry.access.redhat.com
+quay.io
+ghcr.io
+docker.io
+icr.io
+```
+
+The default IngressController now uses a custom TLS profile:
+
+```yaml
+tlsSecurityProfile:
+  type: Custom
+  custom:
+    minTLSVersion: VersionTLS12
+defaultCertificate:
+  name: router-certs-default
+```
+
+## Apply Flow
+
+The bootstrap clone on `gf-ocp-bootstrap-01` was fast-forwarded to
+`92198cc`, then `Application/hub-dc-v7-bootstrap` was hard-refreshed.
+
+Argo CD reconciled the new revision:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `92198cc` |
+
+APIServer encryption took several minutes. During the rollout, the API-related
+ClusterOperators temporarily reported non-steady conditions. The gate waited
+until both API encryption conditions completed before removing `kubeadmin`.
+
+Final API state:
+
+| Resource | Result |
+| --- | --- |
+| `APIServer/cluster` encryption | `aesgcm` |
+| `APIServer/cluster` audit profile | `WriteRequestBodies` |
+| `OpenShiftAPIServer/cluster` encryption | `True / EncryptionCompleted` |
+| `KubeAPIServer/cluster` encryption | `True / EncryptionCompleted` |
+
+## Kubeadmin Removal
+
+Before deletion, the durable admin path was revalidated:
+
+```text
+oc auth can-i '*' '*' --as=ze
+yes
+```
+
+After validation, `Secret/kubeadmin` was deleted from `kube-system`. A
+post-delete check confirmed:
+
+| Check | Result |
+| --- | --- |
+| `kubeadmin` Secret | absent |
+| `ze` cluster-admin capability | yes |
+
+## Final Validation
+
+Final hub health:
+
+| Check | Result |
+| --- | --- |
+| OpenShift version | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `92198cc` |
+
+The hub `ocp4-cis` ComplianceScan was rescanned after the changes:
+
+| Scan | Phase | Result | Start | End |
+| --- | --- | --- | --- | --- |
+| `ocp4-cis` | DONE | NON-COMPLIANT | `2026-05-19T09:16:01Z` | `2026-05-19T09:16:45Z` |
+
+Post-rescan counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 160 |
+| FAIL | 2 |
+| MANUAL | 21 |
+
+Target checks remediated by this gate:
+
+| Check | Result |
+| --- | --- |
+| `ocp4-cis-kubeadmin-removed` | PASS |
+| `ocp4-cis-api-server-encryption-provider-cipher` | PASS |
+| `ocp4-cis-audit-profile-set` | PASS |
+| `ocp4-cis-ocp-allowed-registries` | PASS |
+| `ocp4-cis-ocp-allowed-registries-for-import` | PASS |
+| `ocp4-cis-ingress-controller-tls-cipher-suites` | PASS |
+
+Remaining hub CIS failures:
+
+| Check | Result | Next handling |
+| --- | --- | --- |
+| `ocp4-cis-audit-log-forwarding-enabled` | FAIL | Decide hub logging/audit forwarding or document exception. |
+| `ocp4-cis-configure-network-policies-namespaces` | FAIL | Classify hub namespaces before applying policies. |
+
+## Result
+
+The hub CIS API/config hardening gate is complete.
+
+The six direct hub API/config findings now pass. The hub remains healthy, the
+desired state is in GitOps, `kubeadmin` is removed, and the remaining hub CIS
+failures are explicitly separated into future logging and NetworkPolicy gates.

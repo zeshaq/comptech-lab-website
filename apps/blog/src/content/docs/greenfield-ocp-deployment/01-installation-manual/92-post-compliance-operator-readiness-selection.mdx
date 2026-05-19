@@ -1,0 +1,181 @@
+---
+title: "Installation Manual - 92 Post-compliance operator readiness selection"
+sidebar_label: "92 Post-compliance operator readiness selection"
+description: "Read-only operator readiness and next-gate selection after hub compliance cleanup."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
+gate for the greenfield v7 clusters.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-01` / `#413` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-20` / `#412` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+Kubeconfigs on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Desired State
+
+The bootstrap GitOps clone was clean and matched the live Argo revision:
+
+```text
+repo: /home/ze/greenfield-ops/openshift-gitops
+HEAD: 12c68aee6d6a77dfcc197926d4f36594ea224625
+status: main...origin/main
+```
+
+## Cluster Health
+
+| Check | `hub-dc-v7` | `spoke-dc-v7` |
+| --- | --- | --- |
+| OpenShift | `4.20.18` | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready | `6/6` Ready |
+| MCPs | updated, not updating, not degraded | updated, not updating, not degraded |
+| ClusterOperators | steady | steady |
+| Non-running pods | none | none |
+| Pending CSRs | none | none |
+| Argo CD | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+
+## Installed Operators
+
+All installed Subscriptions reported `AtLatestKnown`. No non-complete
+InstallPlans were found.
+
+Hub operator areas:
+
+```text
+Advanced Cluster Management
+cert-manager
+Compliance Operator
+External Secrets Operator
+LVMS
+Loki Operator
+MCE
+OADP
+OpenShift GitOps
+OpenShift Logging
+RHACS
+```
+
+Spoke operator areas:
+
+```text
+cert-manager
+Compliance Operator
+External Secrets Operator
+File Integrity Operator
+Local Storage Operator
+Loki Operator
+OADP
+ODF dependency operators
+OpenShift Logging
+RHACS secured cluster
+```
+
+## Platform Dependencies
+
+OADP is installed and reconciled on both clusters.
+
+| Cluster | DPA | BSL | Schedule |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `Reconciled=True` | `Available` | `platform-resource-daily`, enabled |
+| `spoke-dc-v7` | `Reconciled=True` | `Available` | `platform-resource-daily`, enabled |
+
+External Secrets stores are Ready/Valid, and no non-ready ExternalSecrets were
+reported.
+
+Spoke ODF/Ceph/NooBaa, Loki, log forwarding, and RHACS secured cluster are
+steady.
+
+## Compliance State
+
+Hub Compliance Operator state:
+
+```text
+ocp4-cis: DONE / COMPLIANT
+ocp4-cis-node-master: DONE / COMPLIANT
+counts: PASS=162, MANUAL=21, FAIL=0
+```
+
+Spoke Compliance Operator state remains partially non-compliant for known
+unrelated controls:
+
+```text
+PASS=1028
+FAIL=432
+MANUAL=107
+```
+
+## Catalog Finding
+
+The platform is healthy enough for more work, but catalog hygiene is not ready
+for another operator install.
+
+Both clusters still have:
+
+```text
+OperatorHub/cluster spec: {}
+default classic sources enabled
+external classic CatalogSources READY
+external OLM v1 ClusterCatalogs Serving=True
+```
+
+Hub has mirrored OLM v1 `cc-*` ClusterCatalogs:
+
+```text
+cc-certified-operator-index-v4-20
+cc-redhat-operator-index-v4-20
+```
+
+Spoke does not currently show mirrored `cc-*` ClusterCatalogs.
+
+Installed Subscriptions are using mirrored classic `cs-*` sources, but future
+PackageManifest resolution is mixed while the external defaults remain
+available.
+
+## Decision
+
+Do not install another operator as the immediate next step.
+
+Selected next gate:
+
+```text
+OP-GF-OPERATORS-02: disconnected catalog hygiene and package-source pinning
+```
+
+That gate should make catalog resolution mirror-only and deterministic before
+another operator install.
+
+## First Operator Candidate
+
+After catalog hygiene, the first actual operator candidate is:
+
+```text
+Gatekeeper preflight and dry-run-only install design
+```
+
+Gatekeeper is a reasonable governance/security next layer, but it affects
+admission. It should wait until catalog source resolution is clean and the
+install plan is dry-run reviewed.

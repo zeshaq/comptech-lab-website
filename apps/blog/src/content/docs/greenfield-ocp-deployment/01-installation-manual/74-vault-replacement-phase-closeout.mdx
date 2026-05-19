@@ -1,0 +1,161 @@
+---
+title: "Installation Manual - 74 Vault replacement phase closeout"
+sidebar_label: "74 Vault replacement phase closeout"
+description: "Final read-only closeout for the v7 Vault replacement phase after R1 cutover, backup proof, old VM deletion, and stale DNS cleanup."
+---
+
+This chapter records the final read-only closeout for the greenfield v7 Vault
+replacement phase.
+
+The phase replaced a lost-custody Vault deployment with a new R1 Vault path,
+migrated OpenShift consumers, proved backup and restore behavior, removed the
+old VM and disk footprint, and cleaned up the final stale DNS record.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Final State
+
+Replacement R1 Vault remains the active Vault path for greenfield OpenShift
+consumers.
+
+| Area | Final state |
+| --- | --- |
+| R1 Vault VMs | running, autostart enabled |
+| stable Vault DNS | `vault.v7.comptech-lab.com -> 30.30.200.35-.37` |
+| old Vault VM definitions | absent |
+| old Vault disk images | absent |
+| old Vault node DNS records | absent |
+| PowerDNS serial | `45` |
+| GitOps revision | `0bb0cca` |
+| OADP schedules | normal daily schedules restored |
+
+## Final Read-Only Validation
+
+Libvirt validation from `dl385-2`:
+
+| Old VM | Domain | Disk image |
+| --- | --- | --- |
+| `gf-ocp-vault-seed-01` | absent | absent |
+| `gf-ocp-vault-01` | absent | absent |
+| `gf-ocp-vault-02` | absent | absent |
+| `gf-ocp-vault-03` | absent | absent |
+
+R1 VM state:
+
+| R1 VM | State | Autostart |
+| --- | --- | --- |
+| `gf-ocp-vault-r1-seed-01` | running | enabled |
+| `gf-ocp-vault-r1-01` | running | enabled |
+| `gf-ocp-vault-r1-02` | running | enabled |
+| `gf-ocp-vault-r1-03` | running | enabled |
+
+Vault health:
+
+| Endpoint set | Result |
+| --- | --- |
+| old direct IPs `30.30.200.30-.33` | HTTP `000` |
+| R1 direct IPs `30.30.200.35-.37` | HTTP `200` |
+
+DNS validation:
+
+| Name | Result |
+| --- | --- |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `NO_RECORD` |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | `NO_RECORD` |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | `NO_RECORD` |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | `NO_RECORD` |
+
+PowerDNS authoritative zone contains only the stable Vault R1 records for
+Vault access and reports SOA serial `45`.
+
+## OpenShift Validation
+
+Cluster health:
+
+| Cluster | OpenShift | Nodes | ClusterOperators |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady |
+
+Argo CD:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `0bb0cca` |
+| `spoke-dc-v7-cluster-config` | Synced | Healthy | `0bb0cca` |
+
+External Secrets:
+
+| Cluster | Result |
+| --- | --- |
+| hub | `6/6` ExternalSecrets Ready |
+| spoke | `6/6` ExternalSecrets Ready |
+
+R1-backed ClusterSecretStores remained Ready/Valid on both clusters:
+
+- `vault-r1-eso-smoke`;
+- `vault-r1-oadp`;
+- `vault-r1-rhacs`.
+
+Vault egress policies allow only R1 Vault CIDRs:
+
+```text
+30.30.200.35/32
+30.30.200.36/32
+30.30.200.37/32
+```
+
+OADP:
+
+| Cluster | DPA | BSL | Schedule | Latest backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | Reconciled | Available | `15 2 * * *` | `platform-resource-daily-20260518063347` | Completed | `10122/10122` | 0 | 0 |
+| `spoke-dc-v7` | Reconciled | Available | `45 2 * * *` | `platform-resource-daily-20260518063423` | Completed | `16808/16808` | 0 | 0 |
+
+RHACS:
+
+- hub Central reported Available;
+- no non-running StackRox pods were found on hub or spoke.
+
+## Phase Summary
+
+The completed Vault replacement phase included:
+
+- accepted ADR and GitHub issue governance;
+- replacement R1 VM allocation;
+- R1 Vault build and custody creation;
+- Kubernetes auth and smoke read validation for hub/spoke;
+- dedicated OADP, ESO smoke, and RHACS replacement stores;
+- MinIO OADP credential rotation and seeding into R1 Vault;
+- OADP DPA validation;
+- ad hoc backup validation;
+- scheduled backup enablement and proof;
+- restore drill;
+- stable Vault DNS promotion;
+- removal of the unused `vault-platform` store;
+- post-cleanup scheduled backup proof;
+- old Vault retirement readiness;
+- removal of old Vault egress CIDRs;
+- old VM power-off;
+- cold retention soak;
+- post-power-off backup proof;
+- deletion of old VM definitions and disk images;
+- stale old seed DNS cleanup.
+
+## Result
+
+The greenfield v7 Vault replacement phase is complete.
+
+The active OpenShift consumers use replacement R1 Vault paths, backup and
+restore behavior has been proven, and the old lost-custody Vault VM, disk, and
+DNS footprint is removed from active infrastructure.
+
+Issue `#389` was closed after the final read-only validation passed.

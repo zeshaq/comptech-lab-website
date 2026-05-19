@@ -1,0 +1,119 @@
+---
+title: "Installation Manual - 90 Hub platform-bootstrap system:deployers canary"
+sidebar_label: "90 Hub platform-bootstrap system:deployers canary"
+description: "Live canary result for hub-dc-v7 platform-bootstrap system:deployers cleanup."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` live canary for the namespace
+`system:deployers` cleanup candidate.
+
+The canary deleted only the `platform-bootstrap` target objects. OpenShift
+recreated them immediately, so the broader cleanup path is stopped.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-19` / `#411` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-18` / `#410` |
+
+## Scope
+
+Target objects:
+
+```text
+RoleBinding/platform-bootstrap/system:deployers
+ServiceAccount/platform-bootstrap/deployer
+```
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Pre-change State
+
+Before deletion, the hub was healthy:
+
+| Check | Result |
+| --- | --- |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+The target state was:
+
+| Object | Evidence |
+| --- | --- |
+| RoleBinding | present, bound `ServiceAccount:platform-bootstrap:deployer` to `ClusterRole/system:deployer` |
+| ServiceAccount | present, `0` referenced Secrets, `0` imagePullSecrets |
+| Workloads | `0` pods/controllers in `platform-bootstrap` |
+| Usage | no pod/controller used ServiceAccount `deployer` |
+
+## Live Canary
+
+At `2026-05-19T14:51:24Z`, only the target RoleBinding and ServiceAccount were
+deleted.
+
+Both objects were already present in the immediate post-delete read. The first
+formal 30-second observation confirmed:
+
+```text
+rolebinding=present
+serviceaccount=present
+recreation_detected=yes
+```
+
+Final metadata showed both objects were recreated at
+`2026-05-19T14:51:24Z`. The recreated RoleBinding manager was:
+
+```text
+openshift-controller-manager
+```
+
+## Post-change State
+
+After recreation, hub health remained steady:
+
+| Check | Result |
+| --- | --- |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Decision
+
+Stop the `system:deployers` cleanup path.
+
+The objects are unused by workloads, but this is not a durable cleanup because
+OpenShift recreates the namespace default RBAC immediately. Do not delete the
+other 18 namespace `system:deployers` RoleBindings or `deployer`
+ServiceAccounts.
+
+For the current phase, classify this item as an accepted OpenShift default
+namespace RBAC/no-change exception.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-20: hub ACM addon metrics Secret-read conditional exception validation
+```
+
+That gate should be read-only unless a separate design identifies a supported,
+durable remediation.

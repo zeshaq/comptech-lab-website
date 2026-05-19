@@ -1,0 +1,172 @@
+---
+title: "Installation Manual - 66 Old Vault retirement readiness"
+sidebar_label: "66 Old Vault retirement readiness"
+description: "Readiness inventory and criteria before retiring the old lost-custody Vault VMs."
+---
+
+This chapter records the readiness gate before retiring the old v7 Vault
+deployment that lost administrator and recovery custody.
+
+No DNS record was changed and no Vault VM was stopped during this gate.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Current Endpoint State
+
+Stable Vault DNS resolves to replacement Vault R1:
+
+```text
+vault.v7.comptech-lab.com -> 30.30.200.35, 30.30.200.36, 30.30.200.37
+```
+
+Old node-specific DNS records still exist:
+
+| Name | Address |
+| --- | --- |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | `30.30.200.31` |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | `30.30.200.32` |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | `30.30.200.33` |
+
+Replacement R1 node-specific DNS records do not exist. The stable endpoint is
+the only DNS name used for R1 service access.
+
+## VM Inventory
+
+All old and replacement Vault VMs were still running on `dl385-2`.
+
+| VM | Purpose | IP | MAC | State |
+| --- | --- | --- | --- | --- |
+| `gf-ocp-vault-seed-01` | old seal seed | `30.30.200.30` | `52:54:00:70:08:30` | running |
+| `gf-ocp-vault-01` | old main voter | `30.30.200.31` | `52:54:00:70:08:31` | running |
+| `gf-ocp-vault-02` | old main voter | `30.30.200.32` | `52:54:00:70:08:32` | running |
+| `gf-ocp-vault-03` | old main voter | `30.30.200.33` | `52:54:00:70:08:33` | running |
+| `gf-ocp-vault-r1-seed-01` | R1 seal seed | `30.30.200.34` | `52:54:00:70:08:34` | running |
+| `gf-ocp-vault-r1-01` | R1 main voter | `30.30.200.35` | `52:54:00:70:08:35` | running |
+| `gf-ocp-vault-r1-02` | R1 main voter | `30.30.200.36` | `52:54:00:70:08:36` | running |
+| `gf-ocp-vault-r1-03` | R1 main voter | `30.30.200.37` | `52:54:00:70:08:37` | running |
+
+Old VM disk paths:
+
+```text
+/var/lib/libvirt/images/gf-ocp-vault-seed-01.qcow2
+/var/lib/libvirt/images/gf-ocp-vault-01.qcow2
+/var/lib/libvirt/images/gf-ocp-vault-02.qcow2
+/var/lib/libvirt/images/gf-ocp-vault-03.qcow2
+```
+
+Do not delete these disk images until a separate decommission gate explicitly
+records the retention decision.
+
+## Health Inventory
+
+Old Vault health:
+
+| Endpoint | Role | Result |
+| --- | --- | --- |
+| `30.30.200.30:8200` | old seed | initialized, unsealed |
+| `30.30.200.31:8200` | old main | initialized, unsealed, standby |
+| `30.30.200.32:8200` | old main | initialized, unsealed, active |
+| `30.30.200.33:8200` | old main | initialized, unsealed, standby |
+
+Replacement Vault R1 health:
+
+| Endpoint | Role | Result |
+| --- | --- | --- |
+| `30.30.200.34:8200` | R1 seed | initialized, unsealed |
+| `30.30.200.35:8200` | R1 main | initialized, unsealed, active |
+| `30.30.200.36:8200` | R1 main | initialized, unsealed, standby |
+| `30.30.200.37:8200` | R1 main | initialized, unsealed, standby |
+
+The old main cluster still serves health responses, but it remains
+administratively locked because usable administrator token or recovery share
+custody is not available.
+
+## OpenShift Consumer Inventory
+
+Live hub/spoke consumers no longer use the old `vault-platform` store.
+
+Hub stores:
+
+| Store | Status |
+| --- | --- |
+| `vault-r1-eso-smoke` | Ready / Valid |
+| `vault-r1-oadp` | Ready / Valid |
+| `vault-r1-rhacs` | Ready / Valid |
+
+Spoke stores:
+
+| Store | Status |
+| --- | --- |
+| `vault-r1-eso-smoke` | Ready / Valid |
+| `vault-r1-oadp` | Ready / Valid |
+| `vault-r1-rhacs` | Ready / Valid |
+| `logging-local` | Ready / Valid |
+
+Live ExternalSecrets are Ready / `SecretSynced` and reference only:
+
+- `vault-r1-eso-smoke`
+- `vault-r1-oadp`
+- `vault-r1-rhacs`
+- spoke `logging-local`
+
+`ClusterSecretStore/vault-platform` is absent on both clusters.
+
+## Backup and Argo State
+
+Post-cleanup OADP scheduled backups already passed:
+
+| Cluster | Backup | Result |
+| --- | --- | --- |
+| `hub-dc-v7` | `platform-resource-daily-20260518003309` | Completed, `10403/10403`, no warnings, no errors |
+| `spoke-dc-v7` | `platform-resource-daily-20260518003423` | Completed, `15863/15863`, no warnings, no errors |
+
+The normal daily schedules are restored:
+
+| Cluster | Schedule |
+| --- | --- |
+| `hub-dc-v7` | `15 2 * * *` |
+| `spoke-dc-v7` | `45 2 * * *` |
+
+Argo CD is `Synced/Healthy` at GitOps commit `f742b63` for:
+
+- `hub-dc-v7-bootstrap`
+- hub-side `spoke-dc-v7-cluster-config`
+- spoke-local `spoke-dc-v7-cluster-config`
+
+## Readiness Decision
+
+The old Vault is ready for a staged retirement plan, but not for untracked
+deletion.
+
+The next gate should be a low-risk retirement stage that:
+
+1. removes old Vault IPs `30.30.200.31/32`, `30.30.200.32/32`, and
+   `30.30.200.33/32` from the hub/spoke External Secrets egress
+   NetworkPolicies;
+2. removes or quarantines old node-specific DNS records for
+   `gf-ocp-vault-01`, `gf-ocp-vault-02`, and `gf-ocp-vault-03`;
+3. keeps the old Vault VMs and disk images intact during the first retirement
+   stage;
+4. validates Argo, ExternalSecrets, OADP, RHACS, and Vault R1 health after the
+   DNS/network-policy cleanup.
+
+Only after that stage passes should a separate decommission gate consider
+powering off old Vault VMs. Disk deletion should be the final step and should
+require an explicit retention decision.
+
+## Actions Not Taken
+
+- No DNS record was changed.
+- No NetworkPolicy was changed.
+- No Vault VM was stopped.
+- No disk image was deleted.
+- No Vault token, recovery share, kubeconfig, Secret data, or MinIO credential
+  was printed.

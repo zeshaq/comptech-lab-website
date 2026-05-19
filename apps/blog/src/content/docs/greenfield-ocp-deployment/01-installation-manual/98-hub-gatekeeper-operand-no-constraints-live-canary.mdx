@@ -1,0 +1,262 @@
+---
+title: "Installation Manual - 98 Hub Gatekeeper operand canary"
+sidebar_label: "98 Hub Gatekeeper operand canary"
+description: "Live no-constraints Gatekeeper operand canary on the hub cluster."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-07` live canary that created the
+first `Gatekeeper/gatekeeper` operand on `hub-dc-v7`.
+
+The canary intentionally created admission infrastructure only. It did not
+create constraint templates, constraints, mutation configs, a spoke operand,
+ComplianceScans, OADP backups, node drains, or storage changes.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-07` / `#419` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-06` / `#418` |
+
+## Intent
+
+The hub and spoke both had the Red Hat Gatekeeper Operator installed. The next
+controlled step was to bring up the hub operand without any policies so the
+team could validate admission webhook behavior before policy enforcement.
+
+## Access Path
+
+Live checks and reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+Hub kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+```
+
+## GitOps Change
+
+Platform GitOps commit:
+
+```text
+9ef3b53 Add hub Gatekeeper operand canary
+9ef3b532d9f69172c92307b55d71f83d1242f041
+```
+
+The commit added:
+
+```text
+clusters/hub-dc-v7/security/gatekeeper/kustomization.yaml
+clusters/hub-dc-v7/security/gatekeeper/gatekeeper.yaml
+```
+
+and included `security/gatekeeper` from:
+
+```text
+clusters/hub-dc-v7/security/kustomization.yaml
+```
+
+## Operand Manifest
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+The important choices were:
+
+- keep validation enabled so the real webhook path is exercised;
+- disable mutation for the first canary;
+- keep the webhook fail-open with `failurePolicy: Ignore`;
+- add no policy objects.
+
+## Preflight
+
+Hub health before apply:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+Argo and operator state before apply:
+
+```text
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=943566f35aebd1135f03645cc71b1a6097bdbd11
+subscription=gatekeeper-operator-product state=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=gatekeeper-operator-product.v3.21.0 phase=Succeeded reason=InstallSucceeded
+installplan=install-wtjf5 phase=Complete
+pod=gatekeeper-operator-controller-c7d5c4476-8vr54 status=Running node=hub-dc-v7-master-0
+```
+
+Preflight guardrails:
+
+- no existing `Gatekeeper` custom resource;
+- no existing Gatekeeper webhook configurations;
+- no constraint API resources;
+- server-side admission smoke dry-run passed.
+
+## Render And Dry-run Checks
+
+Local render passed:
+
+```text
+oc kustomize clusters/hub-dc-v7
+rendered_lines=2532
+```
+
+Rendered output contained the intended `Gatekeeper/gatekeeper` object and no
+constraint or mutation objects.
+
+Server-side dry-run for the exact operand passed:
+
+```text
+gatekeeper.operator.gatekeeper.sh/gatekeeper created (server dry run)
+```
+
+Post-dry-run guardrails confirmed no live operand, webhooks, constraints, or
+mutation resources were created by the dry-run.
+
+## Reconciliation
+
+The bootstrap clone on `gf-ocp-bootstrap-01` was fast-forwarded from:
+
+```text
+943566f35aebd1135f03645cc71b1a6097bdbd11
+```
+
+to:
+
+```text
+9ef3b532d9f69172c92307b55d71f83d1242f041
+```
+
+Then `Application/hub-dc-v7-bootstrap` was hard-refreshed.
+
+Canary watch result:
+
+```text
+sync=Synced
+health=Healthy
+revision=9ef3b532d9f69172c92307b55d71f83d1242f041
+Gatekeeper CR=present
+gatekeeper-controller-manager=3/3
+Gatekeeper namespace pods Running=5/5
+validating_webhook_configurations=1
+mutating_webhook_configurations=0
+admission smoke dry-run passed
+```
+
+## Final State
+
+Final hub health stayed clean:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+Final Argo state:
+
+```text
+app=hub-dc-v7-bootstrap sync=Synced health=Healthy rev=9ef3b532d9f69172c92307b55d71f83d1242f041
+```
+
+Final Gatekeeper namespace state:
+
+```text
+deployment.apps/gatekeeper-audit                 1/1
+deployment.apps/gatekeeper-controller-manager    3/3
+deployment.apps/gatekeeper-operator-controller   1/1
+service/gatekeeper-webhook-service
+pod/gatekeeper-audit-898885b67-t9jk4                 Running hub-dc-v7-master-0
+pod/gatekeeper-controller-manager-59c5f66764-7tfmh   Running hub-dc-v7-master-2
+pod/gatekeeper-controller-manager-59c5f66764-mfzjv   Running hub-dc-v7-master-1
+pod/gatekeeper-controller-manager-59c5f66764-vl749   Running hub-dc-v7-master-0
+pod/gatekeeper-operator-controller-c7d5c4476-8vr54   Running hub-dc-v7-master-0
+```
+
+Webhook state:
+
+```text
+validatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-validating-webhook-configuration 2
+webhook=validation.gatekeeper.sh failurePolicy=Ignore timeoutSeconds=3 service=openshift-gatekeeper-system/gatekeeper-webhook-service path=/v1/admit
+webhook=check-ignore-label.gatekeeper.sh failurePolicy=Ignore timeoutSeconds=3 service=openshift-gatekeeper-system/gatekeeper-webhook-service path=/v1/admitlabel
+mutating_webhook_count=0
+```
+
+Policy guardrails:
+
+```text
+ConstraintTemplate API resource=present
+ConstraintTemplate instances=none
+constraints=none
+mutation instances=none
+```
+
+The `ConstraintTemplate` API resource is expected after the operand is
+installed. It is not an active policy. There were no `ConstraintTemplate`
+instances, constraints, mutation instances, or mutating webhooks.
+
+Final admission smoke server-side dry-run passed.
+
+## Rollback Pattern
+
+Primary rollback is GitOps-first:
+
+- remove `security/gatekeeper` from
+  `clusters/hub-dc-v7/security/kustomization.yaml`;
+- remove `clusters/hub-dc-v7/security/gatekeeper`;
+- push the rollback commit;
+- hard-refresh `Application/hub-dc-v7-bootstrap`;
+- let Argo prune the operand;
+- validate no `Gatekeeper` CR, no Gatekeeper webhooks, no operand workloads,
+  clean hub health, and a passing server-side admission smoke dry-run.
+
+Break-glass rollback is reserved for a failed GitOps rollback:
+
+```bash
+oc --kubeconfig "$HUB" delete gatekeeper.operator.gatekeeper.sh gatekeeper
+```
+
+If webhook configurations persist after the CR is gone and admission
+availability is at risk, inspect and remove only webhook configurations with
+`gatekeeper` in the name.
+
+## Result
+
+The gate passed. `hub-dc-v7` now has Gatekeeper validating admission
+infrastructure with mutation disabled, fail-open behavior, and no policies.
+
+Recommended next gate:
+
+```text
+OP-GF-OPERATORS-08: hub Gatekeeper no-constraints soak and rollback drill
+```

@@ -1,0 +1,206 @@
+---
+title: "Installation Manual - 96 Spoke Gatekeeper operator-only install"
+sidebar_label: "96 Spoke Gatekeeper operator-only install"
+description: "Install the Red Hat Gatekeeper Operator on spoke-dc-v7 through GitOps while stopping before the Gatekeeper operand and policies."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-05` spoke Gatekeeper operator-only
+install gate.
+
+The gate installed the Red Hat Gatekeeper Operator on `spoke-dc-v7` through
+platform GitOps. It did not create a `Gatekeeper` custom resource, constraint
+templates, constraints, or admission webhooks through a Gatekeeper operand.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-05` / `#417` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-04` / `#416` |
+
+## Intent
+
+The previous chapter installed the Gatekeeper Operator on the hub only. This
+gate repeated the same operator-only pattern on the active spoke so both
+clusters have the operator available before any admission-impacting
+Gatekeeper operand work begins.
+
+## Access Path
+
+Live checks and reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Preflight
+
+Spoke health before the install:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=6/6
+nonsteady_co_count=0
+nonrunning_pod_count=0
+pending_csr_count=0
+```
+
+Argo state before the install:
+
+```text
+hub-side spoke-dc-v7-cluster-config Synced/Healthy at 9ebf7c06d8de94d464a142e2edd2763727ba506d
+spoke-side spoke-dc-v7-cluster-config Synced/Healthy at 9ebf7c06d8de94d464a142e2edd2763727ba506d
+```
+
+Gatekeeper package metadata still matched the preflight:
+
+```text
+package=gatekeeper-operator-product
+source=cs-redhat-operator-index-v4-20/openshift-marketplace
+defaultChannel=stable
+currentCSV=gatekeeper-operator-product.v3.21.0
+version=3.21.0
+installModes=OwnNamespace:false,SingleNamespace:false,MultiNamespace:false,AllNamespaces:true
+```
+
+No existing spoke Gatekeeper namespace, Subscription, CSV, webhook, or
+Gatekeeper CRD was present before the change.
+
+## GitOps Commit
+
+Platform GitOps commit:
+
+```text
+943566f Add spoke Gatekeeper operator install
+943566f35aebd1135f03645cc71b1a6097bdbd11
+```
+
+Files changed:
+
+```text
+CHANGELOG.md
+clusters/spoke-dc-v7/kustomization.yaml
+clusters/spoke-dc-v7/operators/gatekeeper-operator/kustomization.yaml
+clusters/spoke-dc-v7/operators/gatekeeper-operator/namespace.yaml
+clusters/spoke-dc-v7/operators/gatekeeper-operator/operatorgroup.yaml
+clusters/spoke-dc-v7/operators/gatekeeper-operator/subscription.yaml
+```
+
+## Objects Added
+
+The gate added only these objects:
+
+```text
+Namespace/openshift-gatekeeper-system
+OperatorGroup/openshift-gatekeeper-system/gatekeeper-system
+Subscription/openshift-gatekeeper-system/gatekeeper-operator-product
+```
+
+The Subscription is pinned to:
+
+```text
+source: cs-redhat-operator-index-v4-20
+sourceNamespace: openshift-marketplace
+channel: stable
+startingCSV: gatekeeper-operator-product.v3.21.0
+```
+
+The OperatorGroup uses `spec: {}` because the Gatekeeper CSV supports only
+the AllNamespaces install mode.
+
+## Validation Before Push
+
+Local render passed:
+
+```text
+oc kustomize clusters/spoke-dc-v7
+```
+
+The rendered output contained the three intended operator objects and no
+`Gatekeeper` custom resource, `ConstraintTemplate`, or Gatekeeper constraint.
+
+`git diff --check` passed.
+
+Spoke server-side split dry-runs passed:
+
+```text
+namespace/openshift-gatekeeper-system created (server dry run)
+operatorgroup.operators.coreos.com/gatekeeper-system created (server dry run)
+subscription.operators.coreos.com/gatekeeper-operator-product created (server dry run)
+```
+
+## Reconciliation
+
+The bootstrap clone was fast-forwarded:
+
+```text
+/home/ze/greenfield-ops/openshift-gitops -> 943566f
+```
+
+Both Argo views were hard-refreshed and reconciled:
+
+```text
+hub-side spoke-dc-v7-cluster-config sync=Synced health=Healthy rev=943566f35aebd1135f03645cc71b1a6097bdbd11
+spoke-side spoke-dc-v7-cluster-config sync=Synced health=Healthy rev=943566f35aebd1135f03645cc71b1a6097bdbd11
+```
+
+## Final State
+
+Final spoke health:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=6/6
+nonsteady_clusteroperators=none
+nonrunning_pods=none
+pending_csrs=none
+```
+
+Gatekeeper operator state:
+
+```text
+namespace=openshift-gatekeeper-system phase=Active
+operatorgroup=gatekeeper-system targetNamespaces=[""]
+subscription=gatekeeper-operator-product state=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=gatekeeper-operator-product.v3.21.0 phase=Succeeded reason=InstallSucceeded
+installplan=install-fcm92 phase=Complete
+pod=gatekeeper-operator-controller-c7d5c4476-hwvxb status=Running node=spoke-dc-v7-worker-0
+```
+
+## Guardrails
+
+The operator-owned Gatekeeper CRD now exists:
+
+```text
+gatekeepers.operator.gatekeeper.sh/v1alpha1
+```
+
+The guardrail checks found:
+
+- no `Gatekeeper` custom resources;
+- no Gatekeeper `ConstraintTemplate` or constraint API resources;
+- no validating or mutating webhook configurations with `gatekeeper` in the
+  name.
+
+## Result
+
+The spoke Gatekeeper operator-only install is complete.
+
+The next recommended gate is:
+
+```text
+OP-GF-OPERATORS-06: hub Gatekeeper operand no-constraints preflight and rollback design
+```
+
+Do not create the Gatekeeper operand or policies until the operand gate
+preflight has an explicit rollback plan and acceptance criteria.

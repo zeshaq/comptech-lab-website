@@ -1,0 +1,104 @@
+---
+title: "Installation Manual - 86 Hub CIS manual evidence pack"
+sidebar_label: "86 Hub CIS manual evidence pack"
+description: "Audit evidence and exception register for hub-dc-v7 CIS MANUAL checks."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` CIS manual evidence pack and exception
+register.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-15` / `#407` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-14` / `#406` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Current Compliance State
+
+Read-only validation at `2026-05-19T14:14:19Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `ComplianceScan/ocp4-cis` | `DONE / COMPLIANT` |
+| `ComplianceScan/ocp4-cis-node-master` | `DONE / COMPLIANT` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Evidence Summary
+
+| Evidence | Result |
+| --- | --- |
+| `default` namespace | only `service/kubernetes` and `service/openshift` |
+| Platform namespaces reviewed | 19 non-system platform namespaces |
+| Non-system pod use of `default` service account | none |
+| Non-system RoleBindings to `default` service account | none |
+| ClusterRoleBindings to `default` service account | only OpenShift system `cluster-version-operator` binding |
+| Vault R1 ClusterSecretStores | all `Ready=True`, reason `Valid` |
+| ExternalSecrets | `7/7` Ready |
+| Explicit token automount | three External Secrets pods |
+| Secret env-var references in non-system pods | `stackrox/sensor`, container `crs` |
+| Non-system SCC usage | `restricted-v2=103`, `nonroot-v2=9`, `privileged=3`, `anyuid=1` |
+| Local/platform cluster-admin bindings | Argo CD application-controller and `User::ze` |
+
+## Exception Register
+
+| ID | Exception | Disposition | Review trigger |
+| --- | --- | --- | --- |
+| `EX-001` | RHACS/StackRox collector uses `privileged` SCC | Current platform/vendor exception | RHACS upgrade, collector mode change, SCC reduction gate |
+| `EX-002` | RHACS operator controller uses `anyuid` SCC | Current platform/vendor exception | RHACS Operator upgrade or supported SCC change |
+| `EX-003` | StackRox sensor uses a Secret env-var reference | Current vendor exception | RHACS/Sensor upgrade or supported mounted-Secret config |
+| `EX-004` | Argo CD application-controller has cluster-admin | Current GitOps bootstrap exception | Argo CD least-privilege design and rollback-tested reduction gate |
+| `EX-005` | Local human break-glass user `ze` has cluster-admin | Current lab break-glass exception | Identity/admin handoff or break-glass procedure implementation |
+| `EX-006` | External Secrets pods explicitly automount service account tokens | Current operator-function exception | ESO upgrade or operator configuration change |
+
+## Manual Check Disposition
+
+The hub has no failing CIS checks. The remaining `MANUAL` checks are covered
+by one of these dispositions:
+
+- pass-by-attestation evidence;
+- registered current-phase platform/vendor exception;
+- deferred read-only RBAC least-privilege inventory;
+- deferred SCC least-privilege inventory.
+
+Do not bulk-reduce RBAC or SCC privileges from this evidence pack. Any
+reduction must be a separate governed gate with rollback validation.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-16: hub RBAC least-privilege inventory
+```
+
+That gate should remain read-only first and produce a scoped list of
+non-system roles, bindings, and subjects with:
+
+- wildcard access;
+- Secret access;
+- pod creation access;
+- cluster-admin or near-cluster-admin posture.

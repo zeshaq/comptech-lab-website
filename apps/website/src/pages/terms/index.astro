@@ -1,0 +1,117 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
+
+const effective = "2026-05-19";
+---
+
+<Layout
+  title="Terms of use — CompTech Lab"
+  description="Terms of use for www.comptech-lab.com."
+>
+  <section class="hero">
+    <HeroBackground variant="frames" />
+    <div class="container">
+      <span class="hero-eyebrow">Legal</span>
+      <h1 class="hero-title">Terms of use.</h1>
+      <p class="hero-lede">Effective {effective}.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width: 800px;">
+      <article class="prose">
+        <p>
+          These terms govern your use of <strong>www.comptech-lab.com</strong> ("the site").
+          By using the site you agree to these terms. If you do not agree, please do not use
+          the site.
+        </p>
+        <p>
+          These terms govern access to the site only. Contractual terms for engagements,
+          services, deliverables, and any data processing are set out separately in the
+          relevant engagement contract.
+        </p>
+
+        <h2>1. Acceptable use</h2>
+        <p>You agree not to:</p>
+        <ul>
+          <li>use the site in any way that breaches applicable law or regulation;</li>
+          <li>attempt to gain unauthorised access to the site, its underlying infrastructure, or any related systems;</li>
+          <li>introduce malicious code or content;</li>
+          <li>scrape or systematically extract content other than for ordinary indexing by reputable search engines and AI assistants;</li>
+          <li>use the site to send unsolicited communications or to impersonate any person.</li>
+        </ul>
+        <p>
+          Vulnerability research is welcome under our
+          <a href="/trust/#vulnerability-disclosure">responsible-disclosure</a> path. Please
+          do not perform active testing against production infrastructure without prior
+          authorisation.
+        </p>
+
+        <h2>2. Intellectual property</h2>
+        <p>
+          Unless otherwise stated, all content on the site &mdash; including text, images,
+          diagrams, code samples, logos, and the CompTech Lab brand &mdash; is owned by
+          CompTech Lab or its licensors. You may view, share, and reference the site for
+          non-commercial informational use. Republication or commercial redistribution
+          requires prior written permission.
+        </p>
+        <p>
+          Third-party trademarks (Red Hat, OpenShift, NVIDIA, Cisco, HashiCorp, WSO2, AWS,
+          Microsoft, Google, and others) referenced on the site remain the property of
+          their respective owners and are used here for descriptive purposes only.
+        </p>
+
+        <h2>3. Content accuracy &amp; disclaimers</h2>
+        <p>
+          We make reasonable efforts to keep the site accurate but make no warranty that it
+          is complete, current, or error-free. Architectural descriptions, recommendations,
+          and engagement durations are illustrative and should not be relied on as advice
+          for a specific situation without consultation.
+        </p>
+        <p>
+          The site is provided "as is" without warranties of any kind, express or implied,
+          including warranties of merchantability, fitness for a particular purpose, or
+          non-infringement.
+        </p>
+
+        <h2>4. External links</h2>
+        <p>
+          The site includes links to external resources (the engineering blog at
+          blog.comptech-lab.com, vendor documentation, regulatory bodies, etc.). We do not
+          control those resources and are not responsible for their content.
+        </p>
+
+        <h2>5. Limitation of liability</h2>
+        <p>
+          To the maximum extent permitted by law, CompTech Lab will not be liable for any
+          loss or damage arising out of or in connection with use of the site, including
+          indirect, incidental, consequential, special, or punitive damages.
+        </p>
+        <p>
+          Nothing in these terms limits liability for fraud, fraudulent misrepresentation,
+          death or personal injury caused by negligence, or any other liability that cannot
+          be excluded by law.
+        </p>
+
+        <h2>6. Changes to these terms</h2>
+        <p>
+          We may update these terms from time to time. Material changes will be
+          communicated by updating the effective date above.
+        </p>
+
+        <h2>7. Governing law</h2>
+        <p>
+          These terms are governed by the laws of the jurisdiction in which CompTech Lab
+          is registered, without regard to its conflict-of-laws principles. Specific
+          jurisdiction details are set out in customer engagement contracts.
+        </p>
+
+        <h2>8. Contact</h2>
+        <p>
+          Questions about these terms: <a href="mailto:legal@comptech-lab.com">legal@comptech-lab.com</a>
+        </p>
+      </article>
+    </div>
+  </section>
+</Layout>

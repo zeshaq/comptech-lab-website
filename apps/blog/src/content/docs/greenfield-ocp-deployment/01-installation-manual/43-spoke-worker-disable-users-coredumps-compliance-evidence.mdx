@@ -1,0 +1,346 @@
+---
+title: "Installation Manual - 43 Spoke worker disable users coredumps compliance evidence"
+sidebar_label: "43 Spoke worker disable users coredumps compliance evidence"
+description: "How to collect and interpret fresh Compliance Operator evidence for the spoke-dc-v7 worker disable-users-coredumps control."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the Compliance Operator evidence collected after the
+`spoke-dc-v7` worker `disable-users-coredumps` MachineConfig rollout.
+
+The target ComplianceCheckResult is:
+
+```text
+rhcos4-high-worker-disable-users-coredumps
+```
+
+After a fresh scan, the target rule reports `PASS`.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-30`, issue `#380` |
+| Cluster | `spoke-dc-v7` |
+| ComplianceScan | `rhcos4-high-worker` |
+| Target ComplianceCheckResult | `rhcos4-high-worker-disable-users-coredumps` |
+| Related MachineConfig | `75-worker-disable-users-coredumps` |
+| Worker render | `rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-disable-users-coredumps-compliance-evidence.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Pre-Scan Validation
+
+Validate Argo, cluster health, MCPs, and storage before triggering a rescan.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -l cnpg.io/cluster=noobaa-db-pg-cluster -o wide
+```
+
+Observed before the rescan:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at 4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-1 targetPrimary=noobaa-db-pg-cluster-1
+```
+
+## Host Evidence
+
+Validate that the rendered worker MachineConfig still contains the expected
+limits file.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r '{
+      render: env.worker_render,
+      limitsFile: ([.spec.config.storage.files[]?.path]
+        | index("/etc/security/limits.d/75-disable_users_coredumps.conf") != null),
+      coredumpFile: ([.spec.config.storage.files[]?.path]
+        | index("/etc/systemd/coredump.conf") != null)
+    }'
+```
+
+Observed:
+
+```json
+{
+  "render": "rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66",
+  "limitsFile": true,
+  "coredumpFile": true
+}
+```
+
+Validate the file on every worker.
+
+```bash
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" debug "node/$node" --quiet -- \
+    chroot /host sh -c \
+    "cat /etc/security/limits.d/75-disable_users_coredumps.conf"
+done
+```
+
+Observed on all three workers:
+
+```text
+*     hard   core    0
+```
+
+## Stale Result Before Rescan
+
+Before this gate, the ComplianceCheckResult was still from the earlier worker
+scan.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancecheckresult rhcos4-high-worker-disable-users-coredumps -o json \
+  | jq -r '{
+      name: .metadata.name,
+      status: .status,
+      checkStatus: .metadata.labels["compliance.openshift.io/check-status"],
+      severity: .severity,
+      lastScan: .metadata.annotations["compliance.openshift.io/last-scanned-timestamp"],
+      id: .id
+    }'
+```
+
+Observed pre-scan:
+
+```json
+{
+  "name": "rhcos4-high-worker-disable-users-coredumps",
+  "status": "FAIL",
+  "checkStatus": "FAIL",
+  "severity": "medium",
+  "lastScan": "2026-05-17T14:08:14Z",
+  "id": "xccdf_org.ssgproject.content_rule_disable_users_coredumps"
+}
+```
+
+## Trigger Rescan
+
+Trigger a one-off rescan of the existing worker RHCOS high scan.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  annotate compliancescan rhcos4-high-worker \
+  compliance.openshift.io/rescan= --overwrite
+```
+
+Watch scan state.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancescan rhcos4-high-worker \
+  -o jsonpath='phase={.status.phase} result={.status.result} start={.status.startTimestamp} end={.status.endTimestamp}{"\n"}'
+```
+
+The rescan started at `2026-05-17T15:20:57Z` and completed at
+`2026-05-17T15:23:10Z`.
+
+Observed final scan state:
+
+```json
+{
+  "name": "rhcos4-high-worker",
+  "phase": "DONE",
+  "result": "NON-COMPLIANT",
+  "start": "2026-05-17T15:20:57Z",
+  "end": "2026-05-17T15:23:10Z",
+  "error": null
+}
+```
+
+The suite remains `NON-COMPLIANT` because other worker rules still fail.
+
+## Target Result
+
+Validate the exact target rule.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancecheckresult rhcos4-high-worker-disable-users-coredumps -o json \
+  | jq -r '{
+      name: .metadata.name,
+      status: .status,
+      checkStatus: .metadata.labels["compliance.openshift.io/check-status"],
+      severity: .severity,
+      lastScan: .metadata.annotations["compliance.openshift.io/last-scanned-timestamp"],
+      rule: .metadata.annotations["compliance.openshift.io/rule"],
+      id: .id
+    }'
+```
+
+Observed:
+
+```json
+{
+  "name": "rhcos4-high-worker-disable-users-coredumps",
+  "status": "PASS",
+  "checkStatus": "PASS",
+  "severity": "medium",
+  "lastScan": "2026-05-17T15:20:57Z",
+  "rule": "disable-users-coredumps",
+  "id": "xccdf_org.ssgproject.content_rule_disable_users_coredumps"
+}
+```
+
+## Related Coredump Results
+
+Collect the coredump-family results after the scan.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancecheckresults -o json \
+  | jq -r '.items[]
+    | select(.metadata.name
+      | test("rhcos4-high-worker-(coredump|disable-users|service-systemd-coredump|sysctl-kernel-core)"))
+    | [.metadata.name, .status, .severity,
+       (.metadata.annotations["compliance.openshift.io/last-scanned-timestamp"] // "")]
+    | @tsv' \
+  | sort
+```
+
+Observed:
+
+```text
+rhcos4-high-worker-coredump-disable-backtraces          PASS  medium  2026-05-17T15:20:57Z
+rhcos4-high-worker-coredump-disable-storage            PASS  medium  2026-05-17T15:20:57Z
+rhcos4-high-worker-disable-users-coredumps             PASS  medium  2026-05-17T15:20:57Z
+rhcos4-high-worker-service-systemd-coredump-disabled   FAIL  medium  2026-05-17T15:20:57Z
+rhcos4-high-worker-sysctl-kernel-core-pattern          FAIL  medium  2026-05-17T15:20:57Z
+```
+
+## Final Health
+
+Validate the cluster remained steady after the scan.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+```
+
+Observed:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at 4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-1 targetPrimary=noobaa-db-pg-cluster-1
+```
+
+NooBaa DB placement:
+
+```text
+noobaa-db-pg-cluster-1 primary on spoke-dc-v7-worker-2
+noobaa-db-pg-cluster-2 replica on spoke-dc-v7-worker-1
+```
+
+## Drain Posture
+
+Run server-side dry-run drain checks before planning any next worker gate.
+
+```bash
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain "$node" \
+    --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=20s
+done
+```
+
+Observed after the scan:
+
+```text
+spoke-dc-v7-worker-0 pass
+spoke-dc-v7-worker-1 pass
+spoke-dc-v7-worker-2 fail, protected NooBaa DB primary
+```
+
+The primary PDB state was:
+
+```json
+{
+  "name": "noobaa-db-pg-cluster-primary",
+  "minAvailable": 1,
+  "currentHealthy": 1,
+  "desiredHealthy": 1,
+  "disruptionsAllowed": 0
+}
+```
+
+Do not patch `PDB/noobaa-db-pg-cluster-primary` directly as the default
+workaround.
+
+## Result
+
+The `rhcos4-high-worker-disable-users-coredumps` gate is complete. The target
+rule is proven `PASS` by a fresh Compliance Operator scan, and the cluster
+remained healthy after the scan.
+
+The remaining coredump-family worker failures are:
+
+- `rhcos4-high-worker-service-systemd-coredump-disabled`
+- `rhcos4-high-worker-sysctl-kernel-core-pattern`
+
+Handle either remaining control only through a new tracked preflight and
+rollout gate.

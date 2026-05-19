@@ -1,0 +1,220 @@
+---
+title: "Hardening pass on the original 14 slices"
+sidebar_label: "30 — Hardening pass"
+description: "Pin every floating tag by content-addressable digest, make SETUP.md re-runnable end to end, and add a wso2is-data named volume so DCR clients survive recreates. Companion commits a0bd0701 + fb0e48a2 in the insurance-app repo."
+estimated_minutes: 30
+last_updated: 2026-05-17
+prereqs: ["29 — Demo credentials + SCIM"]
+---
+
+The first fourteen slices built a working stack and accumulated three
+classes of papercut along the way: floating image tags that drifted
+when their upstream re-tagged, SETUP.md commands that assumed a
+clean-slate VM and broke if you re-ran them, and a stateful container
+(WSO2 IS) whose H2 database lived inside the container layer and
+disappeared on every `--force-recreate`.
+
+None of this is sexy. All of it is the difference between "the
+classroom track runs reliably on a new student's VM" and "the student
+emails the instructor at 22:00 because their wso2is is rebooting in a
+loop." This chapter is what closed that gap.
+
+Companion commits: `a0bd0701` (volume + image pinning) and `fb0e48a2`
+(SETUP.md idempotency + final pinning).
+
+## Image pinning by digest
+
+Floating tags like `:latest` and `:7-alpine` are convenient until they
+aren't. The day the upstream re-tags `redisinsight:latest` with a
+breaking change, every fresh VM build now fails — and the failure mode
+is "it worked yesterday on a different VM," which is the hardest kind
+to debug.
+
+The fix is to pin every tagged image by its **content-addressable
+digest** (the SHA256). Once pinned, podman pulls the exact same bytes
+forever, regardless of what the upstream re-tags. Five floating-tag
+admin UIs got the treatment:
+
+```bash
+# Before
+podman run -d --name adminer       docker.io/library/adminer
+podman run -d --name redisinsight  docker.io/redis/redisinsight
+podman run -d --name kafka-ui      docker.io/provectuslabs/kafka-ui
+podman run -d --name minio         docker.io/minio/minio:latest server /data
+podman run -d --name mailpit       docker.io/axllent/mailpit
+
+# After
+podman run -d --name adminer       docker.io/library/adminer@sha256:cc64d253...
+podman run -d --name redisinsight  docker.io/redis/redisinsight@sha256:85562d67...
+podman run -d --name kafka-ui      docker.io/provectuslabs/kafka-ui@sha256:8f2ff02d...
+podman run -d --name minio         docker.io/minio/minio@sha256:14cea493...
+podman run -d --name mailpit       docker.io/axllent/mailpit@sha256:0059ef81...
+```
+
+The digests come from the currently-running, 144/0-green stack —
+running `podman inspect <name> --format '{{.ImageDigest}}'` on each
+container captured the SHA of exactly what the smoke had been passing
+against.
+
+A banner sits above the first pinned line in SETUP.md:
+
+> These digests are pinned to the smoke-validated image. To bump:
+> `podman pull <repo>:<tag>` interactively, capture the new digest
+> with `podman inspect --format '{{.RepoDigests}}'`, replace below,
+> re-run the smoke. Do NOT re-pin without a green smoke run.
+
+The note is the load-bearing part. A pinned digest with no rebump
+ritual rots silently when the upstream stops serving the original
+SHA. The note makes the ritual explicit.
+
+## SETUP.md idempotency pass
+
+A SETUP.md command that errors on a re-run trains students to bail at
+the first error instead of restarting from a known step. Every
+re-runnable command got a guard. The patterns to copy:
+
+```bash
+# qcow2 disk copy: only copy if missing
+[ ! -f "/var/lib/libvirt/images/insurance-app.qcow2" ] && \
+  cp /var/lib/libvirt/images/rhel9-base.qcow2 \
+     /var/lib/libvirt/images/insurance-app.qcow2
+
+# virt-install: skip if the domain already exists
+virsh dominfo insurance-app >/dev/null 2>&1 || \
+  virt-install --name insurance-app --memory 16384 ...
+
+# SSH key generation: only if no key present
+[ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+
+# Git clone: only if directory missing
+[ -d ~/insurance-app ] || git clone https://github.com/zeshaq/insurance-app ~/insurance-app
+
+# Podman network: ignore "already exists"
+podman network create insurance-net 2>/dev/null || true
+
+# SigNoz git clone + sed: clone-once, replay sed from a backup
+[ -d ~/signoz ] || git clone https://github.com/SigNoz/signoz ~/signoz
+cp ~/signoz/deploy/docker/clickhouse-config.xml.bak ~/signoz/deploy/docker/clickhouse-config.xml 2>/dev/null \
+  || cp ~/signoz/deploy/docker/clickhouse-config.xml ~/signoz/deploy/docker/clickhouse-config.xml.bak
+sed -i 's/old/new/' ~/signoz/deploy/docker/clickhouse-config.xml
+
+# Cloudflare DNS: list-then-PUT-or-POST (idempotent upsert)
+EXISTING=$(curl -sS -H "Authorization: Bearer $TOKEN" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=A&name=$FQDN" \
+  | jq -r '.result[0].id // empty')
+if [ -n "$EXISTING" ]; then
+  curl -X PUT  .../dns_records/$EXISTING -d "$BODY"
+else
+  curl -X POST .../dns_records           -d "$BODY"
+fi
+
+# Certbot: --keep-until-expiring is the no-op-if-fresh flag
+certbot certonly --dns-cloudflare ... --keep-until-expiring -d "*.insurance-app.comptech-lab.com"
+```
+
+The principle to copy across any runbook: **read the existing state
+first, take action only if needed**. `mkdir -p`, `[ -f ]` guards,
+upsert patterns, idempotent install flags. Every one of those is
+something the student doesn't have to think about when they restart
+from where they got stuck.
+
+## The wso2is-data named volume
+
+WSO2 IS ships a `wso2is:7.0.0` image that initializes an H2 database
+on first boot. By default that database lives inside the container's
+writable layer at `/home/wso2carbon/wso2is-7.0.0/repository/database/`.
+Any `podman run --replace`, `--force-recreate`, or `podman rm -f`
+wipes it — and with it, every DCR-registered OIDC client, every
+SCIM2-provisioned user, every admin role assignment.
+
+Discovering this is a rite of passage. After the second time you've
+re-registered the customer-app DCR client because someone bumped the
+WSO2 IS container during a smoke debug, you fix it:
+
+```bash
+# Create the volume once (idempotent)
+podman volume create wso2is-data 2>/dev/null || true
+
+# Mount it on the IS container
+podman run -d --replace --name wso2is --network insurance-net \
+  -p 9444:9443 -p 9763:9763 \
+  -v wso2is-data:/home/wso2carbon/wso2is-7.0.0/repository/database \
+  docker.io/wso2/wso2is:7.0.0
+```
+
+Now `podman rm -f wso2is && podman run ...` keeps the H2 database
+intact. DCR clients survive. SCIM users survive. The IS admin
+password (changed away from `admin/admin`?) survives.
+
+The migration cost is **one-time DCR re-registration**: the original
+H2 snapshot was taken from a running IS, so when H2 re-initialized on
+first read of the mounted volume, it created a fresh database. Bumped
+the server.xml basicRegistry user to the new `client_id`, rewrote
+`.wso2is-creds`, moved on.
+
+Future container recreates should stop wso2is first so H2 flushes
+cleanly:
+
+```bash
+podman stop wso2is
+podman rm   wso2is
+podman run  ... (with the -v wso2is-data:... line)
+```
+
+`stop` then `rm` gives H2's writer a chance to flush in-flight pages
+before the volume gets re-mounted by a new container.
+
+## Why these specific things
+
+The temptation in a hardening pass is to do everything: scan images,
+add resource limits, enforce read-only root filesystems, etc. The
+choice to stop at three was deliberate. Each of these was a real
+incident in a real classroom session:
+
+- A student's adminer container started crashing during a section
+  6 demo because `:latest` got re-tagged with a binary that needed a
+  newer libc than the alpine base had.
+- A student got partway through SETUP.md, hit a transient network
+  error during the SigNoz clone, restarted from "Phase 4", and the
+  sed-into-clickhouse-config got applied twice.
+- A student following the runbook restarted wso2is after changing a
+  port mapping, lost all DCR clients, and went hunting for "why does
+  Liberty's mpJwt validation fail now" for an hour.
+
+The hardening pass closes those three specific failure modes. The
+suite went 144 → 198 → 205 across these chapters, and each addition
+captured the verify path for a real student-visible behavior.
+
+## Verify
+
+```bash
+# Image digests are pinned — re-pulling fetches the same SHA
+podman pull docker.io/library/adminer@sha256:cc64d253...
+podman inspect docker.io/library/adminer@sha256:cc64d253... --format '{{.Id}}'
+# matches
+
+# SETUP.md re-runs cleanly on an already-built VM
+cd ~/insurance-app && bash -n SETUP.md && \
+  for step in $(grep -oP '(?<=^```)bash$' SETUP.md | head -20); do
+    echo "block ok"
+  done
+# (manual: walk a couple of phases on a VM with the stack already running)
+
+# wso2is volume mounted — DCR client survives recreate
+podman exec wso2is sh -c 'ls /home/wso2carbon/wso2is-7.0.0/repository/database'
+podman rm -f wso2is && podman run ... # with the volume mount
+podman exec wso2is sh -c 'ls /home/wso2carbon/wso2is-7.0.0/repository/database'
+# both lists show the same .h2.db files
+```
+
+## What you have
+
+- Every floating-tag image pinned by digest, with a documented
+  re-pin ritual.
+- A SETUP.md you can interrupt at any phase and restart from without
+  manual cleanup.
+- A `wso2is-data` named volume so DCR clients and SCIM users
+  survive container recreates.
+- The smoke suite hitting 205/0 across all the slices in the track.
+
+Next: [31 — Going to production: the QA roadmap →](/learn/openliberty/going-to-production-qa-roadmap)

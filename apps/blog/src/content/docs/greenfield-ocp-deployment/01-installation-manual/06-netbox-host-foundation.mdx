@@ -1,0 +1,395 @@
+---
+title: "Installation Manual - 06 NetBox installation"
+sidebar_label: "06 NetBox installation"
+description: "How the gf-ocp NetBox VM host, application, backup/restore model, and HAProxy exposure are installed and validated."
+last_reviewed: 2026-05-15
+draft: false
+---
+
+NetBox is the planned source of truth for IPAM, DNS intent, racks, devices, VMs, prefixes, and service ownership. The current foundation install runs NetBox on a private VM with local PostgreSQL and local Redis. Backup and restore automation is configured before HAProxy public exposure.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| VM name | `gf-ocp-netbox-01` |
+| FQDN | `netbox.v7.comptech-lab.com` |
+| Private IP | `30.30.200.23/16` |
+| Gateway | `30.30.0.1` |
+| DNS | `30.30.200.53`, then `8.8.8.8` |
+| Bridge | `br33` |
+| MAC | `52:54:00:70:07:23` |
+| vCPU | `4` |
+| RAM | `8 GiB` |
+| Disk | `100 GiB` qcow2 overlay |
+| Base image | `/var/lib/libvirt/images/ubuntu-24.04-base.qcow2` |
+| NetBox version | `v4.6.0` |
+| Credential custody | `secret/greenfield/netbox/application/gf-ocp-netbox-01` |
+| Backup credential custody | `secret/greenfield/object-storage/minio/users/netbox-backup` |
+
+Internal DNS initially points the NetBox host name to the private VM IP during host validation:
+
+```text
+netbox.v7.comptech-lab.com A 30.30.200.23
+```
+
+After HAProxy exposure, public DNS points the same host name to the edge IP:
+
+```text
+netbox.v7.comptech-lab.com A 59.153.29.102
+```
+
+## Creation Flow
+
+The operator entry point is the greenfield repository script wrapper:
+
+```bash
+./scripts/gfctl.sh prepare-cloud-init --execute gf-ocp-netbox-01
+./scripts/gfctl.sh cloud-init-iso --execute gf-ocp-netbox-01
+cp scripts/vms/gf-ocp-netbox-01.env.example scripts/vms/gf-ocp-netbox-01.env
+./scripts/gfctl.sh create-vm --execute scripts/vms/gf-ocp-netbox-01.env
+./scripts/gfctl.sh validate-vm --execute ze@30.30.200.23
+```
+
+Before building the seed ISO, replace placeholder SSH public keys in:
+
+```text
+artifacts/cloud-init/gf-ocp-netbox-01/user-data.yaml
+```
+
+The VM creation wrapper uses `VM_BASE_IMAGE` to create a bootable qcow2 overlay from the Ubuntu cloud image. It also stages seed ISOs into `/var/lib/libvirt/cloud-init/` because hardened libvirt hosts cannot read ISO files directly from an operator home directory.
+
+## Validation
+
+Run:
+
+```bash
+dig @30.30.200.53 netbox.v7.comptech-lab.com A +short
+ssh ze@30.30.200.23 'cloud-init status'
+ssh ze@30.30.200.23 'systemctl is-active qemu-guest-agent chrony fail2ban ssh'
+ssh ze@30.30.200.23 'sudo sshd -T | awk "/^(passwordauthentication|permitrootlogin|pubkeyauthentication) /"'
+ssh ze@30.30.200.2 'sudo virsh dominfo gf-ocp-netbox-01 | grep Autostart'
+```
+
+Expected posture:
+
+```text
+30.30.200.23
+status: done
+active
+active
+active
+active
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+Autostart:      enable
+```
+
+## Current Boundary
+
+This phase creates the VM host, installs the initial NetBox application, configures a validated backup/restore path, and exposes NetBox through HAProxy after backup validation is complete.
+
+## Application Install
+
+The installation follows the official NetBox stack: PostgreSQL, Redis, NetBox components, Gunicorn/systemd, and an HTTP server. For this foundation phase, PostgreSQL and Redis are local to `gf-ocp-netbox-01`.
+
+Installed services:
+
+```text
+postgresql
+redis-server
+netbox
+netbox-rq
+nginx
+```
+
+The NetBox configuration is stored locally at:
+
+```text
+/opt/netbox/netbox/netbox/configuration.py
+```
+
+The file is owned by `root:netbox` and mode `0640` because it contains service credentials. Do not print or commit it.
+
+Secrets are stored in Vault at:
+
+```text
+secret/greenfield/netbox/application/gf-ocp-netbox-01
+```
+
+The path contains the database password, Redis password, NetBox secret key, API token pepper, admin username, admin password, admin email, and installed NetBox version.
+
+## Application Validation
+
+Run:
+
+```bash
+ssh ze@30.30.200.23 'systemctl is-active postgresql redis-server netbox netbox-rq nginx'
+ssh ze@30.30.200.23 'systemctl --failed --no-pager'
+ssh ze@30.30.200.23 'sudo nginx -t'
+ssh ze@30.30.200.23 'sudo -u postgres psql -tAc "SELECT datname FROM pg_database WHERE datname = '\''netbox'\'';"'
+ssh ze@30.30.200.23 'sudo /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py check'
+ssh ze@30.30.200.23 'curl -fsS -o /tmp/netbox-login-page.out -w "%{http_code}\n" http://127.0.0.1/login/'
+ssh ze@30.30.200.102 'curl -fsS -o /tmp/netbox-backend.out -w "%{http_code}\n" -H "Host: netbox.v7.comptech-lab.com" http://30.30.200.23/'
+```
+
+Expected posture:
+
+```text
+active
+active
+active
+active
+active
+0 loaded units listed.
+netbox
+System check identified no issues
+200
+302
+```
+
+Direct HTTP access from arbitrary hosts is intentionally blocked by UFW. The VM firewall allows NetBox HTTP/HTTPS only from HAProxy `30.30.200.102`.
+
+## Backup And Restore
+
+NetBox backups are stored in the MinIO bucket `netbox-backups` using a scoped service user. The credential and archive encryption passphrase are stored in Vault at:
+
+```text
+secret/greenfield/object-storage/minio/users/netbox-backup
+```
+
+Installed files on `gf-ocp-netbox-01`:
+
+```text
+/etc/netbox/netbox-backup.env
+/usr/local/sbin/netbox-backup-to-minio.sh
+/usr/local/sbin/netbox-restore-validate.sh
+/etc/systemd/system/netbox-backup.service
+/etc/systemd/system/netbox-backup.timer
+```
+
+Source copies are kept in the greenfield repository:
+
+```text
+scripts/services/netbox/netbox-backup-to-minio.sh
+scripts/services/netbox/netbox-restore-validate.sh
+```
+
+The env file is `root:root` mode `0600`. Do not print or document its values.
+
+The backup includes:
+
+- PostgreSQL custom-format dump of database `netbox`.
+- NetBox media, reports, scripts, and configuration file when present.
+- A timestamped manifest.
+- AES-256-CBC encrypted compressed archive.
+- SHA-256 checksum uploaded beside the encrypted archive.
+
+Run a manual backup:
+
+```bash
+ssh ze@30.30.200.23 'sudo /usr/local/sbin/netbox-backup-to-minio.sh'
+```
+
+Expected output shape:
+
+```text
+backup_object=netbox-backups/netbox/YYYYMMDDTHHMMSSZ/netbox-YYYYMMDDTHHMMSSZ.tar.gz.enc
+```
+
+Run restore validation:
+
+```bash
+ssh ze@30.30.200.23 'sudo /usr/local/sbin/netbox-restore-validate.sh'
+```
+
+Expected output shape:
+
+```text
+restore_validation=passed object=netbox-backups/netbox/YYYYMMDDTHHMMSSZ/netbox-YYYYMMDDTHHMMSSZ.tar.gz.enc
+```
+
+The restore validator downloads the latest encrypted object, verifies the checksum, decrypts and extracts it, restores the dump into a temporary `netbox_restore_validation_*` database, checks the restored schema is readable, and drops the temporary database.
+
+Validation completed on 2026-05-15:
+
+```text
+backup_object=netbox-backups/netbox/20260515T080609Z/netbox-20260515T080609Z.tar.gz.enc
+restore_validation=passed object=netbox-backups/netbox/20260515T080609Z/netbox-20260515T080609Z.tar.gz.enc
+```
+
+The `netbox-backup.timer` is enabled and active. No temporary restore validation database remained after the drill.
+
+### Retention Policy
+
+The initial NetBox backup retention policy is:
+
+- Daily backups from `netbox-backup.timer`.
+- Retain current object versions for `90` days.
+- Retain noncurrent object versions for `90` days.
+- Expire delete markers.
+- Run restore validation monthly during active buildout, then quarterly.
+- Run an extra restore validation after material NetBox, PostgreSQL, MinIO, backup script, encryption, or credential changes.
+
+Applied MinIO lifecycle state:
+
+```text
+current versions: 90 days
+noncurrent versions: 90 days
+delete markers: expire
+```
+
+MinIO requires delete-marker expiration as a separate rule from day-based expiration. The applied commands were:
+
+```bash
+mc ilm rule add \
+  --expire-days 90 \
+  --noncurrent-expire-days 90 \
+  gf-local/netbox-backups
+
+mc ilm rule add \
+  --expire-delete-marker \
+  gf-local/netbox-backups
+```
+
+Validate with:
+
+```bash
+mc ilm rule ls gf-local/netbox-backups
+```
+
+## HAProxy Exposure
+
+NetBox is exposed through the v7 HAProxy edge after backup, restore validation, and retention are in place.
+
+Public DNS:
+
+```text
+netbox.v7.comptech-lab.com A 59.153.29.102
+```
+
+Private backend:
+
+```text
+gf-ocp-netbox-01 / 30.30.200.23:80
+```
+
+NetBox application proxy settings:
+
+```python
+CSRF_TRUSTED_ORIGINS = ['https://netbox.v7.comptech-lab.com']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+```
+
+The NetBox-side Nginx config forwards `X-Forwarded-Proto https` to avoid contradictory scheme headers between HAProxy, Nginx, and Gunicorn.
+
+The edge certificate is the shared v7 wildcard PEM on HAProxy:
+
+```text
+/etc/haproxy/certs/v7-wildcard.pem
+```
+
+Validation:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' \
+  http://netbox.v7.comptech-lab.com/
+
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -L https://netbox.v7.comptech-lab.com/login/
+
+echo | openssl s_client \
+  -connect netbox.v7.comptech-lab.com:443 \
+  -servername netbox.v7.comptech-lab.com 2>/dev/null |
+  openssl x509 -noout -subject -issuer -dates -ext subjectAltName
+```
+
+Expected result:
+
+```text
+301 https://netbox.v7.comptech-lab.com/
+200
+subject=CN = *.v7.comptech-lab.com
+X509v3 Subject Alternative Name:
+    DNS:*.v7.comptech-lab.com, DNS:v7.comptech-lab.com
+```
+
+Direct access to `30.30.200.23` from outside HAProxy should time out or return `000`.
+
+Post-exposure backup and restore validation passed on 2026-05-15 with:
+
+```text
+netbox-backups/netbox/20260515T084335Z/netbox-20260515T084335Z.tar.gz.enc
+```
+
+## Baseline Source Of Truth Seed
+
+The first NetBox source-of-truth baseline is seeded through the greenfield repo, not by manual UI entry:
+
+```text
+data/netbox/greenfield-baseline.json
+scripts/services/netbox/seed-baseline.py
+```
+
+The API token used by the loader is stored in Vault:
+
+```text
+secret/greenfield/netbox/api-tokens/baseline-seed
+```
+
+Do not print the token. Human operators should retrieve it into `NETBOX_TOKEN` from Vault and run:
+
+```bash
+NETBOX_TOKEN=<redacted> \
+  ./scripts/services/netbox/seed-baseline.py \
+  --url https://netbox.v7.comptech-lab.com
+```
+
+The loader is idempotent. Re-running it updates the baseline records instead of creating duplicates.
+
+Seeded records:
+
+- site `CompTech Greenfield v7`;
+- VLAN `br33 service VM network`;
+- prefixes `30.30.0.0/16`, `30.30.200.0/24`, and `59.153.29.96/27`;
+- physical devices `dl385-2` and `gf-ocp-minio-physical-01`;
+- libvirt cluster `gf-ocp-dl385-2-libvirt`;
+- foundation VMs:
+  - `gf-ocp-pdns-01`;
+  - `gf-ocp-haproxy-01`;
+  - `gf-ocp-gitlab-01`;
+  - `gf-ocp-gitlab-runner-01`;
+  - `gf-ocp-netbox-01`;
+  - `gf-ocp-vault-seed-01`;
+  - `gf-ocp-vault-01`;
+  - `gf-ocp-vault-02`;
+  - `gf-ocp-vault-03`;
+- reserved gateway IPs `30.30.0.1/16` and `59.153.29.97/27`.
+
+Validation on 2026-05-15:
+
+```text
+dcim/sites=1
+ipam/prefixes=3
+ipam/vlans=1
+dcim/devices=2
+virtualization/virtual-machines=9
+ipam/ip-addresses=15
+virtualization/clusters=1
+```
+
+Post-seed backup and restore validation passed with:
+
+```text
+netbox-backups/netbox/20260515T092837Z/netbox-20260515T092837Z.tar.gz.enc
+```
+
+## Next Phase
+
+The next NetBox phase should expand the model after details are approved:
+
+- rack and rack-unit placement;
+- future OpenShift physical node inventory;
+- service ownership contacts;
+- approved IP/MAC allocation pools for the next VM wave.

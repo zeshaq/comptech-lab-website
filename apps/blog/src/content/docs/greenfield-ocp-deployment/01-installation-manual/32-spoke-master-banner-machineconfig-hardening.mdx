@@ -1,0 +1,207 @@
+---
+title: "Installation Manual - 32 Spoke master banner MachineConfig hardening"
+sidebar_label: "32 Spoke master banner MachineConfig hardening"
+description: "How to apply and validate the first small MachineConfig-backed node hardening batch for spoke-dc-v7."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the first small MachineConfig-backed node hardening gate
+for `spoke-dc-v7`.
+
+The final accepted scope is master-only legal notice banner hardening. Worker
+MachineConfig hardening is deferred because the logging stack currently has
+single-replica Loki PDBs that block safe worker drains.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-20`, issue `#367` |
+| Cluster | `spoke-dc-v7` |
+| Final scope | Master pool only |
+| MachineConfig | `75-master-etc-issue-banner` |
+| File path | `/etc/issue.d/legal-notice` |
+| Final GitOps revision | `37a3f90c88c5cb20e5f7072bef5869151f5f1672` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/node-hardening-banner-gate.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+Secret data, or full Secret manifests.
+
+## Baseline Health
+
+Confirm the spoke is steady before adding any MachineConfig.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+```
+
+Baseline for this gate:
+
+```text
+OpenShift version: 4.20.18
+Nodes: 6 Ready
+ClusterOperators: no non-steady operators reported
+MCP master: Updated=True Updating=False Degraded=False, 3/3 ready
+MCP worker: Updated=True Updating=False Degraded=False, 3/3 ready
+```
+
+## GitOps Change
+
+Use the operational GitOps repository on the bootstrap VM.
+
+```bash
+cd /home/ze/greenfield-ops/openshift-gitops
+```
+
+The first attempt added both master and worker MachineConfigs:
+
+```text
+d9f5cba Add spoke node banner hardening
+```
+
+Worker rollout immediately exposed Loki PDB drain blockers, so the final
+commit narrowed the first batch to masters:
+
+```text
+37a3f90 Limit first spoke node hardening batch to masters
+```
+
+Final files:
+
+```text
+clusters/spoke-dc-v7/kustomization.yaml
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+clusters/spoke-dc-v7/node-hardening/machineconfig-master-etc-issue-banner.yaml
+```
+
+Render and dry-run before push.
+
+```bash
+oc kustomize clusters/spoke-dc-v7 >/tmp/spoke-dc-v7-render.yaml
+oc --kubeconfig "$SPOKE_KUBECONFIG" apply --dry-run=server \
+  -k clusters/spoke-dc-v7
+git diff --check
+```
+
+## Rollout
+
+After push, hard-refresh the spoke app from the hub.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate application.argoproj.io/spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Watch Argo and MCP status.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get application.argoproj.io spoke-dc-v7-cluster-config \
+  -o jsonpath='{.status.sync.status}{" "}{.status.health.status}{" "}{.status.sync.revision}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+```
+
+Expected final rollout state:
+
+```text
+spoke-dc-v7-cluster-config: Synced Healthy
+master MCP: Updated=True Updating=False Degraded=False, 3/3 ready
+worker MCP: Updated=True Updating=False Degraded=False, 3/3 ready
+Nodes: 6 Ready
+```
+
+## Worker Drain Finding
+
+The worker MachineConfig was intentionally removed from this first batch. The
+attempted worker rollout found that `spoke-dc-v7-worker-2` hosted single-replica
+Loki pods protected by PDBs with zero allowed disruptions:
+
+```text
+logging-loki-distributor
+logging-loki-index-gateway
+logging-loki-querier
+```
+
+MCO could not drain the node without relaxing those PDBs. During rollback
+recovery, those three PDBs were temporarily relaxed just long enough for MCO to
+evict the blocking pods and return `worker-2` to the final worker render. The
+PDBs were then restored and Loki pods returned `Running`.
+
+Do not start another worker MachineConfig batch until logging is made
+drainable or an explicit maintenance window allows temporary logging
+disruption.
+
+## Final Validation
+
+Run the final validation from the bootstrap VM.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get application.argoproj.io spoke-dc-v7-cluster-config \
+  -o json | jq -r '{sync:.status.sync.status,health:.status.health.status,operation:.status.operationState.phase,revision:.status.sync.revision}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get machineconfig 75-master-etc-issue-banner 75-worker-etc-issue-banner \
+  --ignore-not-found
+```
+
+Check the rendered MachineConfig content without opening host shells.
+
+```bash
+master_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp master -o jsonpath='{.status.configuration.name}')
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$master_render" -o json \
+  | jq -r '(.spec.config.storage.files // [] | map(.path) | index("/etc/issue.d/legal-notice")) != null'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r '(.spec.config.storage.files // [] | map(.path) | index("/etc/issue.d/legal-notice")) != null'
+```
+
+Final evidence from this gate:
+
+```text
+Application/spoke-dc-v7-cluster-config: Synced/Healthy, operation Succeeded
+Revision: 37a3f90c88c5cb20e5f7072bef5869151f5f1672
+ClusterVersion: 4.20.18, Available=True, Progressing=False
+Nodes: 6 Ready
+ClusterOperators: no non-steady operators reported
+MCP master: Updated=True Updating=False Degraded=False
+MCP worker: Updated=True Updating=False Degraded=False
+75-master-etc-issue-banner: present
+75-worker-etc-issue-banner: absent
+master rendered config contains /etc/issue.d/legal-notice: true
+worker rendered config contains /etc/issue.d/legal-notice: false
+Loki pods: Running
+```
+
+## Residuals
+
+- Worker MachineConfig-backed hardening is deferred.
+- Logging/Loki needs an HA or drainability gate before worker node hardening.
+- Do not bulk-apply generated ComplianceRemediation objects.

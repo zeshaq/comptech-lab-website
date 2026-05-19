@@ -1,0 +1,258 @@
+---
+title: "Claim filing through a BFF (+ polish)"
+sidebar_label: "26 — Claim filing through a BFF"
+description: "Multipart upload from the browser to SvelteKit to Liberty: rebuild the FormData server-side so you control exactly what Liberty sees. Plus the polish pass — real account page, error pages, breadcrumbs. Slices 21 + 22 in the insurance-app repo."
+estimated_minutes: 60
+last_updated: 2026-05-17
+prereqs: ["25 — Policies, bind & idempotency-key"]
+---
+
+Customers can quote, bind, and pay. They cannot yet file a claim — the
+one operation that involves an actual file upload. The chapter-22
+vanilla tour uploaded straight to Liberty's `/api/claims` from the
+browser using `fetch` + `FormData`. The customer portal does the same
+job through the BFF, which is **slightly different** in a way worth
+spelling out.
+
+This chapter also folds in slice 22's polish pass — a real account
+page, a custom error page, breadcrumbs — because each of those is one
+SvelteKit idiom and they don't earn their own chapters individually.
+
+Companion commits: `495febf5` (slice 21 — claim filing), `e54eed01`
+(slice 22 — polish).
+
+## Multipart through a BFF — the failure mode you don't see coming
+
+Naive multipart proxying through a Node middle tier works on the
+happy path and breaks at every edge. The two failure modes worth
+knowing about:
+
+1. **You parse the incoming form, then re-stream it.** The parser eats
+   the file's bytes into a buffer; for a 50MB photo that's 50MB of
+   memory you didn't budget for, per concurrent request.
+2. **You hot-pipe the request body through.** Now the boundary header,
+   the order of parts, the way the upstream parser interprets your
+   middle-tier additions are all interlocked. Liberty's
+   `@FormParam`-driven `ClaimResource` is happy to reject the whole
+   thing with a 500 if anything is off-spec.
+
+The middle ground we adopt: **parse on the way in, rebuild on the way
+out**. The Node side knows what Liberty's parts are named, so it
+builds a fresh `FormData` with exactly those names:
+
+```ts
+// gui/customer-app/src/routes/claims/file/+page.server.ts
+const incoming = await request.formData();
+const policyNumber = String(incoming.get('policyNumber') ?? '').trim();
+const description  = String(incoming.get('description')  ?? '').trim();
+const otherPartyVin = String(incoming.get('otherPartyVin') ?? '').trim();
+const file = incoming.get('attachment');
+
+if (!policyNumber) {
+  return fail(400, { values: { policyNumber, description, otherPartyVin },
+                     error: 'Policy number is required.' });
+}
+
+const outgoing = new FormData();
+outgoing.append('policyNumber', policyNumber);
+if (description)   outgoing.append('description', description);
+if (otherPartyVin) outgoing.append('otherPartyVin', otherPartyVin);
+if (file instanceof File && file.size > 0) {
+  outgoing.append('attachment', file, file.name);
+}
+
+const res = await liberty('POST', '/api/claims', {
+  body: outgoing,
+  userId:    session.user.id    ?? undefined,
+  userEmail: session.user.email ?? undefined,
+});
+```
+
+The `liberty()` BFF helper from
+[chapter 23](/learn/openliberty/customer-portal-foundation) skips its
+auto-JSON branch when it sees a `FormData` — the body passes through
+untouched, the browser/Node fetch implementation sets the `Content-Type:
+multipart/form-data; boundary=...` header on its own, and Liberty's
+multipart parser sees clean text + binary parts with the part names it
+expects.
+
+The `file` size check is the unsung guard: `incoming.get('attachment')`
+returns a `File` even for an empty submission — `file.size > 0` is the
+right filter, not `file != null`.
+
+## The form
+
+`<input type="file">` doesn't need `enctype="multipart/form-data"` if
+you write `enctype="multipart/form-data"` on the `<form>`. SvelteKit's
+form-actions handle it as-is. The form itself is one block:
+
+```svelte
+<form method="POST" enctype="multipart/form-data" use:enhance>
+  <label>Policy number
+    <input name="policyNumber" required value={data.prefillPolicy} />
+  </label>
+  <label>Description
+    <textarea name="description" rows="3" />
+  </label>
+  <label>Other party VIN (optional)
+    <input name="otherPartyVin" />
+  </label>
+  <label>Photo of damage
+    <input name="attachment" type="file" accept="image/*" />
+  </label>
+  <button>File the claim</button>
+</form>
+```
+
+`data.prefillPolicy` comes from `load()` reading `url.searchParams.get('policy')`,
+so the **"File a claim"** CTA on the policy detail page passes the
+policy number as a query string and the form pre-fills.
+
+## The successful submit → claim detail
+
+The action's last line throws a 303 redirect to the new claim detail
+page:
+
+```ts
+const claim = (await res.json()) as Claim;
+throw redirect(303, `/claims/${claim.id}`);
+```
+
+`/claims/[id]/+page.server.ts` GETs that one claim through the BFF.
+The detail page renders the OCR text panel (slice 9), the partner-
+enrichment panel (slice 10), and the status badge. That whole panel
+turns up because the slice-10 claim flow synchronously enriches with
+OCR + partner data before returning; the BFF doesn't have to poll.
+
+## Polish pass — slice 22
+
+Three independent pieces, none of which earn a chapter on their own.
+
+### Account page
+
+`/account` was a stub. Slice 22 fills it in: profile card (name,
+email, user id), two activity panels (recent policies + recent
+claims), a sign-out form. Both panels fetch through the BFF and render
+into status-badged lists.
+
+The page is honest about its limitation in a paragraph at the bottom:
+
+> The recent-activity panels currently surface system-wide rows
+> because Liberty's policy/claim records do not yet store an owning
+> user id — adding one is a one-line change in `PolicyService` /
+> `ClaimService` plus a column migration, after which the BFF can
+> filter by `X-User-Id` before rendering this page.
+
+That paragraph is intentional teaching content. A real customer
+portal would absolutely filter by user; the artifact doesn't yet, and
+saying so out loud is better than quietly mis-leading the demo
+audience.
+
+### Error page (`+error.svelte`)
+
+SvelteKit's default error page is functional and ugly. A custom
+`+error.svelte` replaces it for any thrown `error(...)` from a
+`load()` or action:
+
+```svelte
+<script lang="ts">
+  import { page } from '$app/state';
+  const status  = $derived(page.status);
+  const message = $derived(page.error?.message ?? 'Something went wrong.');
+</script>
+
+<section class="text-center max-w-xl mx-auto">
+  <p class="text-6xl font-bold text-slate-300 font-mono">{status}</p>
+  <h1 class="text-2xl font-semibold">
+    {#if status === 404}Page not found
+    {:else if status >= 500}Something broke on our end
+    {:else}{message}
+    {/if}
+  </h1>
+  <p>{message}</p>
+  <a href="/">Home</a> · <a href="/quote">Get a quote</a>
+</section>
+```
+
+The status code in giant grey type, a tailored heading per error
+class, and two CTAs back to known-good pages. Drop it once in `src/routes/`
+and it covers every error in every nested route.
+
+### Breadcrumbs
+
+Auto-generated from `page.url.pathname`, lives in `+layout.svelte`,
+takes about 25 lines:
+
+```svelte
+<script lang="ts">
+  import { page } from '$app/state';
+  interface Crumb { label: string; href: string | null; }
+
+  function pretty(seg: string): string {
+    if (/^POL-[A-F0-9]+$/.test(seg)) return seg;     // policy numbers — verbatim
+    if (/^\d+$/.test(seg)) return `#${seg}`;          // numeric ids — prefix with #
+    return seg.charAt(0).toUpperCase() + seg.slice(1);
+  }
+
+  const crumbs: Crumb[] = $derived.by(() => {
+    const segs = page.url.pathname.split('/').filter(Boolean);
+    if (segs.length === 0) return [];
+    const out: Crumb[] = [{ label: 'Home', href: '/' }];
+    let acc = '';
+    segs.forEach((seg, i) => {
+      acc += '/' + seg;
+      out.push({ label: pretty(seg), href: i === segs.length - 1 ? null : acc });
+    });
+    return out;
+  });
+</script>
+```
+
+The `pretty()` function is the one piece a sweep-the-path crumbs
+helper always forgets: route segments aren't all human-readable as-is.
+Policy numbers stay verbatim; numeric ids get a `#` prefix; everything
+else gets title-cased.
+
+## Verify
+
+```bash
+# File a claim through the portal, end to end (signed-in cookies)
+curl -s -b cookies.txt -X POST http://localhost:3000/claims/file \
+  -F "policyNumber=POL-AB12CD" \
+  -F "description=Rear-ended in parking lot" \
+  -F "attachment=@/tmp/photo.jpg" \
+  -o /dev/null -w "%{http_code} %{redirect_url}\n"
+#   303 http://localhost:3000/claims/47
+
+# The redirect target renders OCR text from MI + partner panel if otherPartyVin given
+curl -s -b cookies.txt http://localhost:3000/claims/47 | grep -o 'OCR.*</' | head -1
+
+# Custom 404 page renders
+curl -s http://localhost:3000/does-not-exist | grep -c "Page not found"
+#   1
+```
+
+Smoke script's section 20 grows by three checks for the 404 body and
+the breadcrumb markup; the suite hits 193/0.
+
+## What you have
+
+- A working claim-filing flow through the BFF with multipart upload —
+  the BFF parses incoming, rebuilds outgoing, and lets Liberty's
+  multipart parser see exactly the parts it expects.
+- The pattern for any future file upload: name parts deliberately on
+  both sides, don't hot-pipe.
+- A real /account page that shows recent activity and is honest about
+  what it can't yet filter.
+- A custom error page that covers every 404 and 500 in the portal.
+- Auto-breadcrumbs that handle policy numbers and numeric ids
+  gracefully.
+
+The portal is now a complete customer surface — sign in, get a quote,
+bind, pay, file a claim, see your stuff in /account. What's missing is
+that you've been running it all on `localhost:3000` for two chapters.
+Slice 23 puts it on a real public URL through HAProxy + Cloudflare,
+which surfaces three load-bearing OIDC config details that don't show
+up until they bite.
+
+Next: [27 — Real human OIDC end-to-end →](/learn/openliberty/real-human-oidc)

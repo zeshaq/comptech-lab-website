@@ -1,0 +1,170 @@
+---
+title: "Installation Manual - 70 Old Vault cold-retention soak"
+sidebar_label: "70 Old Vault cold-retention soak"
+description: "Read-only cold-retention validation after the old lost-custody Vault VMs were powered off."
+---
+
+This chapter records the first cold-retention soak checkpoint after the old
+lost-custody v7 Vault VMs were powered off.
+
+No VM was started. No disk image was deleted. No DNS, GitOps, OpenShift,
+Vault R1, or MinIO state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Validation Boundary
+
+The checkpoint validated the current cold-retention state:
+
+- old Vault VMs remained powered off;
+- old Vault autostart remained disabled;
+- old Vault disk images remained retained;
+- replacement Vault R1 remained running;
+- stable Vault DNS still resolved to R1;
+- active OpenShift consumers remained healthy on R1-backed stores;
+- OADP, RHACS, nodes, and ClusterOperators remained healthy.
+
+This checkpoint did not observe a new scheduled backup after old Vault VM
+power-off. The latest normal scheduled backups completed before the power-off
+gate and were rechecked as still Completed. A later post-power-off backup
+window remains the next checkpoint before any disk-retention decision.
+
+## VM State
+
+| VM | State | Autostart |
+| --- | --- | --- |
+| `gf-ocp-vault-seed-01` | shut off | disabled |
+| `gf-ocp-vault-01` | shut off | disabled |
+| `gf-ocp-vault-02` | shut off | disabled |
+| `gf-ocp-vault-03` | shut off | disabled |
+| `gf-ocp-vault-r1-seed-01` | running | enabled |
+| `gf-ocp-vault-r1-01` | running | enabled |
+| `gf-ocp-vault-r1-02` | running | enabled |
+| `gf-ocp-vault-r1-03` | running | enabled |
+
+Old disk images remained present under `/var/lib/libvirt/images/`.
+
+## DNS And Vault Health
+
+DNS remained unchanged:
+
+| Name | Result |
+| --- | --- |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | no A record |
+
+PowerDNS zone serial remained `44`.
+
+Old Vault direct health remained unreachable after power-off:
+
+| Endpoint | HTTP code |
+| --- | ---: |
+| `30.30.200.30:8200` | 000 |
+| `30.30.200.31:8200` | 000 |
+| `30.30.200.32:8200` | 000 |
+| `30.30.200.33:8200` | 000 |
+
+Replacement Vault R1 health was healthy with standby-ok enabled:
+
+| Endpoint | HTTP code |
+| --- | ---: |
+| `30.30.200.35:8200` | 200 |
+| `30.30.200.36:8200` | 200 |
+| `30.30.200.37:8200` | 200 |
+
+## OpenShift Validation
+
+Both clusters remained on OpenShift `4.20.18`.
+
+| Cluster | Node state | ClusterOperator exceptions |
+| --- | --- | --- |
+| `hub-dc-v7` | all Ready | none |
+| `spoke-dc-v7` | all Ready | none |
+
+Argo CD:
+
+| Context | Application | Sync | Health | Revision |
+| --- | --- | --- | --- | --- |
+| hub | `hub-dc-v7-bootstrap` | Synced | Healthy | `c138c6c` |
+| hub | OCM wrapper for `spoke-dc-v7-cluster-config` | Synced | Progressing | `c138c6c` |
+| OCM report | `spoke-cluster-config-pull` | Synced | Healthy | `c138c6c` |
+| spoke | `spoke-dc-v7-cluster-config` | Synced | Healthy | `c138c6c` |
+
+The hub-side wrapper remained `Progressing`, but the managed-cluster report
+showed the spoke application healthy:
+
+```text
+clusters=1 synced=1 healthy=1 inProgress=0 notHealthy=0 notSynced=0
+```
+
+External Secrets stores:
+
+| Cluster | Store | Ready | Reason |
+| --- | --- | --- | --- |
+| hub | `vault-r1-eso-smoke` | True | Valid |
+| hub | `vault-r1-oadp` | True | Valid |
+| hub | `vault-r1-rhacs` | True | Valid |
+| spoke | `vault-r1-eso-smoke` | True | Valid |
+| spoke | `vault-r1-oadp` | True | Valid |
+| spoke | `vault-r1-rhacs` | True | Valid |
+
+ExternalSecrets:
+
+| Cluster | Ready | Notes |
+| --- | --- | --- |
+| hub | `6/6` | OADP and ESO smoke refreshed after old VM power-off; RHACS remained Ready |
+| spoke | `6/6` | OADP, ESO smoke, and logging refreshed after old VM power-off; RHACS remained Ready |
+
+Vault egress policies continued to allow only R1 Vault CIDRs:
+
+```text
+30.30.200.35/32
+30.30.200.36/32
+30.30.200.37/32
+```
+
+## OADP Validation
+
+OADP remained healthy:
+
+| Cluster | DPA | BSL | Schedule | Last Backup |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | `15 2 * * *` | `platform-resource-daily-20260518021546` |
+| `spoke-dc-v7` | Reconciled | Available | `45 2 * * *` | `platform-resource-daily-20260518024523` |
+
+Latest normal scheduled backups were rechecked:
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | `platform-resource-daily-20260518021546` | Completed | `10169/10169` | 0 | 0 |
+| `spoke-dc-v7` | `platform-resource-daily-20260518024523` | Completed | `15844/15844` | 0 | 0 |
+
+These backups completed before the old VM power-off. The next checkpoint
+should observe or intentionally accelerate a new backup window while old Vault
+VMs remain off.
+
+## RHACS Validation
+
+- Hub Central remained deployed.
+- No non-running StackRox pods were found on hub or spoke.
+
+## Result
+
+The first cold-retention checkpoint passed.
+
+Replacement Vault R1 remained healthy, active OpenShift consumers remained
+healthy, and the old lost-custody Vault VMs stayed powered off with old disks
+retained.
+
+The next gate should validate a post-power-off OADP backup window before any
+final retention decision about old Vault VM disk images.

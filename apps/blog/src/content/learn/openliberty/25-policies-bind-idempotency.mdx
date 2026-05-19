@@ -1,0 +1,243 @@
+---
+title: "Policies, bind, and the visible Idempotency-Key"
+sidebar_label: "25 — Policies, bind & idempotency-key"
+description: "The auth-gated half of the customer portal: list policies, bind a quote, pay a premium with a server-generated Idempotency-Key surfaced in the UI. Surface the slice-6 Redlock and slice-7 DLQ patterns where students can see them. Slice 20 in the insurance-app repo."
+estimated_minutes: 60
+last_updated: 2026-05-17
+prereqs: ["24 — Quote wizard (progressive enhancement)"]
+---
+
+Quote was anonymous. Everything past quote is gated. This chapter wires
+the three pages that turn a quote into money: the policy list, the
+bind-confirmation page, the payment form. The teaching value is **not**
+the CRUD — it's the deliberate decision to put the `Idempotency-Key`
+in the UI so students can watch the slice-7 contract behave under
+double-submit and DLQ conditions.
+
+Companion commit: `bcc23f65` in `insurance-app`.
+
+## Two patterns for one chapter
+
+Most ORM-shaped UIs hide every interesting platform contract behind a
+button labeled "Pay." Behind the button is a hash someone hopes is
+unique enough; if the request times out, the user clicks Pay again and
+either gets a double-charge or a "request already in flight" error
+that doesn't survive page refresh. The slice-7 design avoided that
+class of bug. This chapter makes the mechanism *visible* — the form has
+a field labeled **Idempotency-Key** with a "Generate a fresh key"
+button.
+
+The second pattern is the **gated GET → POST** dance. A naive
+"GET /policies/bind?quoteId=42 binds the quote" route lets an attacker
+bind a policy via a CSRF link in an email. The right shape is:
+
+- `GET /policies/bind?quoteId=42` → require auth, render a confirm form.
+- `POST /policies/bind`                → re-check auth, perform the bind.
+
+State-changing operations belong on POST. Always.
+
+## Auth gate via `load()`
+
+A SvelteKit page can gate itself in two lines from `+page.server.ts`:
+
+```ts
+import { error, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import { libertyJson } from '$lib/server/liberty';
+
+export const load: PageServerLoad = async ({ url, locals }) => {
+  const quoteId = url.searchParams.get('quoteId');
+  if (!quoteId || Number.isNaN(parseInt(quoteId, 10))) {
+    throw error(400, 'Missing or invalid quoteId');
+  }
+  const session = await locals.auth();
+  if (!session?.user) {
+    throw redirect(302,
+      `/auth/signin/wso2is?callbackUrl=${encodeURIComponent(`/policies/bind?quoteId=${quoteId}`)}`);
+  }
+  return { quoteId: parseInt(quoteId, 10), user: session.user };
+};
+```
+
+The redirect target preserves the destination via `callbackUrl`, so the
+user comes back to the bind page after WSO2 IS sends them home. That
+single line is most of "real auth UX" for a server-rendered app — the
+rest is just polishing the messages.
+
+## The bind action
+
+`POST` action lives next to `load`:
+
+```ts
+export const actions: Actions = {
+  default: async ({ request, locals }) => {
+    const session = await locals.auth();
+    if (!session?.user) throw redirect(302, '/auth/signin/wso2is');
+
+    const data = await request.formData();
+    const quoteId = parseInt(String(data.get('quoteId') ?? ''), 10);
+    if (Number.isNaN(quoteId)) throw error(400, 'Invalid quoteId');
+
+    const policy = await libertyJson<Policy>('POST', '/api/policies', {
+      body: { quoteId },
+      userId:    session.user.id    ?? undefined,
+      userEmail: session.user.email ?? undefined,
+    });
+    throw redirect(303, `/policies/${policy.policyNumber}`);
+  },
+};
+```
+
+The auth check is duplicated on purpose — `load` runs before render,
+the action runs on submit, and a token-expiry between those two
+moments is a real failure mode. Throwing `redirect(303, ...)` to the
+new policy detail page is the **POST/Redirect/GET** pattern: a browser
+refresh on the destination page doesn't replay the bind.
+
+Underneath, Liberty's `PolicyService` does the actual bind with the
+slice-6 Redlock: only one of two simultaneous binds on the same
+`quoteId` succeeds; the other gets a 409. The BFF surfaces that as a
+standard SvelteKit error page.
+
+## Payment — generate the key server-side
+
+The teaching point of this whole chapter sits in twelve lines of
+TypeScript. The form's `load()` generates a fresh `Idempotency-Key` on
+each render and ships it down as a hidden field:
+
+```ts
+import { randomUUID } from 'node:crypto';
+
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const session = await locals.auth();
+  if (!session?.user) {
+    throw redirect(302, `/auth/signin/wso2is?callbackUrl=${encodeURIComponent(`/policies/${params.number}/pay`)}`);
+  }
+  return {
+    policyNumber: params.number,
+    idempotencyKey: randomUUID(),
+    user: session.user,
+  };
+};
+```
+
+Three things are deliberate:
+
+- **Server-side generation.** The browser doesn't pick the key; the
+  server does. A client-side key generator would let an adversary
+  control the key space and try to collide with an honest user's
+  retry.
+- **Per-render, not per-page.** Refresh the page, get a new key. The
+  same key only persists across the form-action retry cycle, which is
+  exactly what idempotency wants.
+- **Visible in the UI.** The hidden field is also rendered as
+  read-only text with a "Generate a fresh key" link that re-loads the
+  page. Students see the key, can copy it, can re-submit with the
+  same key, can verify the externalRef in the response.
+
+The form's POST action sends it as both a header and a body field:
+
+```ts
+const payment = await libertyJson<Payment>('POST', '/api/payments', {
+  headers: { 'Idempotency-Key': idempotencyKey },
+  body: { policyNumber: params.number, amount, currency },
+  userId:    session.user.id    ?? undefined,
+  userEmail: session.user.email ?? undefined,
+});
+```
+
+Header is what slice 7's PaymentResource keys off; the body keeps the
+key in the response so the UI can show "key xyz collapsed to
+externalRef abc" on success.
+
+## The amount=9999 demo
+
+Slice 7 wired a DLQ for "payment-gateway said no." amount=9999 is the
+deterministic failure trigger. The pay action's error branch surfaces
+that intentionally:
+
+```ts
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes('502')) {
+    return fail(502, {
+      values: { amount: amountStr, currency, idempotencyKey },
+      error: 'Payment gateway declined the charge. Retry with the same Idempotency-Key — you will NOT be double-charged.',
+    });
+  }
+  return fail(500, { values: { amount: amountStr, currency, idempotencyKey }, error: msg });
+}
+```
+
+Note the `fail(...)` call **keeps the same idempotencyKey** in the
+re-rendered form. Click Submit again: same key, same externalRef on
+Liberty's side, payment status stays FAILED. Open Kafka UI and the
+DLQ topic has the failed event. The "retry won't double-charge"
+promise stops being a slide and becomes a thing you can verify.
+
+## The policy list
+
+`/policies` is the lightest page in the chapter — it just GETs
+`/api/policies?limit=20` through the BFF and renders a table. The
+deliberate choice: **reads are public for the demo**. The
+`@RolesAllowed("policy-reader")` from chapter 11 stays on the POST
+side; the GET is wide-open so the list page works without a sign-in
+prompt. Real production would gate it; the demo wants browsability.
+
+```ts
+// /policies/+page.server.ts
+export const load: PageServerLoad = async () => {
+  const policies = await libertyJson<Policy[]>('GET', '/api/policies?limit=20');
+  return { policies };
+};
+```
+
+Status badges (BOUND vs DRAFT vs CANCELLED) get a tiny `statusClass()`
+helper for color mapping — the same one the account page reuses in
+[chapter 26](/learn/openliberty/claim-filing-bff).
+
+## Verify
+
+```bash
+# Anonymous list works
+curl -s http://localhost:3000/policies | grep -c "POL-"
+#   20 (or however many bound policies exist)
+
+# Anonymous bind is gated → 302 to login
+curl -sI -X POST http://localhost:3000/policies/bind \
+  -d "quoteId=42" | grep -i location
+#   location: /auth/signin/wso2is?callbackUrl=...
+
+# After signing in (cookie jar), pay form renders with a fresh key
+curl -s -b cookies.txt http://localhost:3000/policies/POL-AB12CD/pay \
+  | grep -o 'name="idempotencyKey" value="[0-9a-f-]*"'
+#   name="idempotencyKey" value="38a4..."
+
+# Same key, two submits → first 200, second 200 with same externalRef
+KEY=$(uuidgen)
+for i in 1 2; do
+  curl -s -b cookies.txt -X POST http://localhost:3000/policies/POL-AB12CD/pay \
+    -d "amount=99.95&currency=USD&idempotencyKey=$KEY"
+done
+# Both responses contain the same externalRef in form.payment.externalRef
+```
+
+The smoke script's section 20 codifies these checks as part of the
+suite — 6 new checks bring the total to 184/0.
+
+## What you have
+
+- The auth-gated half of the customer portal: list, bind, pay.
+- The GET→POST gate pattern for any state-changing operation, with
+  callback preservation so the UX survives the login bounce.
+- A visible `Idempotency-Key` field that makes the slice-7 contract
+  observable — copy-paste, retry, watch externalRef stay stable.
+- A working `amount=9999` DLQ demo that proves "retry is safe" rather
+  than asserting it.
+- The POST/Redirect/GET pattern in the bind flow so a refresh doesn't
+  re-bind.
+
+Slice 21 closes the customer's loop: file a claim. That involves
+multipart upload through the BFF, which is its own short story.
+
+Next: [26 — Claim filing through a BFF →](/learn/openliberty/claim-filing-bff)

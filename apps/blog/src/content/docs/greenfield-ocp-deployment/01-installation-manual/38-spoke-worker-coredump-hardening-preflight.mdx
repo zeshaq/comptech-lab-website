@@ -1,0 +1,199 @@
+---
+title: "Installation Manual - 38 Spoke worker coredump hardening preflight"
+sidebar_label: "38 Spoke worker coredump hardening preflight"
+description: "Why the next spoke-dc-v7 worker coredump MachineConfig control was selected but not applied during preflight."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the preflight for the next small worker MachineConfig
+hardening gate on `spoke-dc-v7`. The gate selected the next worker control but
+did not apply it, because worker-1 currently hosts the protected NooBaa DB
+primary and fails server-side drain validation.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-26`, issue `#376` |
+| Cluster | `spoke-dc-v7` |
+| Selected control | `rhcos4-high-worker-coredump-disable-storage` |
+| Intended pool | `worker` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-hardening-coredump-preflight.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Selected Control
+
+The selected next worker control is:
+
+```text
+rhcos4-high-worker-coredump-disable-storage
+```
+
+The generated Compliance Operator remediation writes:
+
+```text
+/etc/systemd/coredump.conf
+```
+
+with:
+
+```ini
+[Coredump]
+Storage=none
+ProcessSizeMax=0
+```
+
+This was chosen because it is a single worker-pool file change with a clear
+compliance source. It is smaller than the broad auditd, USBGuard, kernel
+argument, and sysctl batches.
+
+## GitOps State
+
+The active greenfield GitOps clone is:
+
+```text
+/home/ze/greenfield-ops/openshift-gitops
+```
+
+At preflight, it was clean at:
+
+```text
+89907515eef83cdf166e1dc2b73e6f6db0254b09
+```
+
+The existing node hardening files were:
+
+```text
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+clusters/spoke-dc-v7/node-hardening/machineconfig-master-etc-issue-banner.yaml
+clusters/spoke-dc-v7/node-hardening/machineconfig-worker-etc-issue-banner.yaml
+```
+
+No coredump hardening MachineConfig was present.
+
+## Preflight
+
+Validate GitOps, cluster, node, MCP, and storage health.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io hub-dc-v7-bootstrap spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa -o jsonpath='phase={.status.phase}{"\n"}available={.status.conditions[?(@.type=="Available")].status}{"\n"}degraded={.status.conditions[?(@.type=="Degraded")].status}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get storagecluster ocs-storagecluster -o jsonpath='phase={.status.phase}{"\n"}available={.status.conditions[?(@.type=="Available")].status}{"\n"}degraded={.status.conditions[?(@.type=="Degraded")].status}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cephcluster ocs-storagecluster-cephcluster -o jsonpath='phase={.status.phase}{"\n"}health={.status.ceph.health}{"\n"}'
+```
+
+Observed state:
+
+```text
+hub-dc-v7-bootstrap=Synced/Healthy
+spoke-dc-v7-cluster-config=Synced/Healthy
+OpenShift=4.20.18
+ClusterVersion=Available=True Progressing=False Failing=False
+Nodes=six Ready nodes, all schedulable
+ClusterOperators=no non-steady operators reported
+MCP master=Updated=True Updating=False Degraded=False
+MCP worker=Updated=True Updating=False Degraded=False
+NooBaa=Ready Available=True Degraded=False
+StorageCluster=Ready Available=True Degraded=False
+CephCluster=Ready HEALTH_OK
+```
+
+## NooBaa DB Placement
+
+Validate CNPG and pod placement.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster -o jsonpath='currentPrimary={.status.currentPrimary}{"\n"}targetPrimary={.status.targetPrimary}{"\n"}readyInstances={.status.readyInstances}{"\n"}phase={.status.phase}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -l cnpg.io/cluster=noobaa-db-pg-cluster \
+  -o custom-columns=POD:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,READY:.status.containerStatuses[0].ready,ROLE:.metadata.labels.role
+```
+
+Observed placement:
+
+```text
+currentPrimary=noobaa-db-pg-cluster-2
+targetPrimary=noobaa-db-pg-cluster-2
+readyInstances=2
+phase=Cluster in healthy state
+
+noobaa-db-pg-cluster-1  spoke-dc-v7-worker-0  Running  True  replica
+noobaa-db-pg-cluster-2  spoke-dc-v7-worker-1  Running  True  primary
+```
+
+## Worker Drainability
+
+Run server-side dry-run drain checks before any worker MachineConfig rollout.
+
+```bash
+for node in $(oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes \
+  -l node-role.kubernetes.io/worker= \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort); do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" adm drain "$node" \
+    --ignore-daemonsets --delete-emptydir-data --dry-run=server --timeout=90s
+done
+```
+
+Observed results:
+
+| Worker | Result | Reason |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | passed | hosts NooBaa DB replica |
+| `spoke-dc-v7-worker-1` | failed | hosts protected NooBaa DB primary |
+| `spoke-dc-v7-worker-2` | passed | no NooBaa DB primary |
+
+Worker-1 failed on:
+
+```text
+error when evicting pods/"noobaa-db-pg-cluster-2" -n "openshift-storage":
+Cannot evict pod as it would violate the pod's disruption budget.
+```
+
+## Decision
+
+The coredump control was selected but not applied.
+
+A worker MachineConfig change rolls the worker MCP across all worker nodes.
+Since worker-1 is not currently drainable, an unattended worker MCP rollout is
+likely to block when MCO reaches worker-1.
+
+## Next Step
+
+Before applying the selected control, run an approved supervised worker MCP
+rollout plan that handles NooBaa DB primary placement. The plan must either
+relocate the primary before MCO drains the current primary host, or introduce a
+durable ODF/NooBaa availability pattern that makes the worker pool repeatably
+drainable.
+
+Do not patch `PDB/noobaa-db-pg-cluster-primary` directly as the default fix.

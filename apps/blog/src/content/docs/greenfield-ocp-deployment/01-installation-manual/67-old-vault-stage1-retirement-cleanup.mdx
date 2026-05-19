@@ -1,0 +1,181 @@
+---
+title: "Installation Manual - 67 Old Vault stage 1 retirement cleanup"
+sidebar_label: "67 Old Vault stage 1 retirement cleanup"
+description: "First staged cleanup after replacement Vault R1 became the active OpenShift-facing Vault."
+---
+
+This chapter records the first staged retirement cleanup for the old
+lost-custody v7 Vault deployment.
+
+This gate removed old main Vault rollback affordances from OpenShift egress
+policy and DNS, but it did not stop VMs and did not delete disk images.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## GitOps Change
+
+GitOps commit:
+
+```text
+3ee5e95 Remove old Vault egress CIDRs
+```
+
+Changed files:
+
+- `clusters/hub-dc-v7/secrets/eso/networkpolicy-vault-egress.yaml`
+- `clusters/spoke-dc-v7/secrets/eso/networkpolicy-vault-egress.yaml`
+
+Removed old main Vault CIDRs from both External Secrets egress policies:
+
+- `30.30.200.31/32`
+- `30.30.200.32/32`
+- `30.30.200.33/32`
+
+Kept replacement Vault R1 CIDRs:
+
+- `30.30.200.35/32`
+- `30.30.200.36/32`
+- `30.30.200.37/32`
+
+Validation:
+
+- local `oc kustomize` render passed for hub and spoke;
+- rendered manifests contained only the R1 Vault CIDRs for
+  `allow-egress-to-vault-vms`;
+- `git diff --check` passed;
+- server-side dry-run accepted both rendered overlays.
+
+The server-side dry-run emitted the existing LVMS warning about an unspecified
+`vg1` device selector path. That warning is unrelated to the Vault egress
+policy change.
+
+## Argo Reconciliation
+
+The bootstrap GitOps clone was fast-forwarded and Argo CD was hard-refreshed.
+
+Final Argo CD state:
+
+| Cluster context | Application | Sync | Health | Revision |
+| --- | --- | --- | --- | --- |
+| hub | `hub-dc-v7-bootstrap` | Synced | Healthy | `3ee5e95a17bb6c31f611044508c9639d5838c353` |
+| hub | `spoke-dc-v7-cluster-config` | Synced | Healthy | `3ee5e95a17bb6c31f611044508c9639d5838c353` |
+| spoke | `spoke-dc-v7-cluster-config` | Synced | Healthy | `3ee5e95a17bb6c31f611044508c9639d5838c353` |
+
+Live NetworkPolicy state on both clusters:
+
+```text
+external-secrets/allow-egress-to-vault-vms -> 30.30.200.35/32,30.30.200.36/32,30.30.200.37/32
+```
+
+## DNS Cleanup
+
+PowerDNS host:
+
+- `gf-ocp-pdns-01`
+- SSH endpoint used: `ze@59.153.29.101`
+
+Removed old main node A records:
+
+| Name | Result |
+| --- | --- |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | no A record |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | no A record |
+
+Preserved old seed and stable R1 DNS:
+
+| Name | Result |
+| --- | --- |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+
+PowerDNS zone serial after the change:
+
+```text
+44
+```
+
+## OpenShift Consumer Validation
+
+Both clusters remained on OpenShift `4.20.18` with all nodes Ready and no
+cluster-operator exceptions.
+
+External Secrets:
+
+| Cluster | Total ExternalSecrets | Ready ExternalSecrets |
+| --- | ---: | ---: |
+| `hub-dc-v7` | 6 | 6 |
+| `spoke-dc-v7` | 6 | 6 |
+
+Ready ClusterSecretStores on both clusters:
+
+- `vault-r1-eso-smoke`
+- `vault-r1-oadp`
+- `vault-r1-rhacs`
+
+`ClusterSecretStore/vault-platform` remained absent on both clusters.
+
+OADP:
+
+| Cluster | DPA | BSL | Schedule | Latest validated backups |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | `15 2 * * *` | `platform-resource-daily-20260518003309` completed `10403/10403` |
+| `spoke-dc-v7` | Reconciled | Available | `45 2 * * *` | `platform-resource-daily-20260518003423` completed `15863/15863` |
+
+RHACS:
+
+- hub Central is Available;
+- StackRox pods were Running on hub and spoke;
+- existing scanner-v4 indexer/matcher restart counts were historical and did
+  not change this gate's outcome.
+
+Vault R1 health:
+
+| Endpoint | Health HTTP code |
+| --- | ---: |
+| `30.30.200.35:8200` | 200 |
+| `30.30.200.36:8200` | 200 |
+| `30.30.200.37:8200` | 200 |
+
+## Old Vault Preservation
+
+All old and replacement Vault VMs remained running on `dl385-2`.
+
+| VM | State |
+| --- | --- |
+| `gf-ocp-vault-seed-01` | running |
+| `gf-ocp-vault-01` | running |
+| `gf-ocp-vault-02` | running |
+| `gf-ocp-vault-03` | running |
+| `gf-ocp-vault-r1-seed-01` | running |
+| `gf-ocp-vault-r1-01` | running |
+| `gf-ocp-vault-r1-02` | running |
+| `gf-ocp-vault-r1-03` | running |
+
+Direct old Vault health checks still returned HTTP `200` for:
+
+- `30.30.200.30`
+- `30.30.200.31`
+- `30.30.200.32`
+- `30.30.200.33`
+
+Old VM disk images were not deleted.
+
+## Result
+
+Stage 1 retirement cleanup passed.
+
+OpenShift consumers now have no DNS or egress dependency on the old main Vault
+nodes. The old seed DNS record, old VMs, and old disk images remain preserved
+for rollback and forensic retention.
+
+The next gate should be a post-stage-1 soak through the next scheduled OADP
+backup window. Only after that passes should a separate gate consider powering
+off old Vault VMs. Disk deletion remains a final explicit retention decision.

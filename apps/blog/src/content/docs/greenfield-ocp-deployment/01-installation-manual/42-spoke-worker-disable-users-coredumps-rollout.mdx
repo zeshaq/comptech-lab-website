@@ -1,0 +1,323 @@
+---
+title: "Installation Manual - 42 Spoke worker disable users coredumps rollout"
+sidebar_label: "42 Spoke worker disable users coredumps rollout"
+description: "How the spoke-dc-v7 worker user-coredump limits MachineConfig was applied through GitOps and validated."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the rollout of the selected
+`rhcos4-high-worker-disable-users-coredumps` control on `spoke-dc-v7`.
+
+The rollout applied a worker MachineConfig through GitOps and validated this
+file on every worker:
+
+```text
+/etc/security/limits.d/75-disable_users_coredumps.conf
+*     hard   core    0
+```
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-29`, issue `#379` |
+| Cluster | `spoke-dc-v7` |
+| Control | `rhcos4-high-worker-disable-users-coredumps` |
+| MachineConfig | `75-worker-disable-users-coredumps` |
+| GitOps commit | `4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb` |
+| Final worker render | `rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-disable-users-coredumps-rollout.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## GitOps Change
+
+The active GitOps repository is:
+
+```text
+git@github.com:zeshaq/openshift-platform-gitops.git
+```
+
+Commit applied:
+
+```text
+4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb Add spoke worker user coredump hardening
+```
+
+Files changed:
+
+```text
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+clusters/spoke-dc-v7/node-hardening/machineconfig-worker-disable-users-coredumps.yaml
+```
+
+The new MachineConfig writes:
+
+```text
+/etc/security/limits.d/75-disable_users_coredumps.conf
+```
+
+with:
+
+```text
+*     hard   core    0
+```
+
+## Pre-Apply Checks
+
+Validate cluster, MCP, and storage health before applying the worker pool
+change.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io hub-dc-v7-bootstrap spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} primary={.status.currentPrimary}{"\n"}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -l cnpg.io/cluster=noobaa-db-pg-cluster -o wide
+```
+
+Observed:
+
+```text
+hub-dc-v7-bootstrap Synced/Healthy at 8175ed896909906e8317a6c1f9514c4ce4bf942a
+spoke-dc-v7-cluster-config Synced/Healthy at 8175ed896909906e8317a6c1f9514c4ce4bf942a
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP Updated=True Updating=False Degraded=False
+worker MCP Updated=True Updating=False Degraded=False
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 primary=noobaa-db-pg-cluster-2
+```
+
+Pre-apply NooBaa DB placement:
+
+```text
+noobaa-db-pg-cluster-1 replica on spoke-dc-v7-worker-1
+noobaa-db-pg-cluster-2 primary on spoke-dc-v7-worker-2
+```
+
+Worker-2 was not drainable because it hosted the protected NooBaa DB primary.
+
+## Server-Side Dry Run
+
+Before pushing GitOps, dry-run the full node-hardening kustomization from the
+bootstrap VM.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" apply --dry-run=server \
+  -k /tmp/op-gf-spokedcv7-29-gitops/clusters/spoke-dc-v7/node-hardening
+```
+
+Observed for the new MachineConfig:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-disable-users-coredumps created (server dry run)
+```
+
+Existing MachineConfigs dry-ran as `configured`; `oc apply` warned that they
+lack `last-applied-configuration` annotations, but this was server-side
+dry-run only.
+
+## Apply Through Argo
+
+After pushing the GitOps commit, refresh the spoke cluster-config
+application.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate applications.argoproj.io spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Validate convergence:
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+```
+
+Observed final state:
+
+```text
+spoke-dc-v7-cluster-config  Synced  Healthy  4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+```
+
+## Worker MCP Watch
+
+Watch the worker MCP and worker node annotations.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes \
+  -l node-role.kubernetes.io/worker -o json \
+  | jq -r '.items[] |
+    [.metadata.name,
+     (.spec.unschedulable // false),
+     (.metadata.annotations["machineconfiguration.openshift.io/state"] // ""),
+     (.metadata.annotations["machineconfiguration.openshift.io/currentConfig"] // ""),
+     (.metadata.annotations["machineconfiguration.openshift.io/desiredConfig"] // "")]
+    | @tsv'
+```
+
+Observed rollout order:
+
+1. `spoke-dc-v7-worker-2`
+2. `spoke-dc-v7-worker-1`
+3. `spoke-dc-v7-worker-0`
+
+Final MCP state:
+
+```text
+worker rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+```
+
+## NooBaa Primary Handling
+
+CNPG moved the NooBaa DB primary away from updating workers:
+
+| Worker update | Primary movement |
+| --- | --- |
+| worker-2 | `noobaa-db-pg-cluster-2` on worker-2 to `noobaa-db-pg-cluster-1` on worker-1 |
+| worker-1 | `noobaa-db-pg-cluster-1` on worker-1 to `noobaa-db-pg-cluster-2` on worker-0 |
+| worker-0 | `noobaa-db-pg-cluster-2` on worker-0 to `noobaa-db-pg-cluster-1` on worker-2 |
+
+The supervisor invoked the ODF-bundled CNPG plugin once during the worker-1
+transition:
+
+```bash
+KUBECONFIG="$SPOKE_KUBECONFIG" /tmp/kubectl-cnpg-noobaa \
+  promote noobaa-db-pg-cluster noobaa-db-pg-cluster-2 \
+  -n openshift-storage --request-timeout=60s
+```
+
+The plugin reported:
+
+```text
+noobaa-db-pg-cluster-2 is already the primary node in the cluster
+```
+
+No direct patch was made to `PDB/noobaa-db-pg-cluster-primary`.
+
+## Final Validation
+
+Validate the rendered worker MachineConfig contains the limits file.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r '{has_limits:any(.spec.config.storage.files[]?; .path == "/etc/security/limits.d/75-disable_users_coredumps.conf")}'
+```
+
+Expected:
+
+```text
+has_limits=true
+```
+
+Validate the host file on every worker.
+
+```bash
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" debug "node/$node" --quiet -- \
+    chroot /host sh -c \
+    "cat /etc/security/limits.d/75-disable_users_coredumps.conf"
+done
+```
+
+Observed on all three workers:
+
+```text
+*     hard   core    0
+```
+
+Validate cluster and storage health:
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+```
+
+Observed final state:
+
+```text
+all six nodes Ready
+no non-steady ClusterOperators reported
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 primary=noobaa-db-pg-cluster-1
+```
+
+Ceph briefly reported `HEALTH_WARN` immediately after MCP completion and
+returned to `HEALTH_OK` by `2026-05-17T15:07:29Z`.
+
+Final NooBaa DB placement:
+
+```text
+noobaa-db-pg-cluster-1 primary on spoke-dc-v7-worker-2
+noobaa-db-pg-cluster-2 replica on spoke-dc-v7-worker-1
+```
+
+## Post-Rollout Drainability
+
+Server-side dry-run drain results after rollout:
+
+| Worker | Result | Notes |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-1` | pass | hosts NooBaa DB replica |
+| `spoke-dc-v7-worker-2` | fail | hosts protected NooBaa DB primary |
+
+Worker-2 failed on:
+
+```text
+error when evicting pods/"noobaa-db-pg-cluster-1" -n "openshift-storage": global timeout reached: 20s
+```
+
+## Compliance Evidence
+
+The Compliance Operator result is still stale because this chapter did not run
+a rescan.
+
+```text
+rhcos4-high-worker-disable-users-coredumps FAIL
+lastScan=2026-05-17T14:08:14Z
+```
+
+The next tracked gate should rescan `ComplianceScan/rhcos4-high-worker` and
+confirm the target rule becomes `PASS`.

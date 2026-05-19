@@ -1,0 +1,113 @@
+---
+title: "Installation Manual - 65 OADP post-cleanup scheduled backup validation"
+sidebar_label: "65 OADP post-cleanup scheduled backup validation"
+description: "Temporary schedule acceleration and validation after Vault platform store cleanup."
+---
+
+This chapter records the post-cleanup OADP backup validation that followed
+removal of the unused `vault-platform` ClusterSecretStore.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Reason
+
+After the unused `vault-platform` store was pruned, Argo CD returned to
+`Synced/Healthy`. The next validation gate was to prove that scheduled OADP
+backups still run through the replacement Vault R1 credential path and MinIO
+object store.
+
+The schedules were temporarily accelerated through GitOps, observed, and then
+restored to their normal daily values.
+
+## Temporary Schedule Acceleration
+
+Temporary GitOps commit:
+
+```text
+7a5b0c0 Temporarily accelerate OADP schedules
+```
+
+Temporary cron values:
+
+| Cluster | Temporary cron |
+| --- | --- |
+| `hub-dc-v7` | `33 0 * * *` |
+| `spoke-dc-v7` | `34 0 * * *` |
+
+Validation before reconcile:
+
+- hub and spoke overlays rendered locally;
+- server-side dry-run accepted both overlays;
+- bootstrap clone was fast-forwarded;
+- Argo CD was hard-refreshed.
+
+Argo converged at the temporary revision and both schedules fired:
+
+| Cluster | Backup | Last backup |
+| --- | --- | --- |
+| `hub-dc-v7` | `platform-resource-daily-20260518003309` | `2026-05-18T00:33:09Z` |
+| `spoke-dc-v7` | `platform-resource-daily-20260518003423` | `2026-05-18T00:34:23Z` |
+
+## Backup Results
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `platform-resource-daily-20260518003309` | Completed | `10403/10403` | none | none |
+| `spoke-dc-v7` | `platform-resource-daily-20260518003423` | Completed | `15863/15863` | none | none |
+
+## MinIO Validation
+
+Object validation used the stored OADP backup user credential on `dl385-2`
+without printing credential values.
+
+| Cluster | Prefix | Objects |
+| --- | --- | ---: |
+| `hub-dc-v7` | `hub-dc-v7/general/backups/platform-resource-daily-20260518003309` | `12` |
+| `spoke-dc-v7` | `spoke-dc-v7/general/backups/platform-resource-daily-20260518003423` | `12` |
+
+## Schedule Restoration
+
+Normal schedules were restored immediately after validation.
+
+Restore GitOps commit:
+
+```text
+f742b63 Restore OADP daily schedules
+```
+
+Restored cron values:
+
+| Cluster | Restored cron | Last backup |
+| --- | --- | --- |
+| `hub-dc-v7` | `15 2 * * *` | `2026-05-18T00:33:09Z` |
+| `spoke-dc-v7` | `45 2 * * *` | `2026-05-18T00:34:23Z` |
+
+Final Argo state:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `f742b63` |
+| hub-side `spoke-dc-v7-cluster-config` | Synced | Healthy | `f742b63` |
+| spoke-local `spoke-dc-v7-cluster-config` | Synced | Healthy | `f742b63` |
+
+Final OADP state:
+
+- hub and spoke `DataProtectionApplication` resources are Reconciled.
+- hub and spoke `BackupStorageLocation` resources are Available.
+- both accelerated scheduled backups remain Completed with no warnings or
+  errors.
+- no Vault secret, policy, role, token, DNS record, or old Vault VM was
+  changed.
+
+## Next Step
+
+Start an old Vault retirement readiness gate. That gate should inventory old
+node-specific DNS records, old Vault VM state, rollback requirements, and the
+minimum retention window before decommissioning anything.

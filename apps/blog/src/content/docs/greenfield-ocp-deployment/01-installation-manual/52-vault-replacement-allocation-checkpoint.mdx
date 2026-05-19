@@ -1,0 +1,88 @@
+---
+title: "Installation Manual - 52 Vault replacement allocation checkpoint"
+sidebar_label: "52 Vault replacement allocation"
+description: "Replacement host, IP, and checkpoint allocation for the single-phase v7 Vault replacement."
+---
+
+This chapter records the next checkpoint in the single-phase replacement of
+the lost-custody greenfield v7 Vault.
+
+No live service was changed in this checkpoint. The allocation below is a
+documented reservation for the replacement build gate.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Current Vault Allocation
+
+| Existing name | IP | Role |
+| --- | --- | --- |
+| `gf-ocp-vault-seed-01` | `30.30.200.30` | Seed/transit Vault |
+| `gf-ocp-vault-01` | `30.30.200.31` | Main Vault Raft voter |
+| `gf-ocp-vault-02` | `30.30.200.32` | Main Vault Raft voter |
+| `gf-ocp-vault-03` | `30.30.200.33` | Main Vault Raft voter |
+| `vault.v7.comptech-lab.com` | `.31`, `.32`, `.33` | Current client endpoint |
+
+The current endpoint remains read-only legacy for the recovery effort. Do not
+repoint it during replacement buildout.
+
+## Replacement Allocation
+
+Reserved for the replacement Vault:
+
+| Replacement name | IP | MAC | Role |
+| --- | --- | --- | --- |
+| `gf-ocp-vault-r1-seed-01` | `30.30.200.34` | `52:54:00:70:08:34` | Seed/transit Vault |
+| `gf-ocp-vault-r1-01` | `30.30.200.35` | `52:54:00:70:08:35` | Main Vault Raft voter |
+| `gf-ocp-vault-r1-02` | `30.30.200.36` | `52:54:00:70:08:36` | Main Vault Raft voter |
+| `gf-ocp-vault-r1-03` | `30.30.200.37` | `52:54:00:70:08:37` | Main Vault Raft voter |
+| `vault-r1.v7.comptech-lab.com` | `.35`, `.36`, `.37` | n/a | Temporary replacement endpoint |
+
+`r1` means replacement wave 1. The temporary endpoint is for validation. The
+stable endpoint remains `vault.v7.comptech-lab.com` and must not be promoted
+until custody, policies, and consumers validate.
+
+## Collision Checks Performed
+
+Read-only checks from `dl385-2` found:
+
+- no replacement VM names in libvirt;
+- no replacement MACs in libvirt interface inventory;
+- no DNS records for the replacement names or temporary endpoint;
+- no ping replies from `30.30.200.34-.37`;
+- no change to the existing `vault.v7.comptech-lab.com` records.
+
+These checks are not permanent IPAM. Re-run them immediately before creating
+the replacement VMs.
+
+## Build Gates
+
+Continue under the same issue and ADR:
+
+1. Re-run allocation preflight.
+2. Create replacement VMs at the reserved names and IPs.
+3. Create redundant custody before seeding secrets.
+4. Initialize seed Vault and main Vault without printing recovery material.
+5. Prove Raft, auto-unseal, audit, and KV v2.
+6. Configure the dedicated OADP Vault policy, role, and store first.
+7. Rotate or recreate the MinIO `oadp-backup` credential.
+8. Restore or identify the v7 kubeconfig custody path on the bootstrap VM.
+9. Validate OADP ESO readiness before re-applying DPA resources.
+10. Migrate remaining ESO consumers one class at a time.
+11. Promote DNS only after validation.
+12. Retire the locked Vault after dependency checks and a rollback window.
+
+## Actions Not Taken
+
+- No replacement VM was created.
+- No DNS record was created or changed.
+- No current Vault policy, auth role, token, or service was changed.
+- No OpenShift, MinIO, or GitOps desired state was changed.
+- No secret value, kubeconfig, token, recovery share, or MinIO credential was
+  read or printed.

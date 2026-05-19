@@ -1,0 +1,206 @@
+---
+title: "Installation Manual - 93 Disconnected catalog hygiene"
+sidebar_label: "93 Disconnected catalog hygiene"
+description: "Disable default external operator catalogs and pin greenfield v7 operator resolution to mirrored sources."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-02` catalog hygiene gate for the
+greenfield v7 clusters.
+
+The gate changed catalog desired state through GitOps. It did not install a
+new operator.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-02` / `#414` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-01` / `#413` |
+
+## Intent
+
+The previous readiness gate found that future operators could still resolve
+through default external catalog names. This gate made catalog resolution
+mirror-only and deterministic before starting Gatekeeper planning.
+
+## Access Path
+
+Live checks and GitOps refreshes used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+Kubeconfigs on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## GitOps Commits
+
+Platform GitOps commits:
+
+```text
+495d41a Harden v7 operator catalog sources
+b384be3 Allow spoke Argo to manage ClusterCatalogs
+11e76f4 Order catalog sync after spoke RBAC
+```
+
+Final live Argo revision:
+
+```text
+11e76f466ddcccee78e6ea59f06c55ad775b3c25
+```
+
+## Desired-state Changes
+
+Both clusters now declare:
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: OperatorHub
+metadata:
+  name: cluster
+spec:
+  disableAllDefaultSources: true
+```
+
+Both clusters set the built-in external OLM v1 catalogs to unavailable:
+
+```text
+openshift-redhat-operators
+openshift-certified-operators
+openshift-redhat-marketplace
+openshift-community-operators
+```
+
+Spoke was aligned with hub by adding:
+
+```text
+cs-redhat-operator-index-v4-20
+cs-certified-operator-index-v4-20
+cc-redhat-operator-index-v4-20
+cc-certified-operator-index-v4-20
+```
+
+The spoke GitOps controller also received a narrow permission extension for
+`olm.operatorframework.io/clustercatalogs`, and catalog resources were moved
+to Argo sync wave `1` so RBAC lands before catalog reconciliation.
+
+## Validation
+
+Render and dry-run validation passed:
+
+```text
+oc kustomize clusters/hub-dc-v7
+oc kustomize clusters/spoke-dc-v7
+oc apply --dry-run=server
+```
+
+The server-side dry-runs reported existing last-applied-configuration warnings
+for already-live resources. The new catalog and RBAC resources validated.
+
+## Argo State
+
+Final Argo state:
+
+| Application | State |
+| --- | --- |
+| hub `hub-dc-v7-bootstrap` | `Synced/Healthy` |
+| hub `spoke-dc-v7-cluster-config` | `Synced/Healthy` |
+| spoke `spoke-dc-v7-cluster-config` | `Synced/Healthy` |
+
+All three were at:
+
+```text
+11e76f466ddcccee78e6ea59f06c55ad775b3c25
+```
+
+## Final Catalog State
+
+Both clusters report default sources disabled:
+
+```text
+certified-operators disabled=true
+community-operators disabled=true
+redhat-marketplace disabled=true
+redhat-operators disabled=true
+```
+
+Only mirrored classic CatalogSources remained in the checked set:
+
+| CatalogSource | State |
+| --- | --- |
+| `cs-redhat-operator-index-v4-20` | `READY` |
+| `cs-certified-operator-index-v4-20` | `READY` |
+
+OLM v1 catalog state:
+
+| ClusterCatalog | State |
+| --- | --- |
+| `cc-redhat-operator-index-v4-20` | `Serving=True`, mirrored Quay |
+| `cc-certified-operator-index-v4-20` | `Serving=True`, mirrored Quay |
+| `openshift-redhat-operators` | `Serving=False`, `Unavailable` |
+| `openshift-certified-operators` | `Serving=False`, `Unavailable` |
+| `openshift-redhat-marketplace` | `Serving=False`, `Unavailable` |
+| `openshift-community-operators` | `Serving=False`, `Unavailable` |
+
+## Health
+
+Cluster health stayed steady after reconciliation:
+
+| Check | `hub-dc-v7` | `spoke-dc-v7` |
+| --- | --- | --- |
+| OpenShift | `4.20.18` | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready | `6/6` Ready |
+| ClusterOperators | steady | steady |
+| Non-running pods | none | none |
+| Pending CSRs | none | none |
+| Subscriptions | `AtLatestKnown` | `AtLatestKnown` |
+| Non-complete InstallPlans | none | none |
+
+OADP, External Secrets stores, RHACS, logging/Loki, and spoke
+ODF/Ceph/NooBaa remained healthy.
+
+## Package-source Check
+
+The checked candidate packages now resolve to the mirrored Red Hat classic
+source on both clusters:
+
+```text
+cs-redhat-operator-index-v4-20/openshift-marketplace
+```
+
+Checked packages:
+
+```text
+gatekeeper-operator-product
+netobserv-operator
+tempo-product
+opentelemetry-product
+openshift-pipelines-operator-rh
+cluster-kube-descheduler-operator
+quay-operator
+rhods-operator
+```
+
+## Result
+
+Catalog hygiene is complete for the current phase.
+
+The next gate is:
+
+```text
+OP-GF-OPERATORS-03: Gatekeeper preflight and dry-run-only install design
+```
+
+Do not install Gatekeeper directly without that preflight. Gatekeeper affects
+admission, so the next step should validate channels, dependencies, dry-run
+manifests, and rollback posture first.

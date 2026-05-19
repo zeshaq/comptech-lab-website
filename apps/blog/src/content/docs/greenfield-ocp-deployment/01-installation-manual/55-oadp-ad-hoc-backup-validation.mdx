@@ -1,0 +1,115 @@
+---
+title: "Installation Manual - 55 OADP ad hoc backup validation"
+sidebar_label: "55 OADP ad hoc backup"
+description: "Hub and spoke ad hoc OADP backup validation against replacement Vault R1 and MinIO."
+---
+
+This chapter records the first no-schedule OADP backup validation after the
+replacement Vault R1 credential and DPA gate.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+Both clusters were steady before creating test resources:
+
+| Cluster | OpenShift | Store | ExternalSecret | DPA | BSL | Velero |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | Ready | Ready | Reconciled | Available | `1/1` |
+| `spoke-dc-v7` | `4.20.18` | Ready | Ready | Reconciled | Available | `1/1` |
+
+No `Backup`, `Restore`, `Schedule`, or `VolumeSnapshotLocation` objects existed
+in `openshift-adp` before the gate.
+
+## Test Backup
+
+Created one temporary namespace on each cluster:
+
+```text
+codex-oadp-verify-20260517210513
+```
+
+Created one ad hoc Velero Backup per cluster:
+
+```text
+hub-dc-v7:   codex-oadp-r1-hub-20260517210513
+spoke-dc-v7: codex-oadp-r1-spoke-20260517210513
+```
+
+The backups included only the temporary namespace, used the existing
+cluster-specific `BackupStorageLocation`, set `snapshotVolumes: false`, and
+did not create any schedules.
+
+## Results
+
+| Cluster | Backup phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Completed | `16/16` | none | none |
+| `spoke-dc-v7` | Completed | `18/18` | none | none |
+
+MinIO object creation was validated:
+
+```text
+hub-dc-v7   11 objects under hub-dc-v7/general/backups/codex-oadp-r1-hub-20260517210513/
+spoke-dc-v7 11 objects under spoke-dc-v7/general/backups/codex-oadp-r1-spoke-20260517210513/
+```
+
+Credential values were not printed.
+
+## Cleanup
+
+Deleted the Backup CRs and temporary namespaces.
+
+The hub Backup CR re-synced once from object storage before object cleanup was
+complete. The exact test backup prefixes were then removed from MinIO, and the
+re-synced hub Backup CR was deleted again.
+
+Final cleanup state:
+
+```text
+hub-dc-v7   no Backup, Restore, Schedule, or DeleteBackupRequest objects
+spoke-dc-v7 no Backup, Restore, Schedule, or DeleteBackupRequest objects
+hub-dc-v7   matching MinIO objects: 0
+spoke-dc-v7 matching MinIO objects: 0
+```
+
+Final OADP state:
+
+| Cluster | BSL | Velero |
+| --- | --- | --- |
+| `hub-dc-v7` | Available | `1/1` |
+| `spoke-dc-v7` | Available | `1/1` |
+
+## Operational Note
+
+Use fully qualified Velero resource names on spoke:
+
+```text
+backups.velero.io
+restores.velero.io
+schedules.velero.io
+deletebackuprequests.velero.io
+```
+
+The short name `backup` is ambiguous on spoke because another Backup CRD is
+installed there.
+
+## Actions Not Taken
+
+- No OADP Schedule objects were created.
+- No Restore objects were created.
+- No stable Vault DNS cutover was made.
+- No old Vault mutation was made.
+- No secret values were printed.
+
+## Next Action
+
+Run a governed OADP schedule enablement gate with conservative retention, then
+follow with a restore validation drill.

@@ -1,0 +1,148 @@
+---
+title: "Installation Manual - 62 Vault stable DNS promotion"
+sidebar_label: "62 Vault DNS promotion"
+description: "Promotion of vault.v7.comptech-lab.com from the old locked Vault to replacement Vault R1."
+---
+
+This chapter records the stable Vault DNS promotion from the old locked v7
+Vault to replacement Vault R1. It followed the readiness gate and used the HA
+path: first widen ExternalSecrets egress to all R1 main nodes, then promote
+the stable DNS record.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## GitOps Egress Change
+
+GitOps commit:
+
+```text
+a3839f6 Allow Vault R1 standby egress
+```
+
+The commit updated:
+
+- `clusters/hub-dc-v7/secrets/eso/networkpolicy-vault-egress.yaml`
+- `clusters/spoke-dc-v7/secrets/eso/networkpolicy-vault-egress.yaml`
+
+The egress policy now allows all old Vault IPs and all R1 main-node IPs:
+
+| IP | Purpose |
+| --- | --- |
+| `30.30.200.31/32` | old Vault node |
+| `30.30.200.32/32` | old Vault node |
+| `30.30.200.33/32` | old Vault node |
+| `30.30.200.35/32` | R1 main node |
+| `30.30.200.36/32` | R1 main node |
+| `30.30.200.37/32` | R1 main node |
+
+Both overlays rendered locally. Server-side dry-run validation accepted both
+rendered overlays with `--force-conflicts`. The initial non-forced dry-run
+showed expected Argo field-manager ownership conflicts; no live state was
+changed by dry-run validation.
+
+Argo CD converged:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `a3839f6` |
+| hub-side `spoke-dc-v7-cluster-config` | Synced | Healthy | `a3839f6` |
+| spoke-local `spoke-dc-v7-cluster-config` | Synced | Healthy | `a3839f6` |
+
+## DNS Change
+
+PowerDNS host:
+
+```text
+pdns.v7.comptech-lab.com / gf-ocp-pdns-01
+```
+
+Before:
+
+```text
+vault.v7.comptech-lab.com -> 30.30.200.31, 30.30.200.32, 30.30.200.33
+```
+
+Change applied:
+
+```text
+pdnsutil replace-rrset v7.comptech-lab.com vault A 300 30.30.200.35 30.30.200.36 30.30.200.37
+pdnsutil increase-serial v7.comptech-lab.com
+rec_control wipe-cache vault.v7.comptech-lab.com
+```
+
+After:
+
+```text
+vault.v7.comptech-lab.com -> 30.30.200.35, 30.30.200.36, 30.30.200.37
+```
+
+The zone serial was set to `43`.
+
+Old node-specific records were left in place for explicit rollback or
+forensic access. No `vault-r1.v7.comptech-lab.com` record was created in this
+gate.
+
+## Validation
+
+DNS resolution returned the R1 IPs from:
+
+- `dl385-2`
+- direct query to PowerDNS `30.30.200.53`
+- `gf-ocp-bootstrap-01`
+- hub ESO controller pod
+- spoke ESO controller pod
+
+Stable DNS Vault health checks reached replacement Vault R1. Responses
+included active and standby nodes, all initialized and unsealed.
+
+Final cluster state:
+
+| Cluster | OpenShift | ClusterOperators | Nodes | Argo |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | `Synced/Healthy` at `a3839f6` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | `Synced/Healthy` at `a3839f6` |
+
+Live stores:
+
+| Cluster | Store | Status |
+| --- | --- | --- |
+| `hub-dc-v7` | `vault-platform` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-eso-smoke` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-oadp` | `True/Valid` |
+| `hub-dc-v7` | `vault-r1-rhacs` | `True/Valid` |
+| `spoke-dc-v7` | `vault-platform` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-eso-smoke` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-oadp` | `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-rhacs` | `True/Valid` |
+| `spoke-dc-v7` | `logging-local` | `True/Valid` |
+
+All active ExternalSecrets were Ready / `SecretSynced`.
+
+OADP remained healthy:
+
+| Cluster | DPA | BSL | Schedule |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | Enabled |
+| `spoke-dc-v7` | Reconciled | Available | Enabled |
+
+StackRox pods remained acceptable: hub `18/18`, spoke `16/16`.
+
+## Actions Not Taken
+
+- No Vault secret, policy, auth role, or token was changed.
+- No old Vault VM was stopped or modified.
+- No `vault-r1.v7.comptech-lab.com` record was created.
+- No secret values were printed.
+
+## Next Action
+
+Run a post-promotion soak and cleanup planning gate. Do not decommission the
+old Vault VMs until another validation window confirms no consumer falls back
+to the old node-specific records.

@@ -1,0 +1,113 @@
+---
+title: "Installation Manual - 56 OADP schedule enablement"
+sidebar_label: "56 OADP schedules"
+description: "Conservative hub and spoke OADP schedule enablement after ad hoc backup validation."
+---
+
+This chapter records conservative OADP schedule enablement after the
+replacement Vault R1 DPA and ad hoc backup gates passed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+Both clusters were steady before the schedule change:
+
+| Cluster | OpenShift | ClusterOperators | BSL | Velero | Existing scheduled objects |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | Available | `1/1` | none |
+| `spoke-dc-v7` | `4.20.18` | steady | Available | `1/1` | none |
+
+## Schedule Policy
+
+Created one resource-only Velero Schedule per cluster:
+
+```text
+platform-resource-daily
+```
+
+| Cluster | Cron | StorageLocation | TTL | Snapshots | FS backup |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `15 2 * * *` | `hub-dc-v7` | `168h0m0s` | disabled | disabled |
+| `spoke-dc-v7` | `45 2 * * *` | `spoke-dc-v7` | `168h0m0s` | disabled | disabled |
+
+The schedules include all namespaces as Kubernetes resources only. Volume
+snapshots and filesystem backup are disabled for this first recurring gate.
+
+## GitOps
+
+GitOps commits:
+
+```text
+aa2c0dc Add v7 OADP resource backup schedules
+acdac33 Allow spoke Argo CD to manage OADP schedules
+```
+
+The second commit grants the spoke Argo controller the minimum additional
+permission needed for `velero.io/schedules`.
+
+## Validation
+
+Render and admission checks passed:
+
+- hub render included one `Schedule`;
+- spoke render included one `Schedule`;
+- server dry-run admission passed for both overlays.
+
+Argo CD reached:
+
+```text
+hub-dc-v7-bootstrap          Synced/Healthy @ acdac33
+spoke-dc-v7-cluster-config   Synced/Healthy @ acdac33 on hub
+spoke-dc-v7-cluster-config   Synced/Healthy @ acdac33 on spoke
+```
+
+Live schedule state:
+
+| Cluster | Phase | LastBackup | Backup/Restore/Delete requests |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | Enabled | empty | none |
+| `spoke-dc-v7` | Enabled | empty | none |
+
+The empty `lastBackup` value is expected because the first scheduled window
+had not occurred yet.
+
+Final OADP state:
+
+| Cluster | BSL | Velero | Cluster health |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | Available | `1/1` | steady |
+| `spoke-dc-v7` | Available | `1/1` | steady |
+
+## Operational Notes
+
+Use fully qualified Velero resource names:
+
+```text
+schedules.velero.io
+backups.velero.io
+restores.velero.io
+deletebackuprequests.velero.io
+```
+
+Short names are ambiguous in this environment.
+
+## Actions Not Taken
+
+- No ad hoc Backup was created during this gate.
+- No Restore object was created.
+- No stable Vault DNS cutover was made.
+- No old Vault mutation was made.
+- No secret values were printed.
+
+## Next Action
+
+Verify the first scheduled hub/spoke backup series after `02:15/02:45 UTC`,
+then run a governed restore validation drill.

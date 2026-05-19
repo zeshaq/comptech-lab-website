@@ -1,0 +1,67 @@
+---
+title: "Security Lab — roadmap and sprints"
+sidebar_label: "Roadmap and sprints"
+description: "Goals, phases, sprint targets, and GitHub tracking model for the security lab."
+last_reviewed: 2026-05-15
+draft: false
+---
+
+The lab roadmap is tracked in the private GitHub repository with milestones, issues, labels, and a GitHub Project board.
+
+## Goals
+
+| Goal | Outcome |
+| --- | --- |
+| Recoverable work | Long-running tasks run in `tmux`, with task notes and logs where useful |
+| Practical security learning | VAPT, vulnerability management, detection, telemetry, and remediation workflows |
+| Cisco data center networking | NX-OS, MP-BGP EVPN, VXLAN, multisite, Nexus Dashboard, and NDFC |
+| Safe documentation | Public/protected docs include learning notes and architecture, not secrets |
+| Repeatable phases | Each phase produces runbooks, verification evidence, and next-step issues |
+
+## Phases
+
+| Phase | Target |
+| --- | --- |
+| Phase 0 — Governance and resume protocol | Complete |
+| Phase 1 — Lab stabilization | Complete for current lab services |
+| Phase 2 — Single-site EVPN/VXLAN | Complete for the two-spine, two-leaf Nexus lab |
+| Phase 3 — Dual-border and services VRF | Complete for current tenant border and services leak-control drills |
+| Phase 4 — Security validation loops | Complete for current SOC evidence and daily health model |
+| Phase 5 — Nexus Dashboard and NDFC | Next Cisco data center expansion |
+| Phase 6 — Cisco expansion track | Future: ISE, FTDv/FMCv, ASAv, Catalyst 8000V, ACI, or IOS XRv |
+| Phase 7 — NetApp / StorageGRID | Paused until official evaluation media and license are staged |
+
+## Sprint Targets
+
+| Sprint | Dates | Target outcome |
+| --- | --- | --- |
+| Sprint 01 | 2026-05-13 to 2026-05-26 | Lab baseline stable, Security Onion verified, EVE-NG ready for Nexus 9300v first boot |
+| Sprint 02 | 2026-05-27 to 2026-06-09 | Single-site EVPN/VXLAN underlay, overlay, and tenant reachability working |
+| Sprint 03 | 2026-06-10 to 2026-06-23 | Multisite design and border gateway workflow working |
+| Sprint 04 | 2026-06-24 to 2026-07-07 | Detection, scanning, and VAPT evidence loops documented |
+| Sprint 05 | 2026-07-08 to 2026-07-21 | Nexus Dashboard deployed and NDFC evaluated against manual fabric workflows |
+| Sprint 06 | 2026-07-22 to 2026-08-04 | Next Cisco expansion track selected and first appliance staged |
+
+## GitHub Tracking Model
+
+| Object | Use |
+| --- | --- |
+| GitHub Project | Board for status, phase, sprint, priority, and workstream |
+| Milestones | Phase boundaries |
+| Issues | Concrete implementation, validation, research, and documentation tasks |
+| Labels | Area, priority, type, and sprint filtering |
+| ADRs | Durable technical decisions |
+| Task logs | Resume state for long-running or state-changing work |
+
+## Current Closure
+
+The current Nexus/SOC phase is closed for lab use. The closure criteria were:
+
+- full Nexus validation completed;
+- services VRF guard returned healthy;
+- SOC daily health returned healthy;
+- scenario evidence had no failed or partial cases;
+- endpoint checks responded;
+- private documentation and replay commands were committed and pushed.
+
+The next recommended sprint is operations hardening: schedule the services VRF guard, add alerting for guard failures, keep the dashboard current, and then decide whether to proceed with Nexus Dashboard/NDFC or the paused NetApp/StorageGRID track.

@@ -1,0 +1,185 @@
+---
+title: "Installation Manual - 72 Old Vault final retention deletion"
+sidebar_label: "72 Old Vault final retention deletion"
+description: "Final deletion of the old lost-custody Vault VM definitions and disk images after R1 and backup validation."
+---
+
+This chapter records the final old Vault retention deletion gate for
+`hub-dc-v7` and `spoke-dc-v7`.
+
+The old lost-custody Vault VMs had already been removed from active use,
+powered off, and validated through a post-power-off OADP backup window. This
+gate removed their retained libvirt definitions and local qcow2 disk images.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+The user explicitly approved the destructive retention step before deletion.
+
+## Scope
+
+Deleted old VM definitions and disk images:
+
+| VM | Disk image |
+| --- | --- |
+| `gf-ocp-vault-seed-01` | `/var/lib/libvirt/images/gf-ocp-vault-seed-01.qcow2` |
+| `gf-ocp-vault-01` | `/var/lib/libvirt/images/gf-ocp-vault-01.qcow2` |
+| `gf-ocp-vault-02` | `/var/lib/libvirt/images/gf-ocp-vault-02.qcow2` |
+| `gf-ocp-vault-03` | `/var/lib/libvirt/images/gf-ocp-vault-03.qcow2` |
+
+Out of scope for this gate:
+
+- no replacement R1 Vault VM was changed;
+- no Vault R1 configuration or token material was changed;
+- no OpenShift, GitOps, MinIO IAM, OADP, RHACS, or External Secrets object was
+  changed;
+- no DNS record was changed.
+
+Before deletion, libvirt XML snapshots for the four retired domains were saved
+in the local operations report folder for audit context.
+
+## Preflight
+
+Preflight confirmed:
+
+- the old Vault VMs were `shut off` and autostart disabled;
+- the old qcow2 disk images were still present;
+- the replacement R1 VMs were running and autostart enabled;
+- R1 Vault health with `standbyok=true` returned HTTP `200` on
+  `30.30.200.35-.37`;
+- old Vault direct health returned HTTP `000` on `30.30.200.30-.33`;
+- stable `vault.v7.comptech-lab.com` resolved to R1 IPs
+  `30.30.200.35`, `30.30.200.36`, and `30.30.200.37`;
+- `hub-dc-v7` and `spoke-dc-v7` were on OpenShift `4.20.18`;
+- all nodes were Ready;
+- no ClusterOperator exceptions were reported;
+- Argo CD applications were `Synced/Healthy` at GitOps revision `0bb0cca`;
+- ExternalSecrets were `6/6` Ready on both clusters;
+- R1-backed ClusterSecretStores were Ready/Valid on both clusters:
+  - `vault-r1-eso-smoke`;
+  - `vault-r1-oadp`;
+  - `vault-r1-rhacs`;
+- OADP DPAs were Reconciled and BSLs were Available;
+- latest post-power-off backups remained Completed:
+  - hub `platform-resource-daily-20260518063347`, `10122/10122`, warnings
+    `0`, errors `0`;
+  - spoke `platform-resource-daily-20260518063423`, `16808/16808`, warnings
+    `0`, errors `0`;
+- RHACS pods were Running on hub and spoke, and hub Central was Available and
+  Deployed.
+
+## Deletion
+
+The deletion was performed from `dl385-2` against exact VM and disk names.
+
+For each old VM:
+
+1. verify the domain was still `shut off`;
+2. undefine the libvirt domain;
+3. remove the matching qcow2 disk image;
+4. verify the domain and disk image were absent.
+
+No wildcard deletion was used.
+
+## Validation
+
+Post-delete libvirt validation:
+
+| VM | Domain | Disk image |
+| --- | --- | --- |
+| `gf-ocp-vault-seed-01` | absent | absent |
+| `gf-ocp-vault-01` | absent | absent |
+| `gf-ocp-vault-02` | absent | absent |
+| `gf-ocp-vault-03` | absent | absent |
+
+Replacement R1 VMs remained healthy:
+
+| VM | State | Autostart |
+| --- | --- | --- |
+| `gf-ocp-vault-r1-seed-01` | running | enabled |
+| `gf-ocp-vault-r1-01` | running | enabled |
+| `gf-ocp-vault-r1-02` | running | enabled |
+| `gf-ocp-vault-r1-03` | running | enabled |
+
+Vault health:
+
+| Endpoint set | Result |
+| --- | --- |
+| old direct IPs `30.30.200.30-.33` | HTTP `000` |
+| R1 direct IPs `30.30.200.35-.37` | HTTP `200` |
+
+DNS after deletion:
+
+| Name | Result |
+| --- | --- |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | no record |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | no record |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | no record |
+
+The old seed DNS record remains as a stale record. It was intentionally left
+unchanged because this gate only deleted retained VM definitions and disk
+images.
+
+OpenShift validation after deletion:
+
+| Cluster | OpenShift | Nodes | ClusterOperators | DPA | BSL |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady | Reconciled | Available |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady | Reconciled | Available |
+
+OADP schedule and backup state:
+
+| Cluster | Schedule | Latest backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | `15 2 * * *` | `platform-resource-daily-20260518063347` | Completed | `10122/10122` | 0 | 0 |
+| `spoke-dc-v7` | `45 2 * * *` | `platform-resource-daily-20260518063423` | Completed | `16808/16808` | 0 | 0 |
+
+External Secrets remained Ready:
+
+| Cluster | Result |
+| --- | --- |
+| hub | `6/6` ExternalSecrets Ready |
+| spoke | `6/6` ExternalSecrets Ready |
+
+Vault egress policies still allowed only R1 Vault CIDRs:
+
+```text
+30.30.200.35/32
+30.30.200.36/32
+30.30.200.37/32
+```
+
+Argo CD final state:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `0bb0cca` |
+| `spoke-dc-v7-cluster-config` | Synced | Healthy | `0bb0cca` |
+
+RHACS remained healthy:
+
+- hub Central was Available and Deployed;
+- no non-running StackRox pods were found on hub or spoke.
+
+## Result
+
+The old lost-custody Vault VM rollback path by retained local disk is now
+intentionally gone.
+
+The replacement R1 Vault path remained healthy, OpenShift consumers remained
+healthy, and the latest post-power-off OADP backups remained Completed after
+the old definitions and disk images were removed.
+
+Remaining cleanup:
+
+- remove or archive the stale `gf-ocp-vault-seed-01.v7.comptech-lab.com` DNS
+  record under a separate DNS cleanup gate if desired;
+- close the Vault replacement phase after a final issue closeout checkpoint.

@@ -1,0 +1,341 @@
+---
+title: "Real human OIDC end-to-end"
+sidebar_label: "27 — Real human OIDC end-to-end"
+description: "Cloudflare DNS + HAProxy + the three load-bearing OIDC config bits that make Auth.js' authorization-code + PKCE dance against WSO2 IS actually work end-to-end. The chapter most engineers wish they'd read first. Slice 23 in the insurance-app repo."
+estimated_minutes: 90
+last_updated: 2026-05-17
+prereqs: ["26 — Claim filing through a BFF"]
+---
+
+Every previous chapter has run on `localhost:3000`. The portal worked,
+the BFF worked, the chapter-23 "Verify" steps showed an `/auth/signin/wso2is`
+redirect to the WSO2 IS authorize endpoint with `code_challenge` and
+`state` query params. So why isn't the portal *done*?
+
+Because **localhost is a lie**. Click the redirect in a browser, type
+your password into WSO2 IS, watch it redirect back, and you'll land on
+one of three errors depending on which detail you got first:
+
+- `error=invalid_redirect_uri`
+- `unexpected HTTP status code 302` from oauth4webapi
+- `Origin mismatch` from SvelteKit's CSRF check
+
+This chapter is the one where OIDC actually works end-to-end against
+WSO2 IS. There are exactly three load-bearing config bits that make
+the difference. The order matters: get the first one wrong and the
+second won't manifest because nothing's reaching the second yet.
+
+Companion commit: `2c5d6cb` in `insurance-app`. Plus the public DNS
+setup in `SETUP.md` section 6 and the HAProxy frontend in ADR 0007.
+
+## The three load-bearing config bits
+
+| # | Where | What | Why |
+|---|---|---|---|
+| 1 | `customer-app` container env | `ORIGIN=https://my.insurance-app.comptech-lab.com` | Without it, `adapter-node` uses the request's Host header to construct callback URLs — which becomes `localhost:3000` once HAProxy is in the path. Auth.js then advertises `localhost:3000/auth/callback/wso2is` to WSO2 IS, and WSO2 IS responds with `invalid_redirect_uri`. |
+| 2 | `auth.ts` provider config | `issuer: 'https://is.insurance-app.comptech-lab.com/oauth2/token'` (note the suffix) | WSO2 IS 7's `iss` claim is `https://<host>/oauth2/token`, not `https://<host>`. `oauth4webapi` (under @auth/sveltekit) discovers `<issuer>/.well-known/openid-configuration` and then validates `discovery.issuer === config.issuer`. Both have to use the `/oauth2/token` form. Without the suffix you get either a discovery 302 (wrong path) or an issuer mismatch (right path, wrong field). |
+| 3 | HAProxy frontend | `http-request set-header X-Forwarded-Proto https` + `http-request set-header X-Forwarded-Host my.insurance-app.comptech-lab.com` | Adapter-node honors `X-Forwarded-*` headers when `app.set('trust proxy', 1)` is on (and `trustHost: true` is set in `@auth/sveltekit`). HAProxy has to actually send them. The standard `option forwardfor` only handles `X-Forwarded-For`; the Proto and Host ones are explicit. |
+
+Each section below walks through one of them with the actual config
+and the error message you'll see if it's wrong.
+
+## 1. The `ORIGIN` env var on adapter-node
+
+SvelteKit's Node adapter builds outgoing URLs (redirects, callback URLs,
+cookies' Domain attribute) from one of two sources:
+
+- The incoming request's `Host` header, by default.
+- The `ORIGIN` env var, if set.
+
+The default is fine for development behind no proxy. The instant
+HAProxy sits in front, `Host` becomes whatever HAProxy sends — which
+is by default the public hostname, but every middlebox handles it
+slightly differently. **Setting `ORIGIN` explicitly is the only way to
+guarantee adapter-node uses the URL the customer typed.**
+
+```bash
+podman run -d --replace --name customer-app --network insurance-net \
+  -e CUSTOMER_OIDC_CLIENT_ID -e CUSTOMER_OIDC_CLIENT_SECRET -e AUTH_SECRET \
+  -e WSO2IS_CLIENT_ID -e WSO2IS_CLIENT_SECRET \
+  -e ORIGIN=https://my.insurance-app.comptech-lab.com \
+  -e LIBERTY_BASE=http://insurance-app:9080 \
+  -e WSO2IS_TOKEN_URL_INTERNAL=http://wso2is:9763/oauth2/token \
+  -p 3000:3000 customer-app:dev
+```
+
+What goes wrong if you forget `ORIGIN`:
+
+1. Browser hits `https://my.insurance-app.comptech-lab.com/auth/signin/wso2is`.
+2. SvelteKit looks at the incoming Host header. Depending on HAProxy
+   config, it might see `localhost:3000` (the backend address HAProxy
+   forwards to) or it might see the public hostname.
+3. If it sees `localhost:3000`, Auth.js builds
+   `redirect_uri=http://localhost:3000/auth/callback/wso2is` and sends
+   that to WSO2 IS.
+4. WSO2 IS checks the registered redirect URIs (which are
+   `https://my.insurance-app.comptech-lab.com/auth/callback/wso2is`)
+   and rejects with `error=invalid_redirect_uri`.
+
+You'll see the error in the URL bar after IS rejects the request.
+
+## 2. The `/oauth2/token` suffix on the issuer
+
+WSO2 IS 7 chose a non-standard place for its OIDC discovery document
+and for its `iss` claim. Most providers (Google, Auth0, Okta) put both
+at the bare hostname:
+
+```
+issuer:  https://accounts.google.com
+discover: https://accounts.google.com/.well-known/openid-configuration
+```
+
+WSO2 IS 7 puts both at `/oauth2/token`:
+
+```
+issuer:  https://is.insurance-app.comptech-lab.com/oauth2/token
+discover: https://is.insurance-app.comptech-lab.com/oauth2/token/.well-known/openid-configuration
+```
+
+The fix in `gui/customer-app/src/auth.ts` is one line:
+
+```ts
+{
+  id: 'wso2is',
+  type: 'oidc',
+  issuer: 'https://is.insurance-app.comptech-lab.com/oauth2/token',
+  wellKnown:
+    'https://is.insurance-app.comptech-lab.com/oauth2/token/.well-known/openid-configuration',
+  // ...
+}
+```
+
+The comment in the source captures the reasoning so future-you doesn't
+re-investigate:
+
+```ts
+// WSO2 IS 7's `iss` claim — and its discovery URL — both live
+// under /oauth2/token, not at the bare host. oauth4webapi (under
+// @auth/sveltekit) computes the discovery URL as
+// `<issuer>/.well-known/openid-configuration` and validates that
+// discovery.issuer === config.issuer; both work out only when
+// issuer carries the /oauth2/token suffix.
+```
+
+Three different failure modes from getting this wrong:
+
+- `issuer` bare, `wellKnown` bare. You'll see a 302 from WSO2 IS
+  bouncing the discovery request to `/oauth2/token/.well-known/...`
+  and oauth4webapi reports `unexpected HTTP status code 302`.
+- `issuer` bare, `wellKnown` correct (the in-between state). Discovery
+  fetches succeed; oauth4webapi then validates that `discovery.issuer`
+  matches `config.issuer` — `https://.../oauth2/token` vs
+  `https://...`. Mismatch. Hard fail.
+- Both correct. Everything works.
+
+The shape of the error message matters: `unexpected HTTP status code
+302` looks like an HTTP issue and tempts you to chase HAProxy. The
+actual cause is the issuer URL.
+
+## 3. HAProxy frontend — the X-Forwarded headers
+
+HAProxy in the lab is `gf-ocp-haproxy-01`. The frontend that handles
+`https://*.insurance-app.comptech-lab.com` already exists for the
+chapter-22 vanilla GUI; slice 23 adds an ACL + a backend for the new
+hostname. The frontend snippet that matters:
+
+```haproxy
+frontend fe_https_public
+    bind *:443 ssl crt /etc/haproxy/insurance-app.pem alpn h2,http/1.1
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Ssl on
+    http-request set-header X-Forwarded-Host %[req.hdr(host)]
+    option forwardfor
+
+    acl host_my_insurance hdr(host) -i my.insurance-app.comptech-lab.com
+    use_backend be_insurance_customer_app if host_my_insurance
+
+backend be_insurance_customer_app
+    server customer1 30.30.26.1:3000 check
+```
+
+Plus the matching 80→443 redirect on the HTTP frontend:
+
+```haproxy
+frontend fe_http_public
+    bind *:80
+    acl host_my_insurance hdr(host) -i my.insurance-app.comptech-lab.com
+    http-request redirect scheme https code 301 if host_my_insurance
+```
+
+Why each `X-Forwarded-*` header earns its line:
+
+- **`X-Forwarded-Proto: https`** — Adapter-node uses this to construct
+  the cookie's `Secure` flag and to build the redirect URL after the
+  OIDC callback. Without it, the cookie is set as not-Secure (the
+  browser rejects it on the HTTPS callback page) AND the `redirect_uri`
+  parameter Auth.js advertises to WSO2 IS gets `http://...` even
+  though the user is on `https://...`.
+- **`X-Forwarded-Ssl: on`** — Some middleware (not adapter-node, but
+  worth setting now for downstream stuff) keys off this header rather
+  than `X-Forwarded-Proto`. Cheap insurance.
+- **`X-Forwarded-Host: %[req.hdr(host)]`** — Forwards the *original*
+  Host header (`my.insurance-app.comptech-lab.com`) as a header that
+  adapter-node trusts. Without this, adapter-node falls back to the
+  per-backend Host header (which is also the public hostname, *but*
+  every HAProxy admin eventually overrides per-backend Host headers
+  for some reason, and the explicit `X-Forwarded-Host` is the safer
+  default).
+- **`option forwardfor`** — Generates `X-Forwarded-For` with the
+  client IP. Not OIDC-relevant, but you want it for SigNoz traces.
+
+The matching SvelteKit-side configuration is two flags, set in
+chapter 23 already and worth repeating:
+
+```ts
+// gui/customer-app/svelte.config.js
+csrf: { checkOrigin: false },  // smoke test posts from different hosts
+
+// gui/customer-app/src/auth.ts
+trustHost: true,  // honor X-Forwarded-Host
+```
+
+`trustHost: true` is required for Auth.js to use the
+`X-Forwarded-Host` header for callback URL construction. Without it,
+Auth.js ignores `X-Forwarded-Host` and you're back to the localhost
+problem.
+
+## Cloudflare DNS — the easy part
+
+The DNS record is a one-liner once the HAProxy config is in place:
+
+```bash
+HAPROXY_IP=59.153.29.102
+ZONE_ID=<comptech-lab.com zone id>
+TOKEN=$(cat ~/cloudflare-token)
+FQDN=my.insurance-app.comptech-lab.com
+
+# Upsert: list first, PUT if exists, POST if new
+EXISTING=$(curl -sS -H "Authorization: Bearer $TOKEN" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=A&name=$FQDN" \
+  | jq -r '.result[0].id // empty')
+if [ -n "$EXISTING" ]; then
+  curl -sS -X PUT -H "Authorization: Bearer $TOKEN" \
+    "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$EXISTING" \
+    -H 'Content-Type: application/json' \
+    -d "{\"type\":\"A\",\"name\":\"$FQDN\",\"content\":\"$HAPROXY_IP\",\"ttl\":120,\"proxied\":false}"
+else
+  curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
+    "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+    -H 'Content-Type: application/json' \
+    -d "{\"type\":\"A\",\"name\":\"$FQDN\",\"content\":\"$HAPROXY_IP\",\"ttl\":120,\"proxied\":false}"
+fi
+```
+
+**`proxied: false`** — keep Cloudflare in DNS-only mode for now. The
+lab's TLS cert is HAProxy-mounted and that cert chain is what we want
+the browser to verify. With Cloudflare-proxied DNS, the browser sees
+Cloudflare's cert and the OIDC dance still works, but you've added a
+hop and an extra layer of cert pinning to debug.
+
+The certbot side of TLS provisioning lives in `SETUP.md` Phase 6.5 —
+it's a Cloudflare-DNS-01 challenge that runs from the HAProxy host
+itself, with a deploy hook that rebuilds the HAProxy PEM and reloads.
+Re-runs idempotently thanks to `--keep-until-expiring`.
+
+## Update the WSO2 IS DCR client
+
+The customer-app's DCR registration from chapter 23 listed the
+`redirect_uris` with the public URL already. If you developed locally
+first and registered with `http://localhost:3000/...`, update the
+client — either through the IS Console (Applications → insurance-app-customer
+→ Protocol → Callback URLs) or by re-running DCR PATCH. The redirect
+URI list is checked exactly: trailing slashes matter.
+
+While there, double-check `Allowed Grant Types` contains
+`authorization_code` and `refresh_token`, and **`Public client`** is
+off (the customer-app is a confidential client — it has a client
+secret, which the browser never sees).
+
+## Verify
+
+The full path is a manual click — the smoke covers up to the login form,
+the actual credential entry is a human:
+
+```bash
+# 1) DNS resolves to HAProxy
+dig +short my.insurance-app.comptech-lab.com
+# 59.153.29.102
+
+# 2) HTTPS terminates and routes
+curl -sI https://my.insurance-app.comptech-lab.com/ | head -1
+# HTTP/2 200
+
+# 3) Sign-in redirects with PKCE+state to the right IS
+curl -sI -X POST https://my.insurance-app.comptech-lab.com/auth/signin/wso2is \
+  -H "X-Forwarded-Proto: https" | grep -i location
+# location: https://is.insurance-app.comptech-lab.com/oauth2/authorize?
+#   response_type=code&
+#   client_id=<CUSTOMER_OIDC_CLIENT_ID>&
+#   redirect_uri=https%3A%2F%2Fmy.insurance-app.comptech-lab.com%2Fauth%2Fcallback%2Fwso2is&
+#   code_challenge=<base64url>&
+#   code_challenge_method=S256&
+#   state=<random>&
+#   scope=openid+profile+email
+```
+
+The `redirect_uri` parameter is the load-bearing string. If it says
+`http://localhost:3000/...`, you missed `ORIGIN`. If it says
+`https://my.insurance-app.comptech-lab.com/...`, the three config bits
+above all line up.
+
+Then click "Sign in" in a real browser:
+
+1. Land on WSO2 IS's `/authenticationendpoint/login.do`.
+2. Enter `student@comptech.com` / `Student@1234` (the demo user from
+   [chapter 29](/learn/openliberty/demo-credentials-scim)).
+3. Land back on `https://my.insurance-app.comptech-lab.com/` with a
+   user pill in the header. Inspect cookies: one `authjs.session-token`,
+   HttpOnly, Secure, SameSite=Lax. No JWT visible.
+
+The smoke script's section 23 probes the POST `/auth/signin/wso2is`
+→ IS authorize → `/authenticationendpoint/login.do` chain and asserts
+PKCE + client_id propagate through. End-to-end credential entry is
+still a manual click. Suite hits 198/0.
+
+## The mental model afterwards
+
+Once this chapter is done, the customer portal does what production
+OIDC clients do:
+
+- Browser holds **one** HttpOnly cookie signed by AUTH_SECRET.
+- The SvelteKit server holds the upstream IS access token and refresh
+  token in the session blob.
+- The BFF helper presents an entirely separate service-account JWT to
+  Liberty; Liberty's mpJwt config from chapter 11 doesn't move.
+- Every state-changing request is authenticated by the cookie's
+  presence, with CSRF state coming from PKCE on the initial auth code
+  exchange and SvelteKit's CSRF protection on subsequent forms.
+
+The cost is one extra container (the SvelteKit server) and three lines
+in HAProxy. The benefit is that **JWTs never enter the browser** and
+the customer-facing surface looks like a normal modern web app.
+
+## What you have
+
+- The customer portal reachable at a real public URL via Cloudflare
+  DNS + HAProxy.
+- Three load-bearing config bits documented with the error each one
+  guards against:
+  - `ORIGIN` on the customer-app container.
+  - `/oauth2/token`-suffixed `issuer` in `auth.ts`.
+  - `X-Forwarded-Proto/Host` headers from HAProxy.
+- An end-to-end real-human OIDC code-flow with PKCE, working against
+  WSO2 IS 7, terminating in an HttpOnly session cookie on
+  `https://my.insurance-app.comptech-lab.com`.
+- A smoke probe that asserts every routing hop up to the login form.
+
+The customer side is done. Operators need a different UI — a real-time
+ops view with one-click claim approval — and the React/Express side of
+the curriculum is its own short chapter.
+
+Next: [28 — Agent dashboard: React + Express BFF + Redis sessions →](/learn/openliberty/feature-agent-dashboard-react)

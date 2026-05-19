@@ -1,0 +1,153 @@
+---
+title: "Installation Manual - 82 Hub lower-risk NetworkPolicy apply"
+sidebar_label: "82 Hub lower-risk NetworkPolicy apply"
+description: "GitOps apply and validation for lower-risk hub-dc-v7 operator and agent NetworkPolicies."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` lower-risk operator and agent
+NetworkPolicy apply gate.
+
+The gate applied only ingress policies. It did not add egress default-deny,
+and it did not touch webhook/APIService/route-sensitive namespaces.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-11` / `#403` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-10` / `#402` |
+
+## Access Path
+
+All live checks and the Compliance rescan used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## GitOps Change
+
+Platform GitOps commit:
+
+```text
+c196470 Add hub lower-risk NetworkPolicies
+```
+
+Full Argo revision:
+
+```text
+c196470009afbcbd1724e96b542bb1e72a5b205f
+```
+
+The policies were added under:
+
+```text
+clusters/hub-dc-v7/platform/networkpolicy/
+```
+
+## Applied Policies
+
+| Namespace | Policies | Monitoring allow ports |
+| --- | --- | --- |
+| `cert-manager-operator` | `default-deny-ingress`, `allow-monitoring-ingress` | `8443` |
+| `external-secrets-operator` | `default-deny-ingress`, `allow-monitoring-ingress` | `8443`, `8080` |
+| `rhacs-operator` | `default-deny-ingress`, `allow-monitoring-ingress` | `8443` |
+| `open-cluster-management-agent` | `default-deny-ingress` | none |
+| `open-cluster-management-agent-addon` | `default-deny-ingress`, `allow-monitoring-ingress` | `8443`, `8388` |
+
+Monitoring ingress is allowed from namespaces labeled:
+
+```text
+network.openshift.io/policy-group=monitoring
+```
+
+## Validation
+
+Post-apply validation at `2026-05-19T12:11:17Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Network type | `OVNKubernetes` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `c196470` |
+| Non-running pods | none |
+| Target webhook refs | none |
+| Target APIService refs | none |
+| Target routes | none |
+
+All target pods and deployments stayed Ready after apply.
+
+## Compliance Rescan
+
+A one-off hub `ComplianceScan/ocp4-cis` rescan was triggered after Argo CD and
+hub health were steady.
+
+| Field | Value |
+| --- | --- |
+| Trigger | `2026-05-19T12:11:36Z` |
+| Start | `2026-05-19T12:11:37Z` |
+| End | `2026-05-19T12:12:19Z` |
+| Phase | `DONE` |
+| Result | `NON-COMPLIANT` |
+
+Post-rescan counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+The remaining failed check is still:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```
+
+That is expected because the remaining uncovered namespaces are intentionally
+deferred.
+
+## Residual Coverage
+
+Post-apply inventory at `2026-05-19T12:12:43Z`:
+
+| Metric | Count |
+| --- | ---: |
+| Namespaces | 99 |
+| NetworkPolicies | 98 |
+| Namespaces with policy | 28 |
+| Namespaces without policy | 71 |
+
+Non-system namespaces still without NetworkPolicy:
+
+```text
+cert-manager
+hive
+hypershift
+multicluster-engine
+open-cluster-management
+open-cluster-management-hub
+```
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-12: canary hub webhook/APIService NetworkPolicies or tailoring for cert-manager, hive, and hypershift
+```
+
+Do not blanket default-deny the remaining namespaces. They expose admission
+webhooks, APIService backends, routes, or some combination of those and need a
+canary or tailoring decision.

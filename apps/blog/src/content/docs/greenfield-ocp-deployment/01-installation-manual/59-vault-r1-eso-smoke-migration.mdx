@@ -1,0 +1,120 @@
+---
+title: "Installation Manual - 59 Vault R1 ESO smoke migration"
+sidebar_label: "59 Vault R1 ESO smoke"
+description: "Migration of the hub-dc-v7 and spoke-dc-v7 ESO smoke ExternalSecrets to replacement Vault R1."
+---
+
+This chapter records the first non-OADP consumer migration to replacement
+Vault R1. The scope was intentionally narrow: only the `eso-smoke`
+ExternalSecret on each v7 cluster moved from the old `vault-platform` store to
+a dedicated R1 store.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+Read-only checks used the required path:
+
+```text
+local coordinator -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+| Cluster | OpenShift | ClusterOperators | Nodes | Existing ESO smoke | OADP |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | Ready | DPA Reconciled, BSL Available, Velero `1/1` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | Ready | DPA Reconciled, BSL Available, Velero `1/1` |
+
+The existing stores were Ready before the change:
+
+| Cluster | `vault-platform` | `vault-r1-oadp` |
+| --- | --- | --- |
+| `hub-dc-v7` | Ready | Ready |
+| `spoke-dc-v7` | Ready | Ready |
+
+## GitOps Change
+
+GitOps commit:
+
+```text
+43ee49a Move ESO smoke to Vault R1
+```
+
+The commit added:
+
+| Cluster | New store |
+| --- | --- |
+| `hub-dc-v7` | `ClusterSecretStore/vault-r1-eso-smoke` |
+| `spoke-dc-v7` | `ClusterSecretStore/vault-r1-eso-smoke` |
+
+The new store uses:
+
+| Field | Value |
+| --- | --- |
+| Vault server | `https://30.30.200.35:8200` |
+| Vault role | `eso-secrets` |
+| ServiceAccount | `external-secrets-operator-controller-manager` |
+| ServiceAccount namespace | `external-secrets-operator` |
+
+Then only `ExternalSecret/eso-smoke` was changed to reference
+`vault-r1-eso-smoke`.
+
+## Validation
+
+Both overlays rendered locally with `kubectl kustomize`, and server-side
+dry-run accepted both overlays. The dry-run showed that
+`ClusterSecretStore/vault-r1-eso-smoke` would be created on each cluster.
+
+The bootstrap GitOps clone was fast-forwarded to `43ee49a`, and Argo CD was
+hard-refreshed.
+
+| Argo application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `43ee49a` |
+| hub-side `spoke-dc-v7-cluster-config` | Synced | Healthy | `43ee49a` |
+| spoke-local `spoke-dc-v7-cluster-config` | Synced | Healthy | `43ee49a` |
+
+Post-change ESO validation:
+
+| Cluster | Store | ExternalSecret | Refresh time | Secret keys |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `vault-r1-eso-smoke` Ready | Ready / `SecretSynced` | `2026-05-17T23:09:36Z` | `hello` |
+| `spoke-dc-v7` | `vault-r1-eso-smoke` Ready | Ready / `SecretSynced` | `2026-05-17T23:09:36Z` | `hello` |
+
+Secret values were not printed.
+
+## Unaffected Consumers
+
+The existing old-Vault store remains in place because RHACS still uses it.
+
+| Consumer | Store | Result |
+| --- | --- | --- |
+| OADP cloud credentials | `vault-r1-oadp` | Ready |
+| Hub RHACS ExternalSecrets | `vault-platform` | Ready |
+| Spoke RHACS ExternalSecrets | `vault-platform` | Ready |
+| Spoke logging bridge | `logging-local` | Ready |
+
+## Final State
+
+| Cluster | OpenShift | ClusterOperators | Nodes | OADP |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | `3/3` Ready | DPA Reconciled, BSL Available, Velero `1/1` |
+| `spoke-dc-v7` | `4.20.18` | steady | `6/6` Ready | DPA Reconciled, BSL Available, Velero `1/1` |
+
+## Actions Not Taken
+
+- No old Vault mutation was made.
+- No stable Vault DNS cutover was made.
+- No RHACS ExternalSecret was moved.
+- No secret values were printed.
+
+## Next Action
+
+Run a dedicated RHACS replacement Vault migration or rotation gate before any
+stable Vault DNS promotion.

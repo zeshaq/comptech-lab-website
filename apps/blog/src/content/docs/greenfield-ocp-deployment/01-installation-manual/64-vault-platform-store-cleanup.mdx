@@ -1,0 +1,150 @@
+---
+title: "Installation Manual - 64 Vault platform store cleanup"
+sidebar_label: "64 Vault platform store cleanup"
+description: "Removal of the unused vault-platform ClusterSecretStore after Vault R1 stable DNS promotion."
+---
+
+This chapter records the GitOps cleanup that removed the unused
+`ClusterSecretStore/vault-platform` resources after stable Vault DNS was
+promoted to replacement Vault R1.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Reason
+
+After stable DNS promotion, `vault.v7.comptech-lab.com` resolved to replacement
+Vault R1. Active consumers were already using R1-specific stores, but the old
+`vault-platform` store still existed with old Vault trust material.
+
+The store had no consumers and became:
+
+```text
+Ready=False / InvalidProviderConfig
+```
+
+That made the owning Argo applications `Synced/Degraded` even though active
+secret delivery was healthy.
+
+## GitOps Change
+
+GitOps commit:
+
+```text
+f18b1cd Remove unused Vault platform stores
+```
+
+Deleted:
+
+- `clusters/hub-dc-v7/secrets/eso/clustersecretstore-vault.yaml`
+- `clusters/spoke-dc-v7/secrets/eso/clustersecretstore-vault.yaml`
+
+Updated:
+
+- `clusters/hub-dc-v7/secrets/eso/kustomization.yaml`
+- `clusters/spoke-dc-v7/secrets/eso/kustomization.yaml`
+
+The R1-specific stores were left unchanged:
+
+- `vault-r1-eso-smoke`
+- `vault-r1-oadp`
+- `vault-r1-rhacs`
+
+## Validation
+
+Local render:
+
+| Overlay | Rendered lines | `vault-platform` references |
+| --- | ---: | --- |
+| `clusters/hub-dc-v7` | `1380` | none |
+| `clusters/spoke-dc-v7` | `2213` | none |
+
+Server-side dry-run accepted both overlays.
+
+Argo prune permission was checked for:
+
+- hub application controller;
+- spoke managed-pull application controller
+  `system:serviceaccount:openshift-gitops:acm-openshift-gitops-argocd-application-controller`.
+
+The bootstrap clone on `gf-ocp-bootstrap-01` was fast-forwarded to `f18b1cd`.
+
+Argo CD converged:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `f18b1cd` |
+| hub-side `spoke-dc-v7-cluster-config` | Synced | Healthy | `f18b1cd` |
+| spoke-local `spoke-dc-v7-cluster-config` | Synced | Healthy | `f18b1cd` |
+
+`ClusterSecretStore/vault-platform` is absent on both clusters.
+
+## Post-Cleanup State
+
+Stable Vault DNS:
+
+```text
+vault.v7.comptech-lab.com -> 30.30.200.35, 30.30.200.36, 30.30.200.37
+```
+
+R1 health:
+
+| IP | Result |
+| --- | --- |
+| `30.30.200.35` | initialized, unsealed, active |
+| `30.30.200.36` | initialized, unsealed, standby |
+| `30.30.200.37` | initialized, unsealed, standby |
+
+Cluster health:
+
+| Cluster | OpenShift | Nodes | ClusterOperators |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady |
+
+Stores:
+
+| Cluster | Store status |
+| --- | --- |
+| `hub-dc-v7` | `vault-r1-eso-smoke`, `vault-r1-oadp`, `vault-r1-rhacs` all `True/Valid` |
+| `spoke-dc-v7` | `vault-r1-eso-smoke`, `vault-r1-oadp`, `vault-r1-rhacs` all `True/Valid`; `logging-local` `True/Valid` |
+
+Active ExternalSecrets:
+
+| Cluster | Result |
+| --- | --- |
+| `hub-dc-v7` | ESO smoke, OADP, and RHACS ExternalSecrets Ready / `SecretSynced` |
+| `spoke-dc-v7` | ESO smoke, OADP, logging, and RHACS ExternalSecrets Ready / `SecretSynced` |
+
+OADP:
+
+| Cluster | DPA | BSL | Schedule | Latest scheduled Backup CR |
+| --- | --- | --- | --- | --- |
+| `hub-dc-v7` | Reconciled | Available | Enabled | `platform-resource-daily-20260517223546` |
+| `spoke-dc-v7` | Reconciled | Available | Enabled | `platform-resource-daily-20260517224523` |
+
+StackRox remained acceptable on hub and spoke.
+
+## Actions Not Taken
+
+- No Vault secret, policy, auth role, auth mount, token, or certificate was
+  changed.
+- No DNS record was changed.
+- No old Vault VM was stopped or modified.
+- No active ExternalSecret was moved.
+- No secret values were printed.
+
+## Next Action
+
+Wait for the next scheduled OADP backup window after cleanup, then run a
+read-only validation gate. If the backup window and Argo health remain steady,
+start old Vault retirement readiness planning.
+
+Do not remove old node-specific DNS records or stop old Vault VMs before that
+validation.

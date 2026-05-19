@@ -1,0 +1,179 @@
+---
+title: "Installation Manual - 73 Old Vault stale DNS cleanup"
+sidebar_label: "73 Old Vault stale DNS cleanup"
+description: "Removal of the final stale old Vault seed DNS record after old VM and disk deletion."
+---
+
+This chapter records the DNS cleanup gate that removed the last stale old
+Vault node record after the old lost-custody Vault VM definitions and disks
+were deleted.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+The previous gate removed the old Vault VM definitions and disk images. This
+gate removed the final stale DNS reference to the deleted old seed VM.
+
+## Scope
+
+Removed from PowerDNS zone `v7.comptech-lab.com`:
+
+| Record | Previous value |
+| --- | --- |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | `30.30.200.30` |
+
+Preserved:
+
+| Record | Value |
+| --- | --- |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+
+Out of scope for this gate:
+
+- no replacement R1 Vault VM was changed;
+- no Vault R1 configuration or token material was changed;
+- no OpenShift, GitOps, MinIO IAM, OADP, RHACS, or External Secrets object was
+  changed.
+
+## Preflight
+
+PowerDNS preflight:
+
+| Check | Result |
+| --- | --- |
+| PowerDNS host | `gf-ocp-pdns-01` |
+| Zone | `v7.comptech-lab.com` |
+| Zone serial before change | `44` |
+| Stale seed record | present |
+| Old main Vault records | absent |
+| Stable Vault record | R1 IPs only |
+
+DNS preflight from `dl385-2` and `gf-ocp-bootstrap-01` confirmed:
+
+- `vault.v7.comptech-lab.com` resolved to `30.30.200.35-.37`;
+- `gf-ocp-vault-seed-01.v7.comptech-lab.com` still resolved to
+  `30.30.200.30`;
+- `gf-ocp-vault-01-.03.v7.comptech-lab.com` had no A records.
+
+R1 Vault health with `standbyok=true` returned HTTP `200` on:
+
+```text
+30.30.200.35
+30.30.200.36
+30.30.200.37
+```
+
+OpenShift preflight:
+
+| Cluster | OpenShift | Nodes | ClusterOperators | DPA | BSL |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady | Reconciled | Available |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady | Reconciled | Available |
+
+Latest backups before the DNS cleanup remained Completed:
+
+| Cluster | Backup | Items | Warnings | Errors |
+| --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | `platform-resource-daily-20260518063347` | `10122/10122` | 0 | 0 |
+| `spoke-dc-v7` | `platform-resource-daily-20260518063423` | `16808/16808` | 0 | 0 |
+
+ExternalSecrets were `6/6` Ready on both clusters, and the R1-backed
+ClusterSecretStores were Ready/Valid:
+
+- `vault-r1-eso-smoke`;
+- `vault-r1-oadp`;
+- `vault-r1-rhacs`.
+
+## Change
+
+PowerDNS command summary:
+
+```text
+pdnsutil delete-rrset v7.comptech-lab.com gf-ocp-vault-seed-01 A
+pdnsutil increase-serial v7.comptech-lab.com
+rec_control wipe-cache gf-ocp-vault-seed-01.v7.comptech-lab.com v7.comptech-lab.com
+```
+
+Zone serial advanced from `44` to `45`.
+
+The `dl385-2` local `systemd-resolved` cache still served the old answer
+briefly after authoritative DNS was updated. The resolver cache was restarted
+on `dl385-2` for validation, after public and lab DNS no longer returned the
+old A record.
+
+## Validation
+
+PowerDNS authoritative zone after the change:
+
+| Record | Result |
+| --- | --- |
+| `gf-ocp-vault-seed-01.v7.comptech-lab.com` | absent |
+| `gf-ocp-vault-01.v7.comptech-lab.com` | absent |
+| `gf-ocp-vault-02.v7.comptech-lab.com` | absent |
+| `gf-ocp-vault-03.v7.comptech-lab.com` | absent |
+| `vault.v7.comptech-lab.com` | `30.30.200.35`, `30.30.200.36`, `30.30.200.37` |
+| zone serial | `45` |
+
+Resolver validation:
+
+| Source | Seed record | Stable Vault record |
+| --- | --- | --- |
+| PowerDNS authoritative zone | absent | R1 IPs |
+| `gf-ocp-bootstrap-01` | `NO_RECORD` | R1 IPs |
+| `dl385-2` after local resolver cache restart | `NO_RECORD` | R1 IPs |
+| public resolvers checked from `dl385-2` | no A answer | R1 IPs |
+
+OpenShift validation after DNS cleanup:
+
+| Cluster | OpenShift | Nodes | ClusterOperators | DPA | BSL |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | `3/3` Ready | steady | Reconciled | Available |
+| `spoke-dc-v7` | `4.20.18` | `6/6` Ready | steady | Reconciled | Available |
+
+OADP schedules remained normal:
+
+| Cluster | Schedule |
+| --- | --- |
+| `hub-dc-v7` | `15 2 * * *` |
+| `spoke-dc-v7` | `45 2 * * *` |
+
+Latest backups after the DNS cleanup:
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | ---: | ---: | ---: |
+| `hub-dc-v7` | `platform-resource-daily-20260518063347` | Completed | `10122/10122` | 0 | 0 |
+| `spoke-dc-v7` | `platform-resource-daily-20260518063423` | Completed | `16808/16808` | 0 | 0 |
+
+External Secrets remained Ready:
+
+| Cluster | Result |
+| --- | --- |
+| hub | `6/6` ExternalSecrets Ready |
+| spoke | `6/6` ExternalSecrets Ready |
+
+Argo CD final state:
+
+| Application | Sync | Health | Revision |
+| --- | --- | --- | --- |
+| `hub-dc-v7-bootstrap` | Synced | Healthy | `0bb0cca` |
+| `spoke-dc-v7-cluster-config` | Synced | Healthy | `0bb0cca` |
+
+RHACS remained healthy:
+
+- no non-running StackRox pods were found on hub or spoke.
+
+## Result
+
+The last stale old Vault DNS record was removed. The DNS footprint now points
+only at the replacement R1 service endpoint for active Vault access, and the
+deleted old Vault VMs no longer have node-specific A records in
+`v7.comptech-lab.com`.
+
+The Vault replacement phase is ready for a final read-only closeout check and
+issue closure.

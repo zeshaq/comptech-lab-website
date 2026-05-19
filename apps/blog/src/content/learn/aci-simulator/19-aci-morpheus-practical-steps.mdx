@@ -1,0 +1,345 @@
+---
+title: "ACI Morpheus practical steps"
+sidebar_label: "19 - ACI Morpheus practical steps"
+description: "A clean, from-scratch APIC and HPE Morpheus VM Essentials walkthrough for proving one ACI EPG with one Morpheus VLAN-backed VM."
+estimated_minutes: 60
+last_updated: 2026-05-18
+---
+
+This tutorial starts from the point where the platform is already reachable:
+
+- Morpheus VM Essentials is installed.
+- APIC is up.
+- Fabric nodes are discovered and active.
+- The HVM cluster exists or is ready to be added.
+
+The goal is to build one complete working path first:
+
+```text
+APIC EPG web
+  -> VLAN 1191
+  -> Morpheus network Compute VLAN 1191
+  -> OVS bridge cmpt
+  -> Ubuntu VM 10.119.91.15
+```
+
+Once VLAN `1191` works, the same pattern can be repeated for `1192-1199`.
+
+## Step 1: Write the intent map
+
+Before creating objects, write the mapping between APIC policy and Morpheus networking.
+
+For the first pass, only build the `web` row.
+
+| Purpose | VLAN | APIC EPG | Bridge domain | Subnet intent | Morpheus network |
+| --- | ---: | --- | --- | --- | --- |
+| Web | `1191` | `web` | `bd-vlan-1191-web` | `10.119.91.1/24` | `Compute VLAN 1191` |
+| App | `1192` | `app` | `bd-vlan-1192-app` | `10.119.92.1/24` | `Compute VLAN 1192` |
+| DB | `1193` | `db` | `bd-vlan-1193-db` | `10.119.93.1/24` | `Compute VLAN 1193` |
+| Shared services | `1194` | `shared-services` | `bd-vlan-1194-shared-services` | `10.119.94.1/24` | `Compute VLAN 1194` |
+| Security tools | `1195` | `security-tools` | `bd-vlan-1195-security-tools` | `10.119.95.1/24` | `Compute VLAN 1195` |
+| Targets | `1196` | `targets` | `bd-vlan-1196-targets` | `10.119.96.1/24` | `Compute VLAN 1196` |
+| Attacker | `1197` | `attacker` | `bd-vlan-1197-attacker` | `10.119.97.1/24` | `Compute VLAN 1197` |
+| Transit | `1198` | `transit` | `bd-vlan-1198-transit` | `10.119.98.1/24` | `Compute VLAN 1198` |
+| Quarantine | `1199` | `quarantine` | `bd-vlan-1199-quarantine` | `10.119.99.1/24` | `Compute VLAN 1199` |
+
+This table is the contract between APIC and Morpheus. APIC holds policy names and VLAN intent. Morpheus places the VM NIC on the matching VLAN.
+
+## Step 2: Create the APIC tenant model
+
+In APIC, create the logical tenant objects.
+
+| Object | Value |
+| --- | --- |
+| Tenant | `lab-morpheus` |
+| VRF | `morpheus-vrf` |
+| Application profile | `morpheus-kvm-app` |
+| Bridge domain | `bd-vlan-1191-web` |
+| BD subnet intent | `10.119.91.1/24` |
+| EPG | `web` |
+
+The relationship should be:
+
+```text
+tenant lab-morpheus
+  -> vrf morpheus-vrf
+  -> bridge domain bd-vlan-1191-web
+  -> app profile morpheus-kvm-app
+  -> epg web
+```
+
+At the end of this step, EPG `web` should be associated with bridge domain `bd-vlan-1191-web`.
+
+## Step 3: Build the APIC access policy chain
+
+Now connect EPG `web` to a leaf/interface path and VLAN.
+
+For this lab, use leaf `101`, interface `eth1/49`.
+
+Create these APIC objects:
+
+| Object | Value |
+| --- | --- |
+| VLAN pool | `morpheus-kvm-vlan-pool` |
+| VLAN range | `1191-1199`, static allocation |
+| Physical domain | `morpheus-kvm-phys` |
+| AEP | `morpheus-kvm-aep` |
+| Interface policy group | `morpheus-kvm-trunk-pg` |
+| Leaf switch profile | `morpheus-kvm-leaf101-swprof` |
+| Leaf selector | node `101` |
+| Leaf interface profile | `morpheus-kvm-leaf101-ifprof` |
+| Interface selector | `morpheus-kvm-eth1-49`, port `eth1/49` |
+
+The access-policy chain should read like this:
+
+```text
+VLAN pool 1191-1199
+  -> physical domain
+  -> AEP
+  -> interface policy group
+  -> interface selector eth1/49
+  -> leaf 101
+```
+
+Then add the static EPG path binding:
+
+| Field | Value |
+| --- | --- |
+| EPG | `web` |
+| Path | `topology/pod-1/paths-101/pathep-[eth1/49]` |
+| Encapsulation | `vlan-1191` |
+| Mode | trunk or regular, according to the APIC UI option available |
+
+This is the key APIC statement:
+
+```text
+EPG web uses VLAN 1191 on leaf 101 eth1/49.
+```
+
+Check tenant and EPG faults before moving on. The goal is no major policy fault on the tenant, bridge domain, EPG, or static path.
+
+## Step 4: Create the matching Morpheus network
+
+In Morpheus, create the compute network that matches APIC VLAN `1191`.
+
+Go to **Infrastructure > Networks**, then create a network with these values:
+
+| Field | Value |
+| --- | --- |
+| Name | `Compute VLAN 1191` |
+| CIDR | `10.119.91.0/24` |
+| Gateway | `10.119.91.254` |
+| DNS | `8.8.8.8` |
+| Bridge | `cmpt` |
+| VLAN ID | `1191` |
+| Cloud | `HPE VME Cloud` |
+| Cluster | `hpe-vme-hci-01` |
+
+The important part is this:
+
+```text
+APIC EPG web = VLAN 1191
+Morpheus Compute VLAN 1191 = VLAN 1191 on bridge cmpt
+```
+
+The gateway is `10.119.91.254` in this lab because the HVM host provides the live gateway for the nested workload VLAN.
+
+## Step 5: Add the live VLAN gateway on the HVM host
+
+APIC holds the policy intent. The nested KVM lab still needs a live gateway for VM traffic.
+
+On `hpe-vme-hvm-01`, create an OVS internal gateway interface:
+
+```bash
+sudo ovs-vsctl --may-exist add-port cmpt v1191gw tag=1191 -- set interface v1191gw type=internal
+sudo ip addr replace 10.119.91.254/24 dev v1191gw
+sudo ip link set v1191gw up
+```
+
+Enable IPv4 forwarding:
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+Add NAT from the workload VLAN out through the management side:
+
+```bash
+sudo iptables -t nat -C POSTROUTING -s 10.119.91.0/24 -o mgmt -j MASQUERADE || \
+  sudo iptables -t nat -A POSTROUTING -s 10.119.91.0/24 -o mgmt -j MASQUERADE
+```
+
+Verify the gateway exists:
+
+```bash
+ip addr show v1191gw
+sudo ovs-vsctl show
+sudo iptables -t nat -S | grep 10.119.91
+```
+
+## Step 6: Add the manager route
+
+The Morpheus manager also needs to know how to reach VLAN `1191`.
+
+On `hpe-vme-manager`, add a route through the first HVM host:
+
+```bash
+sudo ip route replace 10.119.91.0/24 via 30.30.119.20
+```
+
+Verify:
+
+```bash
+ip route | grep 10.119.91
+```
+
+The live path is now:
+
+```text
+Morpheus manager
+  -> 30.30.119.20
+  -> hpe-vme-hvm-01
+  -> cmpt VLAN 1191
+  -> VM 10.119.91.x
+```
+
+## Step 7: Prepare a usable Linux image
+
+Use an Ubuntu cloud image for the final test. CirrOS is useful for quick boot checks, but it is not a good final Morpheus validation image because static IP and guest customization behavior can be too limited.
+
+The working lab used:
+
+| Item | Value |
+| --- | --- |
+| OS | Ubuntu 24.04 cloud image |
+| Layout | Ubuntu QCOW layout |
+| Plan | `kvm-vm-1024` |
+| Network | `Compute VLAN 1191` |
+
+Before provisioning, confirm the image is selectable in Morpheus and the layout is mapped to the HVM cloud.
+
+## Step 8: Provision the test VM
+
+In Morpheus, create a new instance.
+
+Use these values for the first proof:
+
+| Field | Value |
+| --- | --- |
+| Instance name | `ubuntu-vlan1191-web-06` |
+| Cloud | `HPE VME Cloud` |
+| Cluster | `hpe-vme-hci-01` |
+| Host | `hpe-vme-hvm-01` |
+| Network | `Compute VLAN 1191` |
+| Static IP | `10.119.91.15` |
+| Gateway | `10.119.91.254` |
+| DNS | `8.8.8.8` |
+
+The VM should finish in a running or provisioned state. Morpheus guest-agent status may lag behind; do not use that alone as the pass/fail signal.
+
+## Step 9: Verify from the HVM host
+
+On `hpe-vme-hvm-01`, confirm libvirt created the VM and attached the NIC to the intended network.
+
+```bash
+sudo virsh list --all
+sudo virsh domiflist ubuntu-vlan1191-web-06
+sudo virsh dumpxml ubuntu-vlan1191-web-06 | grep -A10 -B2 -E 'interface|vlan|source network|target dev'
+```
+
+You are looking for:
+
+```text
+network: Compute
+portgroup: Compute VLAN 1191
+vlan tag: 1191
+```
+
+Then test reachability:
+
+```bash
+ping -c 3 10.119.91.15
+nc -vz 10.119.91.15 22
+```
+
+If ping and TCP/22 pass, the first APIC-to-Morpheus mapping is proven.
+
+## Step 10: Verify from the manager
+
+On `hpe-vme-manager`, confirm the same VM is reachable through the route added in Step 6.
+
+```bash
+ip route get 10.119.91.15
+ping -c 3 10.119.91.15
+nc -vz 10.119.91.15 22
+```
+
+The manager should route to `10.119.91.0/24` through `30.30.119.20`.
+
+## Step 11: Make the path persistent
+
+Temporary OVS, NAT, and route commands are not enough. Persist them with systemd services.
+
+On `hpe-vme-hvm-01`, persist:
+
+```text
+v1191gw OVS internal port
+10.119.91.254/24 address
+IPv4 forwarding
+NAT for 10.119.91.0/24 out mgmt
+```
+
+On `hpe-vme-manager`, persist:
+
+```text
+10.119.91.0/24 via 30.30.119.20
+```
+
+The working lab used these service names:
+
+| Host | Service |
+| --- | --- |
+| `hpe-vme-hvm-01` | `security-lab-vlan1191-gateway.service` |
+| `hpe-vme-manager` | `security-lab-vlan1191-route.service` |
+
+After enabling the services, restart them and retest the VM:
+
+```bash
+sudo systemctl restart security-lab-vlan1191-gateway.service
+sudo systemctl restart security-lab-vlan1191-route.service
+
+ping -c 3 10.119.91.15
+nc -vz 10.119.91.15 22
+```
+
+The path is considered persistent when the VM is still reachable after both service restarts.
+
+## Step 12: Repeat only after VLAN 1191 works
+
+Do not build all VLANs first. Finish one VLAN completely.
+
+When VLAN `1191` is working, repeat the same model for each additional EPG:
+
+1. Create the APIC BD and EPG.
+2. Add the static EPG path binding with the matching VLAN.
+3. Create the Morpheus network on bridge `cmpt`.
+4. Add or extend the live gateway/routing design.
+5. Provision one VM.
+6. Test ping and SSH reachability.
+7. Persist the route and gateway behavior.
+
+## Done criteria
+
+The minimum lab is done when all of these are true:
+
+- APIC tenant `lab-morpheus` exists.
+- APIC EPG `web` maps to VLAN `1191`.
+- The APIC access-policy chain reaches leaf `101`, interface `eth1/49`.
+- Morpheus network `Compute VLAN 1191` exists on bridge `cmpt`.
+- HVM host `hpe-vme-hvm-01` has gateway `10.119.91.254`.
+- Manager has a route to `10.119.91.0/24` through `30.30.119.20`.
+- VM `ubuntu-vlan1191-web-06` is running at `10.119.91.15`.
+- TCP/22 to `10.119.91.15` works.
+- Gateway and route services survive restart.
+
+At that point, the lab has proved the practical relationship between APIC policy intent and Morpheus VM placement on an OVS-backed VLAN.

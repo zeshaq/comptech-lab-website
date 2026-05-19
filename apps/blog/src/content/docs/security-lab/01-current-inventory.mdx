@@ -1,0 +1,94 @@
+---
+title: "Security Lab — current inventory"
+sidebar_label: "Current inventory"
+description: "Current VM, network, and endpoint inventory for the security lab."
+last_reviewed: 2026-05-15
+draft: false
+---
+
+## Host And Networks
+
+| Item | Value |
+| --- | --- |
+| Hypervisor | libvirt/KVM |
+| Host | `dl385` |
+| Management bridge | `br30` |
+| Management gateway | `30.30.0.1` |
+| Management CIDR convention | `30.30.0.0/16` |
+| Isolated lab network | `vapt-lab` |
+| Isolated lab bridge | `virbr-vapt` |
+
+`br30` is used for VM management and web UI access. `vapt-lab` is used for controlled lab traffic between sensors and targets.
+
+## Virtual Machines
+
+| VM | Purpose | Management IP | Primary access |
+| --- | --- | --- | --- |
+| `kali-linux` | Offensive workstation | `30.30.30.60` | SSH |
+| `kali-purple` | Purple-team Kali workstation | `30.30.30.61` | SSH |
+| `eve-ng` | Network emulation | `30.30.30.62` | `http://30.30.30.62/` |
+| `security-onion` | IDS/NSM/SOC stack | `30.30.30.63` | SSH / web after setup |
+| `wazuh` | SIEM/XDR | `30.30.30.64` | `https://30.30.30.64/` |
+| `greenbone` | Vulnerability scanning | `30.30.30.65` | `https://30.30.30.65/` |
+| `linux-target-01` | Linux scan and hardening target | `30.30.30.68` | `http://30.30.30.68/` |
+| `juice-shop` | Web app target | `30.30.30.69` | `http://30.30.30.69:3000/` |
+| `security-lab-runtime-01` | GitOps-managed runtime services | `30.30.30.70` | SSH and service ports |
+
+Shared infrastructure used by the lab:
+
+| VM | Role | Notes |
+| --- | --- | --- |
+| `haproxy` | Shared edge proxy | Publishes selected lab services through `*.apps.sub.comptech-lab.com` |
+| `pdns` | Shared authoritative DNS and recursor | Provides wildcard app DNS and lab DNS services |
+| `minio` | Shared object storage | Dedicated security-lab bucket is used for backup replication |
+
+StorageGRID grid-host VMs also exist under `30.30.31.10-30.30.31.19`. They are Linux grid hosts only; StorageGRID software installation is paused until official evaluation media and license are staged.
+
+## Runtime Services
+
+| Service | Purpose | URL |
+| --- | --- | --- |
+| Nautobot | Source of truth and inventory seed target | `http://30.30.30.70:8080/` |
+| Oxidized | Network configuration backup | `http://30.30.30.70:8888/` |
+| Batfish | Network validation and policy analysis API | `http://30.30.30.70:9996/` |
+| TheHive | Case management | `https://thehive.apps.sub.comptech-lab.com/` |
+| Shuffle | SOAR workflow testing | `https://shuffle.apps.sub.comptech-lab.com/` |
+
+## Nexus EVPN/VXLAN Lab
+
+| Node | Role | Lab |
+| --- | --- | --- |
+| `spine-01` | EVPN route-reflector spine | EVE-NG |
+| `spine-02` | EVPN route-reflector spine | EVE-NG |
+| `leaf-01` | VTEP leaf | EVE-NG |
+| `leaf-02` | VTEP leaf | EVE-NG |
+| `border-01` | Tenant border | EVE-NG |
+| `border-02` | Tenant border | EVE-NG |
+
+The current topology has BGP underlay, MP-BGP EVPN overlay, VXLAN tenant segments, dual-border upstream reachability, and services VRF route-leak controls.
+
+## Lab NICs
+
+These VMs also have a second NIC on `vapt-lab`:
+
+| VM | Lab MAC |
+| --- | --- |
+| `wazuh` | `52:54:00:40:30:64` |
+| `greenbone` | `52:54:00:40:30:65` |
+| `security-onion` | `52:54:00:40:30:63` |
+| `linux-target-01` | `52:54:00:40:30:68` |
+| `juice-shop` | `52:54:00:40:30:69` |
+
+## Quick Health Checks
+
+```bash
+virsh list --all
+tmux ls
+curl -Is http://30.30.30.62/
+curl -kIs https://30.30.30.64/
+curl -kIs https://30.30.30.65/
+curl -Is http://30.30.30.68/
+curl -Is http://30.30.30.69:3000/
+```
+
+Expected healthy results are HTTP responses from all endpoints, a clean Git state in the agent repo, and no unexpected Nexus validation sessions left in `tmux`.

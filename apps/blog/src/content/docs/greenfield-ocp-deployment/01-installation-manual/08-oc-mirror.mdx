@@ -1,0 +1,304 @@
+---
+title: "Installation Manual - 08 oc-mirror"
+sidebar_label: "08 oc-mirror"
+description: "How the greenfield OpenShift release and operator mirror workflow is planned, credentialed, and smoke-tested into Quay."
+last_reviewed: 2026-05-15
+draft: false
+---
+
+`oc-mirror` is the image-supply mechanism for the greenfield OpenShift
+deployment. The registry foundation is Quay, and the mirror workflow uses
+`oc-mirror` plugin v2.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Tool | `oc-mirror` plugin v2 |
+| Installed plugin version | 4.20 stream plugin matching the local `oc` 4.20 client |
+| Release mirror target | `quay.v7.comptech-lab.com/openshift-release` |
+| Operator mirror target | `quay.v7.comptech-lab.com/openshift-operators` |
+| Release robot | `openshift-release+ocp_mirror` |
+| Operator robot | `openshift-operators+ocp_mirror` |
+| Smoke image | `registry.access.redhat.com/ubi9/ubi-micro:latest` |
+| Authfile artifacts | `artifacts/oc-mirror/auth/` |
+| Workspace artifacts | `artifacts/oc-mirror/production-release/`, `artifacts/oc-mirror/production-operators/` |
+| Versioned cluster resources | `data/oc-mirror/cluster-resources/release/`, `data/oc-mirror/cluster-resources/operators/` |
+
+Red Hat documents `oc-mirror` plugin v2 for disconnected OpenShift
+installations in OpenShift Container Platform 4.20. The v2 command is used
+with the `--v2` flag.
+
+## Credential Model
+
+Docker auth is selected by registry hostname. Because both targets use
+`quay.v7.comptech-lab.com`, the workflow is intentionally split into two
+separate mirror runs:
+
+- release run with `openshift-release+ocp_mirror`;
+- operator run with `openshift-operators+ocp_mirror`.
+
+The scripts read these Vault paths:
+
+```text
+secret/greenfield/bootstrap/openshift/pull-secret
+secret/greenfield/quay/robots/openshift-release/ocp_mirror
+secret/greenfield/quay/robots/openshift-operators/ocp_mirror
+```
+
+Generated authfiles are ignored Git artifacts and must stay mode `0600`.
+
+## Quay Permission Model
+
+Each mirror robot is a member of a namespace-local `mirror-creators` team with
+the Quay `creator` role:
+
+```text
+openshift-release/mirror-creators
+openshift-operators/mirror-creators
+```
+
+This is required because `oc-mirror` creates destination repositories based on
+the source image paths. Repo-scoped write permission alone is not sufficient.
+
+Quay must also have extended repository names enabled before mirroring:
+
+```yaml
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+```
+
+## Source Files
+
+```text
+data/oc-mirror/imageset-smoke-additional.yaml
+data/oc-mirror/imageset-4.20-template.yaml
+data/oc-mirror/imageset-v7-baseline-release.yaml
+data/oc-mirror/imageset-v7-baseline-operators.yaml
+scripts/services/oc-mirror/build-authfile-from-vault.sh
+scripts/services/oc-mirror/generate-nexus-replay-copy-list.py
+scripts/services/oc-mirror/run-smoke-mirror.sh
+scripts/services/oc-mirror/run-production-mirror.sh
+scripts/services/quay/seed-oc-mirror-repositories-from-mapping.sh
+data/oc-mirror/cluster-resources/release/
+data/oc-mirror/cluster-resources/operators/
+runbooks/oc-mirror-v7.md
+```
+
+The smoke config mirrors only `ubi9/ubi-micro`. The reviewed production
+baseline is captured in the `imageset-v7-baseline-*` files.
+
+## Smoke Validation
+
+Set Vault environment variables:
+
+```bash
+export VAULT_ADDR=https://gf-ocp-vault-02.v7.comptech-lab.com:8200
+export VAULT_CACERT=/path/to/vault-ca.crt
+export VAULT_TOKEN=<redacted>
+```
+
+Run the release namespace smoke:
+
+```bash
+./scripts/services/oc-mirror/run-smoke-mirror.sh --profile release
+```
+
+Run the operator namespace smoke:
+
+```bash
+./scripts/services/oc-mirror/run-smoke-mirror.sh --profile operators
+```
+
+Validated mirror results:
+
+```text
+quay.v7.comptech-lab.com/openshift-release/ubi9/ubi-micro:latest
+quay.v7.comptech-lab.com/openshift-operators/ubi9/ubi-micro:latest
+```
+
+Each run generated an `ImageTagMirrorSet` artifact under its smoke workspace.
+
+## Production Mirror Rules
+
+- The first production mirror uses OpenShift `stable-4.20` pinned to
+  `4.20.18`.
+- The first production mirror uses `redhat-operator-index:v4.20` and
+  `certified-operator-index:v4.20`.
+- Every operator package, channel, and version is pinned to the approved v7
+  image-supply baseline.
+- Keep release and operator mirrors as separate runs unless a dedicated broader
+  mirror credential is approved.
+- Store generated pull-secret material and cluster mirror manifests in Vault or
+  the operational GitLab, not in public GitHub.
+- OpenShift image supply is Quay-backed. Do not use old Nexus as the
+  greenfield OpenShift image source.
+- Keep historical mirror archives only as emergency reference material.
+
+## Historical Replay Reference
+
+Historical local mirror content was assessed before the first greenfield Quay
+mirror. It remains useful for forensic comparison, but the production path is a
+fresh oc-mirror v2 mirror into Quay.
+
+Available local sources:
+
+```text
+/home/ze/rebuild/oc-mirror-archive/20260514-130143-oc-mirror-workspace/
+/home/ze/rebuild/nexus-backups/20260514-130143-nexus-mirror/
+```
+
+The workspace archive has previous run metadata and generated cluster
+resources, but no `mirror_seq*.tar` import archives. Do not use this path for
+normal greenfield execution.
+
+Generate the replay copy list:
+
+```bash
+./scripts/services/oc-mirror/generate-nexus-replay-copy-list.py \
+  --mapping /home/ze/rebuild/oc-mirror-archive/20260514-130143-oc-mirror-workspace/workspace/rhoai-dryrun-20260510-134935/working-dir/dry-run/mapping.txt \
+  --output artifacts/oc-mirror/replay/replay-from-nexus-to-quay.sh
+```
+
+Run it only as an approved emergency replay:
+
+```bash
+export SRC_AUTHFILE=/secure/path/restored-nexus-auth.json
+export DEST_AUTHFILE=/secure/path/quay-auth.json
+artifacts/oc-mirror/replay/replay-from-nexus-to-quay.sh
+```
+
+The generated replay sends release paths to
+`quay.v7.comptech-lab.com/openshift-release/...` and operator/additional paths
+to `quay.v7.comptech-lab.com/openshift-operators/...`.
+
+## V7 Baseline
+
+The first greenfield OpenShift mirror is intentionally conservative. It
+pins the release and operator image supply before any upgrade or tooling
+expansion is considered.
+
+| Scope | Pinned value |
+| --- | --- |
+| OpenShift release channel | `stable-4.20` |
+| OpenShift release | `4.20.18` |
+| Architecture | `amd64` |
+| Upgrade graph | `false` |
+| Red Hat catalog | `registry.redhat.io/redhat/redhat-operator-index:v4.20` |
+| Certified catalog | `registry.redhat.io/redhat/certified-operator-index:v4.20` |
+
+Run dry-runs first:
+
+```bash
+./scripts/services/oc-mirror/run-production-mirror.sh --profile release --dry-run
+./scripts/services/oc-mirror/run-production-mirror.sh --profile operators --dry-run
+```
+
+Pre-seed operator destination repositories from the dry-run mapping:
+
+```bash
+scp scripts/services/quay/seed-oc-mirror-repositories-from-mapping.sh \
+  artifacts/oc-mirror/production-operators/working-dir/dry-run/mapping.txt \
+  ze@30.30.200.40:/tmp/
+ssh ze@30.30.200.40 \
+  'sudo install -m 0755 /tmp/seed-oc-mirror-repositories-from-mapping.sh /usr/local/sbin/seed-oc-mirror-repositories-from-mapping.sh &&
+   sudo /usr/local/sbin/seed-oc-mirror-repositories-from-mapping.sh \
+     --mapping /tmp/mapping.txt \
+     --organization openshift-operators \
+     --robot openshift-operators+ocp_mirror'
+```
+
+After approval, run the real mirrors:
+
+```bash
+./scripts/services/oc-mirror/run-production-mirror.sh --profile release
+./scripts/services/oc-mirror/run-production-mirror.sh --profile operators
+```
+
+The operator run defaults to conservative settings for the large RHOAI/RHAIIS
+tail of the previous operator set:
+
+```text
+--parallel-images 2
+--parallel-layers 3
+--image-timeout 30m
+--retry-times 8
+```
+
+The May 15, 2026 validated production result was:
+
+```text
+193 / 193 release images mirrored successfully
+582 / 582 operator images mirrored successfully
+4 / 4 additional images mirrored successfully
+```
+
+Validate the mirrored release payload:
+
+```bash
+oc adm release info \
+  --registry-config artifacts/oc-mirror/auth/release-auth.json \
+  quay.v7.comptech-lab.com/openshift-release/openshift/release-images:4.20.18-x86_64
+```
+
+Validate both mirrored catalogs:
+
+```bash
+oc image info --filter-by-os linux/amd64 \
+  --registry-config artifacts/oc-mirror/auth/operators-auth.json \
+  quay.v7.comptech-lab.com/openshift-operators/redhat/redhat-operator-index:v4.20
+
+oc image info --filter-by-os linux/amd64 \
+  --registry-config artifacts/oc-mirror/auth/operators-auth.json \
+  quay.v7.comptech-lab.com/openshift-operators/redhat/certified-operator-index:v4.20
+```
+
+The Red Hat catalog package set is:
+
+```text
+openshift-gitops-operator latest 1.20.3
+advanced-cluster-management release-2.16 2.16.1
+multicluster-engine stable-2.11 2.11.1
+lvms-operator stable-4.20 4.20.0
+local-storage-operator stable 4.20.0-202604140241
+odf-operator stable-4.20 4.20.10-rhodf
+cephcsi-operator stable-4.20 4.20.10-rhodf
+mcg-operator stable-4.20 4.20.10-rhodf
+ocs-client-operator stable-4.20 4.20.10-rhodf
+ocs-operator stable-4.20 4.20.10-rhodf
+odf-csi-addons-operator stable-4.20 4.20.10-rhodf
+odf-dependencies stable-4.20 4.20.10-rhodf
+odf-external-snapshotter-operator stable-4.20 4.20.10-rhodf
+odf-prometheus-operator stable-4.20 4.20.10-rhodf
+recipe stable-4.20 4.20.10-rhodf
+rook-ceph-operator stable-4.20 4.20.10-rhodf
+redhat-oadp-operator stable 1.5.5
+openshift-cert-manager-operator stable-v1 1.19.0
+openshift-external-secrets-operator stable-v1 1.1.0
+openshift-pipelines-operator-rh pipelines-1.22 1.22.0
+rhacs-operator stable 4.10.2
+compliance-operator stable 1.9.0
+gatekeeper-operator-product stable 3.21.0
+container-security-operator stable-3.16 3.16.3
+cluster-observability-operator stable 1.4.0
+loki-operator stable-6.5 6.5.0
+cluster-logging stable-6.5 6.5.0
+tempo-product stable 0.20.0-3
+opentelemetry-product stable 0.144.0-3
+netobserv-operator stable 1.11.1
+servicemeshoperator3 stable-3.3 3.3.2
+kiali-ossm stable 2.22.2
+quay-operator stable-3.17 3.17.1
+cluster-kube-descheduler-operator stable 5.3.2
+file-integrity-operator stable 1.3.8
+security-profiles-operator release-alpha-rhel-8 0.10.0
+nfd stable 4.20.0-202604140241
+kubevirt-hyperconverged stable 4.20.11
+rhods-operator stable 2.25.6
+```
+
+The certified catalog package set is:
+
+```text
+cloudnative-pg stable-v1 1.29.0
+open-liberty-certified v1.6 1.6.1
+```

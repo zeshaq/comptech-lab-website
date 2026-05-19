@@ -1,0 +1,331 @@
+---
+title: "Customer portal — SvelteKit + Auth.js BFF"
+sidebar_label: "23 — Customer portal foundation"
+description: "The first slice of the real customer-facing GUI: SvelteKit + Svelte 5 + Tailwind 4 + @auth/sveltekit, deployed as a separate container with a BFF in front of Liberty. The browser never sees a JWT. Slice 18 in the insurance-app repo."
+estimated_minutes: 75
+last_updated: 2026-05-17
+prereqs: ["22 — Feature: GUI tour"]
+---
+
+The vanilla GUI tour from [chapter 22](/learn/openliberty/feature-gui-tour)
+solves one problem: making the API *seeable* for a demo. It does not solve
+the customer-facing one. Customers expect a real frontend with real login
+and real session management — and they do **not** expect a JWT to live in
+their browser's local storage.
+
+This chapter is the first slice of that real frontend. SvelteKit 2.x +
+Svelte 5 + Tailwind 4 + `@auth/sveltekit`, deployed as a separate
+container (`customer-app`) sitting on `insurance-net` next to Liberty.
+The architecture pattern it adopts is the **Backend-For-Frontend (BFF)**:
+the SvelteKit server holds the OIDC session cookie, the browser only sees
+an HttpOnly cookie, and Liberty calls go server-to-server with the
+existing `client_credentials` service-account JWT plus user-identity
+headers.
+
+Companion commit: `bb58015` in `insurance-app`.
+
+## What "real" means here
+
+The teaching shortcut in chapter 22 — Liberty mints a service-account JWT
+and JavaScript attaches it to every fetch — has three real-world
+problems:
+
+1. **Any tab can read the token.** `App.api()` stashes the JWT in a
+   closure today; tomorrow someone changes it to `localStorage`. One XSS
+   on any page exfiltrates a token good for an hour.
+2. **No user identity.** Everything runs as the same service principal.
+   The audit log can't tell who actually filed a claim.
+3. **No login UX.** A real customer expects a "Sign in" button, a
+   real OIDC dance, and a session that survives a page refresh.
+
+The BFF pattern fixes all three at the cost of one extra hop. The
+browser sees a signed, HttpOnly cookie; the SvelteKit server holds the
+upstream OIDC tokens and the service-account JWT; Liberty's `mpJwt`
+config never has to change.
+
+## The shape
+
+```
+Browser ──(HttpOnly cookie)──▶ SvelteKit server (customer-app:3000)
+                                │
+                                ├─ /auth/* — @auth/sveltekit owns it
+                                │     (signin, callback, signout, session)
+                                │     OIDC code-flow + PKCE against WSO2 IS
+                                │
+                                └─ +page.server.ts load() / actions
+                                       │
+                                       │   service-account JWT (cached)
+                                       ▼
+                                   Liberty (insurance-app:9080)
+                                       │   X-User-Id, X-User-Email
+                                       │   propagated from session
+                                       ▼
+                                   Existing @RolesAllowed routes
+```
+
+Two JWTs in play: the **user's** access token from WSO2 IS (stored in
+the SvelteKit session blob — never sent to the browser) and the
+**service-account's** `client_credentials` token (cached in the server's
+process memory, refreshed before expiry). Liberty only sees the second
+one. The first one is plumbing for later slices that want true
+user-identity propagation; for now, the BFF forwards user identity as
+plain headers (`X-User-Id`, `X-User-Email`) on top of the service token.
+
+## A separate DCR client for the human login
+
+Chapter 11 used DCR to register the `insurance-app` client with
+`grant_types: ["client_credentials"]`. That client cannot do an
+interactive login — it has no redirect URI and no `authorization_code`
+grant. The customer portal needs its own client:
+
+```bash
+curl -k -sS -X POST -u admin:admin \
+  https://localhost:9444/api/identity/oauth2/dcr/v1.1/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_name": "insurance-app-customer",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "redirect_uris": ["https://my.insurance-app.comptech-lab.com/auth/callback/wso2is"],
+    "ext_token_type": "JWT"
+  }'
+```
+
+Two non-obvious bits, the same ones chapter 11 called out:
+
+- The DCR path is `oauth2/dcr` with a slash, not `oauth2-dcr` with a
+  hyphen. The hyphen variant 401s silently.
+- `ext_token_type: JWT` is non-negotiable. Without it WSO2 IS issues an
+  opaque reference token instead of a JWT and `@auth/sveltekit`'s
+  signature check rejects it.
+
+Save the `client_id` + `client_secret` to `.customer-app-oidc-creds`
+(gitignored) alongside an `AUTH_SECRET` for cookie signing:
+
+```bash
+cat > ~/insurance-app/.customer-app-oidc-creds <<EOF
+export CUSTOMER_OIDC_CLIENT_ID=<from-DCR-response>
+export CUSTOMER_OIDC_CLIENT_SECRET=<from-DCR-response>
+export AUTH_SECRET=$(openssl rand -hex 32)
+EOF
+```
+
+`AUTH_SECRET` signs the session cookie. Rotating it invalidates every
+existing session, which is the intended behavior on credential
+compromise.
+
+## `@auth/sveltekit` wired to WSO2 IS
+
+WSO2 IS isn't in `@auth/sveltekit`'s built-in providers list, so it's
+declared as a custom OIDC provider. The full config is short:
+
+```ts
+// gui/customer-app/src/auth.ts
+import { SvelteKitAuth } from '@auth/sveltekit';
+import { env } from '$env/dynamic/private';
+
+export const { handle, signIn, signOut } = SvelteKitAuth(async () => ({
+  secret: env.AUTH_SECRET,
+  trustHost: true,
+  providers: [
+    {
+      id: 'wso2is',
+      name: 'WSO2 Identity Server',
+      type: 'oidc',
+      issuer: 'https://is.insurance-app.comptech-lab.com/oauth2/token',
+      wellKnown:
+        'https://is.insurance-app.comptech-lab.com/oauth2/token/.well-known/openid-configuration',
+      clientId: env.CUSTOMER_OIDC_CLIENT_ID,
+      clientSecret: env.CUSTOMER_OIDC_CLIENT_SECRET,
+      authorization: { params: { scope: 'openid profile email' } },
+      checks: ['pkce', 'state'],
+      profile(p) {
+        return {
+          id: p.sub as string,
+          name: (p.name as string | undefined) ?? (p.given_name as string | undefined) ?? (p.sub as string),
+          email: (p.email as string | undefined) ?? null,
+        };
+      },
+    },
+  ],
+  pages: { signIn: '/login' },
+}));
+```
+
+Two things future-you will trip on:
+
+- **`issuer` ends with `/oauth2/token`.** The `iss` claim WSO2 IS puts
+  on JWTs, the `issuer` field in its discovery document, and the
+  `issuer` value here all have to match exactly. The full reasoning
+  lives in [chapter 27](/learn/openliberty/real-human-oidc) — for now,
+  trust that the suffix is load-bearing.
+- **`checks: ['pkce', 'state']`** is the modern default. PKCE protects
+  the public client during the code-for-token exchange; state covers
+  CSRF on the callback. Both are mandatory for any browser-mounted
+  OIDC client in 2026.
+
+The `signIn` page maps to `/login`. The default `/auth/signin` page
+exists too, but customers expect to land on a branded login screen, not
+a generic provider picker.
+
+Wire the handler into the SvelteKit request pipeline:
+
+```ts
+// gui/customer-app/src/hooks.server.ts
+import { handle as authHandle } from './auth';
+export const handle = authHandle;
+```
+
+After this, the SvelteKit server answers:
+
+- `POST /auth/signin/wso2is` → 302 to WSO2 IS authorize endpoint
+- `GET  /auth/callback/wso2is?code=…&state=…` → exchanges the code, sets the session cookie, redirects to `/`
+- `POST /auth/signout` → clears the cookie
+- `GET  /auth/session` → returns the current session blob (used by client-side guards)
+
+## The BFF helper: `liberty()` / `libertyJson()`
+
+Every server-side `load()` and form action that needs Liberty data goes
+through one helper. It handles three things at once: cache the service
+JWT, attach user identity, auto-JSON the body if it's a plain object.
+
+```ts
+// gui/customer-app/src/lib/server/liberty.ts (abbreviated)
+export async function liberty(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  init: RequestInit & LibertyOpts = {}
+): Promise<Response> {
+  const token = await ensureToken();
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  if (init.userId)    headers.set('X-User-Id',    init.userId);
+  if (init.userEmail) headers.set('X-User-Email', init.userEmail);
+
+  let body = init.body as BodyInit | object | undefined;
+  if (body && typeof body === 'object'
+      && !(body instanceof FormData) && !(body instanceof URLSearchParams)) {
+    body = JSON.stringify(body);
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  }
+  return fetch(`${LIBERTY_BASE}${path}`, { ...init, method, headers, body: body as BodyInit });
+}
+```
+
+`ensureToken()` keeps a process-local cache and refreshes ~5 minutes
+before expiry, so the customer-app does one round trip to WSO2 IS per
+hour at idle. The auto-JSON branch is the small ergonomic touch that
+lets the rest of the codebase write `{ body: { vehicleVin, driverAge } }`
+without ceremony; FormData/URLSearchParams/Blob fall through
+untouched, which matters for the multipart claim upload in
+[chapter 26](/learn/openliberty/claim-filing-bff).
+
+## Layout, header, and the session-aware nav
+
+`+layout.server.ts` reads `event.locals.auth()` once per request and
+hands the session blob to every page through `$page.data.session`:
+
+```ts
+export const load: LayoutServerLoad = async (event) => {
+  const session = await event.locals.auth();
+  return { session };
+};
+```
+
+The header in `+layout.svelte` reads the session to render either a
+"Sign in" form or a user pill + "Sign out" form. Both buttons POST to
+`/auth/signin/wso2is` or `/auth/signout` — plain HTML forms, no
+JavaScript required for either path:
+
+```svelte
+{#if session?.user}
+  <a href="/account">{session.user.name ?? session.user.email}</a>
+  <form action="/auth/signout" method="POST" class="inline">
+    <button formaction="/auth/signout?callbackUrl=/">Sign out</button>
+  </form>
+{:else}
+  <form action="/auth/signin/wso2is" method="POST" class="inline">
+    <button>Sign in</button>
+  </form>
+{/if}
+```
+
+## Container shape
+
+`gui/customer-app/Containerfile` is a two-stage Node 22 image. The
+runtime stage runs SvelteKit's adapter-node:
+
+```dockerfile
+FROM docker.io/library/node:22-alpine AS runtime
+ENV NODE_ENV=production
+COPY --from=build /app/package.json /app/package-lock.json* ./
+RUN npm ci --omit=dev --silent
+COPY --from=build /app/build ./build
+EXPOSE 3000
+ENV HOST=0.0.0.0 PORT=3000
+CMD ["node", "build"]
+```
+
+Launched alongside Liberty + WSO2 IS on the same podman network so the
+BFF can reach `http://wso2is:9763/oauth2/token` and
+`http://insurance-app:9080/api/...` without leaving the host:
+
+```bash
+source ~/insurance-app/.customer-app-oidc-creds
+podman run -d --replace --name customer-app --network insurance-net \
+  -e CUSTOMER_OIDC_CLIENT_ID -e CUSTOMER_OIDC_CLIENT_SECRET \
+  -e WSO2IS_CLIENT_ID -e WSO2IS_CLIENT_SECRET \
+  -e AUTH_SECRET \
+  -e WSO2IS_TOKEN_URL_INTERNAL=http://wso2is:9763/oauth2/token \
+  -e LIBERTY_BASE=http://insurance-app:9080 \
+  -p 3000:3000 customer-app:dev
+```
+
+The public URL (`https://my.insurance-app.comptech-lab.com`) and the
+`ORIGIN` env var that makes adapter-node believe it are
+[chapter 27](/learn/openliberty/real-human-oidc) material. For this
+chapter, the in-container `http://localhost:3000` is enough to test
+the wiring.
+
+## Verify
+
+```bash
+# Container up, port forwarded
+curl -sI http://localhost:3000/ | head -1
+#   HTTP/1.1 200 OK
+
+# /auth/session returns the empty session for an anonymous request
+curl -s http://localhost:3000/auth/session
+#   {}
+
+# /auth/signin/wso2is redirects into WSO2 IS authorize
+curl -sI -X POST http://localhost:3000/auth/signin/wso2is | grep -i location
+#   location: https://is.insurance-app.comptech-lab.com/oauth2/authorize?...
+#     scope=openid+profile+email
+#     code_challenge=<base64url>
+#     code_challenge_method=S256
+#     state=<random>
+#     client_id=<CUSTOMER_OIDC_CLIENT_ID>
+```
+
+The `code_challenge` + `code_challenge_method=S256` query params are
+PKCE evidence: `@auth/sveltekit` is doing it for you. Don't accept any
+provider that doesn't.
+
+## What you have
+
+- A SvelteKit customer-app container alongside Liberty + WSO2 IS on
+  the same podman network.
+- The BFF pattern wired: HttpOnly session cookie in the browser, OIDC
+  session blob on the server, service-account JWT for Liberty calls.
+- One BFF helper (`liberty()` / `libertyJson()`) that every server-side
+  page or form action will call.
+- A separate DCR-registered OIDC client for the customer login,
+  distinct from the chapter-11 service-account client.
+- A header that toggles between "Sign in" and the user pill + "Sign
+  out" form depending on the session.
+
+The portal answers `GET /` with an empty marketing page right now.
+Slice 19 puts the first real flow on it — a quote form with progressive
+enhancement.
+
+Next: [24 — Quote wizard with progressive enhancement →](/learn/openliberty/quote-wizard-progressive-enhancement)

@@ -1,0 +1,150 @@
+---
+title: "Installation Manual - 58 OADP restore validation drill"
+sidebar_label: "58 OADP restore validation"
+description: "Controlled namespace-scoped OADP restore validation for hub-dc-v7 and spoke-dc-v7."
+---
+
+This chapter records the governed OADP restore validation drill for
+`hub-dc-v7` and `spoke-dc-v7`. The drill used a temporary namespace and marker
+ConfigMap on each cluster, then proved backup, deletion, restore, marker
+verification, object-store visibility, and cleanup.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Preflight
+
+| Cluster | OpenShift | ClusterOperators | DPA | BSL | Velero | Existing Restores |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | Reconciled | Available | `1/1` | none |
+| `spoke-dc-v7` | `4.20.18` | steady | Reconciled | Available | `1/1` | none |
+
+The normal daily schedules were already restored:
+
+| Cluster | Schedule |
+| --- | --- |
+| `hub-dc-v7` | `15 2 * * *` |
+| `spoke-dc-v7` | `45 2 * * *` |
+
+## Drill Pattern
+
+The restore drill used this temporary namespace on both clusters:
+
+```text
+codex-oadp-restore-20260517225454
+```
+
+The marker was:
+
+```text
+ConfigMap/restore-marker
+```
+
+The marker carried:
+
+| Key | Expected value |
+| --- | --- |
+| `cluster` | the cluster name |
+| `stamp` | `20260517225454` |
+| `purpose` | `oadp-restore-validation` |
+
+## Backup Results
+
+| Cluster | Backup | Phase | Items | Warnings | Errors |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `codex-oadp-restore-hub-20260517225454` | Completed | `16/16` | none | none |
+| `spoke-dc-v7` | `codex-oadp-restore-spoke-20260517225454` | Completed | `18/18` | none | none |
+
+Each source namespace was deleted before the Restore was created.
+
+## Restore Results
+
+| Cluster | Restore | Phase | Estimated items | Warnings | Errors |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `codex-oadp-restore-hub-20260517225454` | Completed | `15` | `3` | none |
+| `spoke-dc-v7` | `codex-oadp-restore-spoke-20260517225454` | Completed | `17` | `4` | none |
+
+Restored marker validation:
+
+| Cluster | Marker cluster | Marker stamp | Marker purpose |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `hub-dc-v7` | `20260517225454` | `oadp-restore-validation` |
+| `spoke-dc-v7` | `spoke-dc-v7` | `20260517225454` | `oadp-restore-validation` |
+
+## Warning Classification
+
+The Restore CRs completed with warnings but no errors. The warning details
+were extracted from Velero restore result artifacts in MinIO.
+
+Hub warnings:
+
+```text
+could not restore, ConfigMap:kube-root-ca.crt already exists. Warning: the in-cluster version is different than the backed-up version
+could not restore, ConfigMap:openshift-service-ca.crt already exists. Warning: the in-cluster version is different than the backed-up version
+could not restore, ClusterServiceVersion:rhacs-operator.v4.10.2 already exists. Warning: the in-cluster version is different than the backed-up version
+```
+
+Spoke warnings:
+
+```text
+could not restore, RoleBinding:system:image-builders already exists. Warning: the in-cluster version is different than the backed-up version
+could not restore, ConfigMap:kube-root-ca.crt already exists. Warning: the in-cluster version is different than the backed-up version
+could not restore, ConfigMap:openshift-service-ca.crt already exists. Warning: the in-cluster version is different than the backed-up version
+could not restore, ClusterServiceVersion:cluster-logging.v6.5.0 already exists. Warning: the in-cluster version is different than the backed-up version
+```
+
+Interpretation: these warnings are auto-created namespace resource collisions
+during namespace recreation, not marker-data loss.
+
+## Object Store Validation
+
+Before cleanup:
+
+| Prefix | Objects |
+| --- | --- |
+| `hub-dc-v7/general/backups/codex-oadp-restore-hub-20260517225454` | `12` |
+| `hub-dc-v7/general/restores/codex-oadp-restore-hub-20260517225454` | `5` |
+| `spoke-dc-v7/general/backups/codex-oadp-restore-spoke-20260517225454` | `12` |
+| `spoke-dc-v7/general/restores/codex-oadp-restore-spoke-20260517225454` | `5` |
+
+After cleanup, all exact test prefixes had `0` objects.
+
+## Cleanup
+
+Cleanup removed:
+
+- temporary namespaces;
+- test Backup CRs;
+- test Restore CRs;
+- matching DeleteBackupRequests;
+- exact test MinIO prefixes.
+
+Final live state:
+
+| Cluster | OpenShift | ClusterOperators | BSL | Velero | Test namespace | Restores | DeleteBackupRequests |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | steady | Available | `1/1` | absent | none | none |
+| `spoke-dc-v7` | `4.20.18` | steady | Available | `1/1` | absent | none | none |
+
+Only the scheduled `platform-resource-daily-*` Backup CRs remain.
+
+## Actions Not Taken
+
+- No full-cluster restore was attempted.
+- No scheduled backup was deleted.
+- No GitOps desired state was changed.
+- No stable Vault DNS cutover was made.
+- No old Vault mutation was made.
+- No secret values were printed.
+
+## Next Action
+
+Treat the OADP-specific Vault R1 migration as validated. Continue the
+replacement Vault work by choosing the next old-Vault consumer class to
+migrate or rotate.

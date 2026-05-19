@@ -1,0 +1,508 @@
+---
+title: "ACI Morpheus setup lab"
+sidebar_label: "18 — ACI Morpheus setup"
+description: "Build an APIC workload policy model, then prove the same VLAN and EPG intent with HPE Morpheus VM Essentials and nested KVM."
+estimated_minutes: 90
+last_updated: 2026-05-18
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const edgeStyle = { background: "#fef3c7", border: "1.5px solid #b45309", borderRadius: 8, padding: 10, color: "#0f172a", width: 185, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const aciStyle = { background: "#e0f2fe", border: "1.5px solid #0369a1", borderRadius: 8, padding: 10, color: "#0f172a", width: 210, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const hpeStyle = { background: "#dcfce7", border: "1.5px solid #15803d", borderRadius: 8, padding: 10, color: "#0f172a", width: 220, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const workloadStyle = { background: "#f8fafc", border: "1.5px solid #64748b", borderRadius: 8, padding: 10, color: "#0f172a", width: 215, textAlign: "center", fontSize: 12 };
+export const warnStyle = { background: "#fff7ed", border: "1.5px solid #c2410c", borderRadius: 8, padding: 10, color: "#0f172a", width: 235, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const rel = { style: { stroke: "#334155", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#334155" }, labelStyle: { fill: "#334155", fontSize: 11 }, labelBgStyle: { fill: "#ffffff" } };
+export const live = { style: { stroke: "#15803d", strokeWidth: 1.8 }, markerEnd: { type: "arrowclosed", color: "#15803d" }, labelStyle: { fill: "#15803d", fontSize: 11 }, labelBgStyle: { fill: "#ffffff" } };
+export const model = { style: { stroke: "#0369a1", strokeWidth: 1.8, strokeDasharray: "6 4" }, markerEnd: { type: "arrowclosed", color: "#0369a1" }, labelStyle: { fill: "#0369a1", fontSize: 11 }, labelBgStyle: { fill: "#ffffff" } };
+
+export const morpheusNodes = [
+  { id: "edge", position: { x: 35, y: 90 }, data: { label: "Public edge\nPowerDNS + HAProxy\n59.153.29.102" }, style: edgeStyle },
+  { id: "aci", position: { x: 310, y: 40 }, data: { label: "Cisco APIC\nACI policy model\naci-sim.v7" }, style: aciStyle },
+  { id: "tenant", position: { x: 310, y: 210 }, data: { label: "lab-morpheus\nVRF + BDs + EPGs\nVLAN 1191-1199" }, style: aciStyle },
+  { id: "manager", position: { x: 600, y: 80 }, data: { label: "HPE Morpheus\nVM Essentials manager\nhpe-vme.v7" }, style: hpeStyle },
+  { id: "cluster", position: { x: 600, y: 250 }, data: { label: "HVM cluster\n3 nested Ubuntu KVM hosts\nOVS mgmt + cmpt" }, style: hpeStyle },
+  { id: "mgmt", position: { x: 895, y: 125 }, data: { label: "Management network\n30.30.0.0/16\nreachable dashboards" }, style: workloadStyle },
+  { id: "vlan1191", position: { x: 895, y: 300 }, data: { label: "Compute VLAN 1191\nEPG web\n10.119.91.0/24" }, style: workloadStyle },
+  { id: "vm", position: { x: 895, y: 465 }, data: { label: "Ubuntu smoke VM\nubuntu-vlan1191-web-06\n10.119.91.15" }, style: workloadStyle },
+  { id: "limit", position: { x: 310, y: 405 }, data: { label: "Boundary\nAPIC models policy\nOVS/HPE carries packets" }, style: warnStyle },
+];
+
+export const morpheusEdges = [
+  { id: "e1", source: "edge", target: "aci", label: "publishes APIC UI", ...live },
+  { id: "e2", source: "edge", target: "manager", label: "publishes manager UI", ...live },
+  { id: "e3", source: "aci", target: "tenant", label: "models policy", ...model },
+  { id: "e4", source: "manager", target: "cluster", label: "provisions hosts", ...live },
+  { id: "e5", source: "cluster", target: "mgmt", label: "manager + dashboards", ...live },
+  { id: "e6", source: "cluster", target: "vlan1191", label: "OVS VLAN tag 1191", ...live },
+  { id: "e7", source: "vlan1191", target: "vm", label: "guest NIC", ...live },
+  { id: "e8", source: "tenant", target: "vlan1191", label: "same EPG/VLAN intent", ...model },
+  { id: "e9", source: "tenant", target: "limit", label: "policy only", ...model },
+];
+
+This lab is the bridge between APIC policy modeling and a real virtualization workflow.
+
+Cisco APIC gives you the ACI policy classroom: tenants, VRFs, bridge domains, EPGs, access policies, static path bindings, contracts, faults, and object relationships. HPE Morpheus VM Essentials gives you the VM lifecycle side: images, clusters, KVM hosts, OVS bridges, VLAN port groups, cloud-init, and workload reachability.
+
+The important boundary is this:
+
+```text
+APIC models the ACI policy.
+HPE VME, KVM, and OVS carry the packets.
+```
+
+Do not expect APIC in this lab to enforce traffic. Use it to learn and document the ACI intent, then prove the matching network behavior in Morpheus and KVM.
+
+The lab slug is:
+
+```text
+aci-morpheus-setup-lab
+```
+
+## Final topology
+
+<Whiteboard client:load data={{ nodes: morpheusNodes, edges: morpheusEdges }} height={680} />
+
+## What we built
+
+| Layer | Final state |
+| --- | --- |
+| APIC | `https://aci-sim.v7.comptech-lab.com/` |
+| ACI backend | `30.30.119.10` |
+| ACI tenant | `lab-morpheus` |
+| ACI VRF | `morpheus-vrf` |
+| ACI app profile | `morpheus-kvm-app` |
+| ACI access path | leaf `101`, interface `eth1/49` |
+| HPE VME manager | `https://hpe-vme.v7.comptech-lab.com/` |
+| Manager backend | `30.30.119.23` |
+| HPE group | `HPE VME Greenfield` |
+| HPE cloud | `HPE VME Cloud` |
+| HPE cluster | `hpe-vme-hci-01` |
+| HVM hosts | `hpe-vme-hvm-01`, `hpe-vme-hvm-02`, `hpe-vme-hvm-03` |
+| Management OVS bridge | `mgmt` |
+| Compute OVS bridge | `cmpt` |
+| Final test VM | `ubuntu-vlan1191-web-06` |
+| Test VM IP | `10.119.91.15/24` |
+
+Credentials, API tokens, APIC cookies, bearer tokens, passwords, and generated keys stay in the private secret store. Never paste them into the blog or into Git.
+
+## Network plan
+
+Use two network classes.
+
+| HPE VME network | Bridge | Purpose |
+| --- | --- | --- |
+| `Management` / `network-11` | OVS `mgmt` | Manager access, dashboards, SSH, edge-published services |
+| `Compute` / `network-1` | OVS `cmpt` | Base workload bridge |
+| `Compute VLAN 1191-1199` / `network-2` through `network-10` | OVS `cmpt` port groups | Segmented lab workload zones |
+
+The management network uses the lab underlay:
+
+```text
+30.30.0.0/16
+gateway 30.30.0.1
+reserved lab range 30.30.119.1-30.30.119.250
+```
+
+The compute VLANs carry the ACI vocabulary.
+
+| VLAN | ACI EPG | Suggested subnet | Role |
+| --- | --- | --- | --- |
+| `1191` | `web` | `10.119.91.0/24` | Web / DMZ workloads |
+| `1192` | `app` | `10.119.92.0/24` | Application tier |
+| `1193` | `db` | `10.119.93.0/24` | Database tier |
+| `1194` | `shared-services` | `10.119.94.0/24` | DNS, NTP, shared tools |
+| `1195` | `security-tools` | `10.119.95.0/24` | SIEM, scanners, sensors |
+| `1196` | `targets` | `10.119.96.0/24` | Vulnerable lab targets |
+| `1197` | `attacker` | `10.119.97.0/24` | Kali and offensive tooling |
+| `1198` | `transit` | `10.119.98.0/24` | Firewall or routing handoff |
+| `1199` | `quarantine` | `10.119.99.0/24` | Isolation and containment |
+
+## Step 1: Start with the fabric boundary
+
+Before building anything, write the boundary down.
+
+In this lab:
+
+- APIC is the authoritative policy model.
+- Morpheus is the authoritative VM lifecycle manager.
+- OVS is the live switching layer for nested workloads.
+- HAProxy and PowerDNS publish dashboards.
+- APIC in this lab does not forward or enforce packets.
+
+This keeps the learning clean. When you create an EPG named `web` in APIC, you also create a Morpheus network named `Compute VLAN 1191` and test a VM on VLAN `1191`.
+
+## Step 2: Confirm the lab endpoints
+
+Confirm the two UI endpoints first.
+
+```text
+APIC:          https://aci-sim.v7.comptech-lab.com/
+HPE VME:       https://hpe-vme.v7.comptech-lab.com/
+```
+
+The backend addresses in this lab are:
+
+```text
+APIC backend:    30.30.119.10
+HPE VME manager: 30.30.119.23
+```
+
+At this point you are only proving that the dashboards are reachable through the shared edge. Do not expose every lab VM directly to the public side. Publish dashboards through HAProxy, and keep attacker/target paths inside compute VLANs.
+
+## Step 3: Bring up the APIC fabric model
+
+In APIC, import or register the fabric nodes, then confirm the basic inventory.
+
+Final fabric state for this lab:
+
+| Node | Name | Role | State |
+| --- | --- | --- | --- |
+| `101` | `leaf1` | leaf | active |
+| `102` | `leaf2` | leaf | active |
+| `103` | `spine1` | spine | active |
+
+The access-policy examples in this guide use leaf `101`, interface `eth1/49`.
+
+## Step 4: Build the ACI policy model
+
+Create the tenant and VRF:
+
+| Object | Name |
+| --- | --- |
+| Tenant | `lab-morpheus` |
+| VRF | `morpheus-vrf` |
+| App profile | `morpheus-kvm-app` |
+
+Create one bridge domain and EPG per workload VLAN.
+
+| EPG | VLAN | Bridge domain | Subnet |
+| --- | --- | --- | --- |
+| `web` | `1191` | `bd-vlan-1191-web` | `10.119.91.1/24` |
+| `app` | `1192` | `bd-vlan-1192-app` | `10.119.92.1/24` |
+| `db` | `1193` | `bd-vlan-1193-db` | `10.119.93.1/24` |
+| `shared-services` | `1194` | `bd-vlan-1194-shared-services` | `10.119.94.1/24` |
+| `security-tools` | `1195` | `bd-vlan-1195-security-tools` | `10.119.95.1/24` |
+| `targets` | `1196` | `bd-vlan-1196-targets` | `10.119.96.1/24` |
+| `attacker` | `1197` | `bd-vlan-1197-attacker` | `10.119.97.1/24` |
+| `transit` | `1198` | `bd-vlan-1198-transit` | `10.119.98.1/24` |
+| `quarantine` | `1199` | `bd-vlan-1199-quarantine` | `10.119.99.1/24` |
+
+The subnets are APIC policy-model subnets. They document what the real gateway plan should look like later.
+
+## Step 5: Build the ACI access-policy chain
+
+The useful ACI lesson is the access-policy chain. Build it in this order:
+
+1. VLAN pool: `morpheus-kvm-vlan-pool`
+2. Static VLAN range: `1191-1199`
+3. Physical domain: `morpheus-kvm-phys`
+4. AEP: `morpheus-kvm-aep`
+5. Access port policy group: `morpheus-kvm-trunk-pg`
+6. Leaf switch profile: `morpheus-kvm-leaf101-swprof`
+7. Leaf selector: `morpheus-kvm-leaf101`, node `101`
+8. Leaf interface profile: `morpheus-kvm-leaf101-ifprof`
+9. Interface selector: `morpheus-kvm-eth1-49`, port `eth1/49`
+10. Static path bindings from each EPG to `topology/pod-1/paths-101/pathep-[eth1/49]`
+
+The final state had all 9 EPGs statically bound to leaf `101`, `eth1/49`, with zero tenant faults.
+
+For learning, trace this chain in the APIC GUI:
+
+```text
+leaf switch profile
+  -> leaf interface profile
+  -> interface selector
+  -> policy group
+  -> AEP
+  -> physical domain
+  -> VLAN pool
+  -> static EPG path binding
+```
+
+That chain is one of the most important ACI mental models.
+
+## Step 6: Prepare Morpheus and the HVM cluster
+
+In HPE VM Essentials, the lab uses:
+
+| Object | Value |
+| --- | --- |
+| Group | `HPE VME Greenfield` |
+| Cloud | `HPE VME Cloud` |
+| Cluster | `hpe-vme-hci-01` |
+| HVM host 1 | `hpe-vme-hvm-01`, `30.30.119.20` |
+| HVM host 2 | `hpe-vme-hvm-02`, `30.30.119.21` |
+| HVM host 3 | `hpe-vme-hvm-03`, `30.30.119.22` |
+| Manager | `hpe-vme-manager`, `30.30.119.23` |
+
+The HVM hosts use three traffic classes:
+
+| Host NIC role | Example interface | Purpose |
+| --- | --- | --- |
+| Management | `ens3` into OVS `mgmt` | Manager, host control, dashboard reachability |
+| Compute | `ens4` into OVS `cmpt` | Workload VLANs |
+| Storage | `ens5` | HCI/storage traffic |
+
+The HPE VME network inventory should show:
+
+| Morpheus network | API name | Bridge | Purpose |
+| --- | --- | --- | --- |
+| `Management` | `network-11` | `mgmt` | Management NICs |
+| `Compute` | `network-1` | `cmpt` | Untagged compute base |
+| `Compute VLAN 1191` | `network-2` | `cmpt` | `web` EPG |
+| `Compute VLAN 1192` | `network-3` | `cmpt` | `app` EPG |
+| `Compute VLAN 1193` | `network-4` | `cmpt` | `db` EPG |
+| `Compute VLAN 1194` | `network-5` | `cmpt` | `shared-services` EPG |
+| `Compute VLAN 1195` | `network-6` | `cmpt` | `security-tools` EPG |
+| `Compute VLAN 1196` | `network-7` | `cmpt` | `targets` EPG |
+| `Compute VLAN 1197` | `network-8` | `cmpt` | `attacker` EPG |
+| `Compute VLAN 1198` | `network-9` | `cmpt` | `transit` EPG |
+| `Compute VLAN 1199` | `network-10` | `cmpt` | `quarantine` EPG |
+
+## Step 7: Configure the first compute VLAN
+
+For the completed smoke test, only VLAN `1191` needed live L3 reachability.
+
+Set Morpheus network `Compute VLAN 1191` like this:
+
+```text
+CIDR:    10.119.91.0/24
+Gateway: 10.119.91.254
+DNS:     8.8.8.8
+Bridge:  cmpt
+VLAN:    1191
+```
+
+Then make the HVM host act as the lab gateway for this nested test VLAN:
+
+```text
+hpe-vme-hvm-01:
+  OVS bridge: cmpt
+  OVS port:   v1191gw
+  VLAN tag:   1191
+  IP:         10.119.91.254/24
+  NAT:        10.119.91.0/24 out mgmt
+```
+
+Add a manager route so Morpheus can reach the guest:
+
+```text
+hpe-vme-manager:
+  10.119.91.0/24 via 30.30.119.20
+```
+
+In this lab, those settings are persisted by systemd:
+
+| Host | Service | Purpose |
+| --- | --- | --- |
+| `hpe-vme-hvm-01` | `security-lab-vlan1191-gateway.service` | Recreates `v1191gw`, forwarding, and NAT |
+| `hpe-vme-manager` | `security-lab-vlan1191-route.service` | Recreates the manager route to VLAN 1191 |
+
+For a production ACI design, do not use this host NAT pattern as the final answer. Put the gateway, firewall, or L3Out design in the real network architecture.
+
+## Step 8: Import a usable Linux image
+
+CirrOS is useful for quick boot smoke tests, but it was not enough for this lab because it did not apply the intended Morpheus static IP and left Morpheus waiting for network finalization.
+
+Use an Ubuntu cloud image for the actual Morpheus validation.
+
+Final image:
+
+| Field | Value |
+| --- | --- |
+| Image | Ubuntu 24.04 Noble cloud image |
+| Morpheus virtual image ID | `206` |
+| Image type | QCOW2 |
+| Cloud-init | enabled |
+| SSH username | `ubuntu` |
+
+The lab also exposed a Morpheus image-cache UUID mismatch during local datastore clone operations. The workaround used during the lab was temporary and was removed after deployment. For real deployment, validate image import and clone behavior cleanly, or open a vendor case before relying on the platform.
+
+## Step 9: Provision the VLAN 1191 test VM
+
+Create a small Ubuntu VM in Morpheus.
+
+| Field | Value |
+| --- | --- |
+| Instance name | `ubuntu-vlan1191-web-06` |
+| Layout | Ubuntu 24.04 QCOW |
+| Plan | `kvm-vm-1024` |
+| Image | virtual image ID `206` |
+| HVM host | `hpe-vme-hvm-01` |
+| Datastore | local datastore ID `1` |
+| Network | `Compute VLAN 1191` / `network-2` |
+| Static IP | `10.119.91.15` |
+
+When the VM boots, it should attach to:
+
+```text
+libvirt network: Compute
+port group:      Compute VLAN 1191
+OVS bridge:      cmpt
+VLAN tag:        1191
+```
+
+## Step 10: Verify from Morpheus
+
+The final Morpheus state:
+
+| Check | Result |
+| --- | --- |
+| Instance ID | `21` |
+| Server ID | `28` |
+| Instance status | `running` |
+| Server status | `provisioned` |
+| Power state | `on` |
+| Provision process | `49`, complete |
+| Post-provision process | `52`, complete |
+| Guest IP | `10.119.91.15` |
+
+Morpheus still reported the guest agent as disconnected in this lab, but provisioning completed and the VM was reachable. That is good enough for this lab wrap-up; for production, guest agent installation should be fixed and monitored.
+
+## Step 11: Verify from the HVM host
+
+On `hpe-vme-hvm-01`, verify that the VM is running:
+
+```bash
+sudo virsh list --all | grep ubuntu-vlan1191
+```
+
+Expected result:
+
+```text
+ubuntu-vlan1191-web-06     running
+```
+
+Verify the NIC binding:
+
+```bash
+sudo virsh domiflist ubuntu-vlan1191-web-06
+sudo virsh dumpxml ubuntu-vlan1191-web-06 | grep -A10 -B2 -E 'interface|vlan|source network|target dev'
+```
+
+Expected values:
+
+```text
+source network='Compute'
+portgroup='Compute VLAN 1191'
+bridge='cmpt'
+tag id='1191'
+target dev='vnet6'
+```
+
+Verify OVS:
+
+```bash
+sudo ovs-vsctl list port vnet6 | grep -E 'name|tag|interfaces'
+sudo ovs-vsctl list port v1191gw | grep -E 'name|tag|interfaces'
+```
+
+Both ports should show VLAN tag `1191`.
+
+Verify host reachability:
+
+```bash
+ping -c 3 10.119.91.15
+```
+
+Final lab result: `3/3` replies.
+
+## Step 12: Verify from the manager
+
+On the manager VM, verify the route:
+
+```bash
+ip route show 10.119.91.0/24
+```
+
+Expected result:
+
+```text
+10.119.91.0/24 via 30.30.119.20 dev eth0
+```
+
+Verify reachability:
+
+```bash
+ping -c 3 10.119.91.15
+nc -vz -w 3 10.119.91.15 22
+```
+
+Final lab result:
+
+```text
+ping: 3/3 replies
+tcp/22: succeeded
+```
+
+## Step 13: Preserve the working path
+
+The lab is wrapped up only after the live path survives service restarts.
+
+Confirm the HVM service:
+
+```bash
+sudo systemctl is-enabled security-lab-vlan1191-gateway.service
+sudo systemctl is-active security-lab-vlan1191-gateway.service
+```
+
+Confirm the manager service:
+
+```bash
+systemctl is-enabled security-lab-vlan1191-route.service
+systemctl is-active security-lab-vlan1191-route.service
+```
+
+Final result:
+
+```text
+security-lab-vlan1191-gateway.service: enabled, active
+security-lab-vlan1191-route.service: enabled, active
+```
+
+Both services were restarted after installation, and the VM ping and SSH-port checks still passed.
+
+## Troubleshooting notes
+
+The lab taught a few practical lessons.
+
+| Problem | What happened | Lesson |
+| --- | --- | --- |
+| License and first-run setup | Cloud and cluster workflows were blocked until the manager had a valid license and setup state | Finish appliance setup before adding HVM cluster objects |
+| HVM cluster terminology | The host workflow is `HVM cluster`, not just adding a generic cloud | Use the HVM cluster path in VME |
+| CirrOS smoke test | CirrOS booted and had outside access, but ignored the intended static IP | Use Ubuntu cloud image for Morpheus finalization tests |
+| Image clone mismatch | Morpheus generated a missing source UUID path for `qemu-img` | Treat this as a lab workaround only; validate properly before production |
+| APIC boundary | APIC policy looked correct, but no real ACI dataplane existed | APIC is the policy classroom here; traffic forwarding happens in OVS/HPE or real ACI hardware |
+| Host NAT | NAT made VLAN 1191 usable in the nested lab | Replace with real gateway/firewall/L3Out design for production |
+
+## Production handoff checklist
+
+Before turning this into a real deployment, close these gaps.
+
+- Replace host NAT with a real routing design.
+- Replace the lab-only single-replica Ceph behavior with a supported storage design.
+- Replace dummy fencing with real fencing.
+- Validate image import and clone behavior without local wrappers.
+- Validate guest agent installation and reporting.
+- Confirm physical trunks from HVM hosts to ACI leaves.
+- Confirm ACI access policy against the real leaf/interface paths.
+- Confirm the gateway location for each BD or subnet.
+- Confirm contracts between `web`, `app`, `db`, `security-tools`, `attacker`, and `quarantine`.
+- Test host reboot, manager reboot, VM restart, and VM redeploy.
+- Backup the manager, ACI config, HVM host config, and image library.
+
+## What this lab proves
+
+At the end of this lab, you have proved:
+
+- APIC can hold a clean ACI-style policy model for a Morpheus/KVM lab.
+- The policy model has a real naming match in Morpheus networks.
+- HPE VME can deploy a VM onto an OVS-backed VLAN port group.
+- VLAN `1191` maps cleanly to EPG `web`.
+- `ubuntu-vlan1191-web-06` is reachable at `10.119.91.15`.
+- The live path is persistent through systemd services.
+- The gap between APIC policy and real dataplane behavior is understood.
+
+That is the real lesson: use the same vocabulary across APIC, Morpheus, and KVM, but always know which system is modeling policy and which system is forwarding packets.

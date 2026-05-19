@@ -1,0 +1,226 @@
+---
+title: "Installation Manual - 101 Spoke Gatekeeper live canary rollback"
+sidebar_label: "101 Spoke Gatekeeper live canary rollback"
+description: "Live canary and rollback record for the spoke Gatekeeper no-constraints operand attempt."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-10`, the `spoke-dc-v7` Gatekeeper
+no-constraints live canary attempt and rollback.
+
+The canary was attempted, but it did not meet readiness acceptance. It was
+rolled back through GitOps, and the final state has no spoke Gatekeeper
+operand, no Gatekeeper admission webhooks, no constraints, and no mutation
+resources.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-10` / `#422` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-09` / `#421` |
+| Follow-up | `OP-GF-OPERATORS-11` / `#423` |
+
+## Intent
+
+The prior spoke preflight proved that the future `Gatekeeper` custom resource
+shape would dry-run successfully. This gate tried the first real spoke operand
+canary while still keeping the safe posture:
+
+- no `ConstraintTemplate`;
+- no `Constraint`;
+- no mutation resources;
+- `validatingWebhook: Enabled`;
+- `mutatingWebhook: Disabled`;
+- `webhook.failurePolicy: Ignore`.
+
+## Access Path
+
+Live checks and reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Baseline
+
+```text
+bootstrap_git_rev=27770eaf9ffd93fdda6e482d08368624a33c04ad
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+hub_side_app=Synced Healthy 27770eaf9ffd93fdda6e482d08368624a33c04ad
+spoke_side_app=Synced Healthy 27770eaf9ffd93fdda6e482d08368624a33c04ad
+```
+
+The correct Gatekeeper operator namespace on the spoke is:
+
+```text
+openshift-gatekeeper-system
+```
+
+Operator state:
+
+```text
+subscription=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=Succeeded reason=InstallSucceeded
+operator_deployment=gatekeeper-operator-controller 1/1
+operator_pod=gatekeeper-operator-controller-c7d5c4476-hwvxb Running on spoke-dc-v7-worker-0
+```
+
+Pre-apply guardrails:
+
+```text
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_api_resources=none
+mutation_api_resources=none
+admission_smoke_pre=configmap/gatekeeper-spoke-live-pre-smoke
+```
+
+## GitOps Commits
+
+```text
+8150e13 Add spoke Gatekeeper operand canary
+2005c3f Allow spoke Argo to manage Gatekeeper operand
+3baeee4 Rollback spoke Gatekeeper operand canary
+436fafc Document spoke Gatekeeper canary rollback
+```
+
+The operand commit added:
+
+```text
+clusters/spoke-dc-v7/security/gatekeeper
+```
+
+The RBAC commit added a narrow permission to the existing spoke Argo
+foundation ClusterRole:
+
+```text
+apiGroup=operator.gatekeeper.sh
+resource=gatekeepers
+verbs=get,list,watch,create,update,patch,delete
+```
+
+The final desired state keeps this RBAC grant for the future retry, but it
+does not keep the spoke operand path.
+
+## Canary Result
+
+The first sync attempt failed because the spoke Argo application controller
+could not patch the cluster-scoped Gatekeeper API:
+
+```text
+gatekeepers.operator.gatekeeper.sh "gatekeeper" is forbidden:
+User "system:serviceaccount:openshift-gitops:acm-openshift-gitops-argocd-application-controller"
+cannot patch resource "gatekeepers" in API group "operator.gatekeeper.sh"
+at the cluster scope
+```
+
+After the RBAC fix, `can-i` returned:
+
+```text
+can_patch_gatekeepers=yes
+```
+
+Argo then created the operand:
+
+```text
+Gatekeeper/gatekeeper validating=Enabled mutating=Disabled failure=Ignore
+validating_webhook_count=1
+mutating_webhook_count=0
+admission_smoke_current=configmap/gatekeeper-spoke-live-smoke
+```
+
+The canary did not meet readiness acceptance because these pods stayed in
+`ContainerCreating`:
+
+```text
+gatekeeper-audit-898885b67-xjvqc
+gatekeeper-controller-manager-59c5f66764-8wvld
+gatekeeper-controller-manager-59c5f66764-95gj8
+gatekeeper-controller-manager-59c5f66764-xtnnj
+```
+
+All were pulling:
+
+```text
+registry.redhat.io/gatekeeper/gatekeeper-rhel9@sha256:da64ddea8260faad7e3bdd33f5ad37dc872ef69a1a530730e55386762838bf87
+```
+
+No Gatekeeper image mirror references were found in IDMS or ICSP checks during
+this gate.
+
+## Rollback
+
+Rollback was GitOps-first:
+
+1. Remove `security/gatekeeper` from
+   `clusters/spoke-dc-v7/security/kustomization.yaml`.
+2. Remove the `clusters/spoke-dc-v7/security/gatekeeper` directory.
+3. Push rollback commit `3baeee4`.
+4. Fast-forward the bootstrap clone.
+5. Hard-refresh the hub-side and spoke-side
+   `Application/spoke-dc-v7-cluster-config`.
+6. Let Argo prune the operand and webhooks.
+
+Two direct cleanup actions were needed:
+
+- clear the stale `.operation` field from the spoke-side Application after it
+  stayed pinned to the failed `8150e13` sync operation;
+- force-delete the four terminating operand pods labeled
+  `gatekeeper.sh/system=yes` after the CR, webhooks, deployments, and
+  ReplicaSets were already pruned.
+
+## Final State
+
+```text
+bootstrap_git_rev=436fafcc211b008ab2884face53d6b054605ead8
+hub_side_app=Synced Healthy 3baeee44ae2713c24b027ae8092f82694e35c21c
+spoke_side_app=Synced Healthy 3baeee44ae2713c24b027ae8092f82694e35c21c
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+gatekeeper_subscription=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+gatekeeper_csv=Succeeded reason=InstallSucceeded
+gatekeeper_operator_deploy=1/1
+can_patch_gatekeepers=yes
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+operand_deployments=none
+operand_replicasets=none
+operand_pods=none
+operator_pods=gatekeeper-operator-controller-c7d5c4476-hwvxb:Running:true
+constrainttemplate_instances=0
+constraint_api_resources=none
+mutation_api_resources=none
+constraint_instances=none
+mutation_instances=none
+admission_smoke_final=configmap/gatekeeper-spoke-final-smoke
+```
+
+## Next Gate
+
+Do not retry the spoke Gatekeeper operand until image readiness is proven.
+
+Recommended next gate:
+
+```text
+OP-GF-OPERATORS-11: spoke Gatekeeper operand image readiness before retry
+```

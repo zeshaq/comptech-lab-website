@@ -1,0 +1,75 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { getCollection } from "astro:content";
+import { MODULE_TITLES, MODULE_TAGLINES } from "../../utils/docModules";
+
+const docs = await getCollection("docs", ({ data }) => !data.draft);
+
+// Group entries by the first id segment (the module folder).
+const byModule = new Map<string, typeof docs>();
+for (const item of docs) {
+  const [moduleId] = item.id.split("/");
+  if (!moduleId) continue;
+  if (!byModule.has(moduleId)) byModule.set(moduleId, []);
+  byModule.get(moduleId)!.push(item);
+}
+
+function formatDate(d: Date | undefined): string | undefined {
+  if (!d) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
+// Build one card per declared module. Iterating MODULE_TITLES keeps the
+// card order stable and intentional; if a module folder exists on disk
+// without a title entry the master landing skips it (the module landing
+// page still renders).
+const moduleCards = Object.keys(MODULE_TITLES).map((moduleId) => {
+  const entries = byModule.get(moduleId) ?? [];
+  const reviewed = entries
+    .map((e) => e.data.last_reviewed)
+    .filter((d): d is Date => !!d)
+    .sort((a, b) => b.valueOf() - a.valueOf());
+  return {
+    id: moduleId,
+    title: MODULE_TITLES[moduleId],
+    tagline: MODULE_TAGLINES[moduleId] ?? "",
+    pageCount: entries.length,
+    lastReviewed: formatDate(reviewed[0]),
+    url: `/docs/${moduleId}/`,
+  };
+});
+
+const totalPages = moduleCards.reduce((s, m) => s + m.pageCount, 0);
+---
+
+<DocsLayout title="Documentation — Zahid">
+  <section class="mb-10">
+    <h1 class="text-2xl font-semibold mb-2">Documentation</h1>
+    <p class="text-[var(--color-muted)] mb-3">
+      Long-form documentation, organised by module. The platform module is the operating manual
+      for the comptech OpenShift fleet; engagement modules carry the proof-of-concept work for
+      specific clients. Pick a module to enter its sidebar and table of contents.
+    </p>
+    <p class="text-[var(--color-muted)] text-sm">
+      <strong>{moduleCards.length}</strong> module{moduleCards.length === 1 ? "" : "s"} ·
+      <strong>{totalPages}</strong> pages total.
+    </p>
+  </section>
+
+  <section class="track-cards">
+    {moduleCards.map((m) => (
+      <a href={m.url} class="track-card">
+        <h2 class="track-card-title">{m.title}</h2>
+        {m.tagline && <p class="track-card-tagline">{m.tagline}</p>}
+        <p class="track-card-meta">
+          {m.pageCount} {m.pageCount === 1 ? "page" : "pages"}
+          {m.lastReviewed && (
+            <>
+              {" · "}last reviewed {m.lastReviewed}
+            </>
+          )}
+        </p>
+      </a>
+    ))}
+  </section>
+</DocsLayout>

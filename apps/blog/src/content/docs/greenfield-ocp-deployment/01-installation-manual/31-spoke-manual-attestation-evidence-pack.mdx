@@ -1,0 +1,331 @@
+---
+title: "Installation Manual - 31 Spoke manual attestation evidence pack"
+sidebar_label: "31 Spoke manual attestation evidence pack"
+description: "How to collect and interpret read-only manual attestation evidence for spoke-dc-v7 Compliance Operator findings."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the read-only manual attestation evidence pack for
+`spoke-dc-v7` after the low-risk compliance config and logging/file-integrity
+gates.
+
+Do this before MachineConfig-backed node hardening. The goal is to prove the
+current RBAC, SCC, ServiceAccount, namespace, secrets, logging, image policy,
+and RHACS posture without copying secret material or treating manual checks as
+automatic remediations.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-19`, issue `#366` |
+| Cluster | `spoke-dc-v7` |
+| Action type | Read-only evidence collection |
+| Access path | `dl385-2` jump host to `gf-ocp-bootstrap-01` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/manual-attestation-evidence-pack.md` |
+| Result | Manual attestation pack complete with residuals recorded |
+
+## Collection Rules
+
+Use the bootstrap host for all `oc` calls.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Collect summaries only. Do not print or copy:
+
+- kubeconfigs;
+- kubeadmin passwords;
+- pull secrets;
+- PAT values;
+- Secret data;
+- full Secret manifests.
+
+Secret posture should be captured as counts by namespace and type, plus
+External Secrets readiness.
+
+## Cluster Health
+
+Reconfirm the spoke is steady before collecting attestation evidence.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance get compliancescan
+```
+
+Expected evidence from this gate:
+
+```text
+OpenShift version: 4.20.18
+ClusterVersion: Available=True Progressing=False
+Nodes: 6 Ready
+ClusterOperators: no non-steady operators reported
+MCP master: Updated=True Updating=False Degraded=False, 3/3 ready
+MCP worker: Updated=True Updating=False Degraded=False, 3/3 ready
+14 ComplianceScan objects: DONE
+```
+
+## Manual Check Families
+
+List the manual check result inventory without result payloads.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancecheckresult -o json \
+  | jq -r '
+      [.items[] | select(.status=="MANUAL") | {
+        name:.metadata.name,
+        scan:(.metadata.labels["compliance.openshift.io/scan-name"] // "unknown"),
+        rule:(.metadata.annotations["compliance.openshift.io/rule"] // "unknown"),
+        severity:(.metadata.labels["compliance.openshift.io/check-severity"] // "unknown")
+      }]
+      | group_by(.name)
+      | map({
+          name:.[0].name,
+          occurrences:length,
+          scans:([.[].scan]|unique|join(",")),
+          rules:([.[].rule]|unique|join(",")),
+          severity:([.[].severity]|unique|join(","))
+        })
+      | sort_by(.name)
+      | .[]
+      | [.name, (.occurrences|tostring), .severity, .rules, .scans] | @tsv'
+```
+
+This gate found:
+
+```text
+PASS:   1022
+FAIL:    438
+MANUAL:  107
+Unique manual rules: 30
+```
+
+The manual rules fall into these families.
+
+| Area | Rules |
+| --- | --- |
+| Service accounts | `accounts-restrict-service-account-tokens`, `accounts-unique-service-account` |
+| SCC and pod security | `general-apply-scc`, `general-default-seccomp-profile`, `scc-*` limit and capability rules |
+| Namespace use | `general-default-namespace-use`, `general-namespaces-in-use` |
+| RBAC | `rbac-least-privilege`, `rbac-limit-cluster-admin`, `rbac-limit-secrets-access`, `rbac-pod-creation-access`, `rbac-wildcard-use` |
+| Secrets | `secrets-consider-external-storage`, `secrets-no-environment-variables` |
+| Observability | `alert-receiver-configured` |
+| Image admission | `general-configure-imagepolicywebhook` |
+| Host and physical controls | `/var/log*` partition checks, USB boot, wireless BIOS checks |
+
+## Identity And RBAC Evidence
+
+Collect identity provider, kubeadmin, and selected RBAC summaries.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get oauth cluster -o json \
+  | jq -r '{identityProviders: [.spec.identityProviders[]? | {name, type}], tokenConfig: (.spec.tokenConfig // {})}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n kube-system \
+  get secret kubeadmin -o name
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterrolebinding -o json \
+  | jq -r '.items[] | select(.roleRef.name=="cluster-admin") | {name:.metadata.name, subjects:(.subjects // [])}'
+```
+
+Evidence from this gate:
+
+```text
+OAuth identity provider: htpasswd-ze, type HTPasswd
+OAuth accessTokenInactivityTimeout: 15m0s
+OAuth accessTokenMaxAgeSeconds: 86400
+kube-system/secret/kubeadmin: absent
+cluster-admin-0: User ze
+cluster-admin: Group system:masters
+cluster-admins: Group system:cluster-admins, User system:admin
+```
+
+Attestation:
+
+- `kubeadmin` has been removed.
+- `ze` is the explicit human break-glass administrator for this solo lab.
+- OpenShift, ACM, storage, network, authentication, API server, GitOps, and
+  migration operator service accounts hold expected elevated platform access.
+- `self-provisioners` remains enabled for `system:authenticated:oauth` and is a
+  follow-up hardening decision.
+
+## SCC Evidence
+
+Collect SCC shape and privileged SCC access.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get scc -o json \
+  | jq -r '.items[] | [
+      .metadata.name,
+      .allowPrivilegedContainer,
+      .allowHostDirVolumePlugin,
+      .allowHostNetwork,
+      .allowHostPID,
+      .allowHostIPC,
+      .allowHostPorts,
+      (.runAsUser.type // ""),
+      ((.seccompProfiles // [])|join(","))
+    ] | @tsv' | sort
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" adm policy who-can use scc privileged
+```
+
+Evidence from this gate:
+
+```text
+restricted-v2 is bound to system:authenticated
+Elevated SCC access is attributable to platform operators and cluster admins
+No tenant workload SCC exception was identified
+```
+
+Expected elevated SCC users include OpenShift control-plane operators, ACM
+agent addons, File Integrity Operator, OpenShift Logging, LSO, ODF, RHACS, and
+cluster-admin identities.
+
+## Service Account And Namespace Evidence
+
+Collect ServiceAccount counts and namespace baseline controls.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get sa -A --no-headers | wc -l
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get sa -A -o json \
+  | jq -r '.items[] | .metadata.namespace' \
+  | sort | uniq -c | sort -nr | head -25
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get ns spoke-platform-bootstrap --show-labels
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n spoke-platform-bootstrap \
+  get networkpolicy,resourcequota,limitrange
+```
+
+Evidence from this gate:
+
+```text
+ServiceAccounts total: 527
+Largest namespaces: openshift-storage, kube-system, openshift-infra,
+openshift-monitoring, open-cluster-management-agent-addon
+
+spoke-platform-bootstrap:
+pod-security.kubernetes.io/enforce=restricted
+pod-security.kubernetes.io/audit=restricted
+pod-security.kubernetes.io/warn=restricted
+NetworkPolicy/default-deny-ingress
+ResourceQuota/spoke-platform-bootstrap-quota
+LimitRange/spoke-platform-bootstrap-defaults
+```
+
+Attestation:
+
+- ServiceAccount volume is primarily from installed OpenShift and platform
+  operators.
+- The explicit bootstrap namespace is restricted, quota-bound, limit-bound, and
+  ingress-default-denied.
+- Broader namespace partitioning remains tied to future tenant namespace
+  templates.
+
+## Secrets And External Secrets Evidence
+
+Collect secret counts by type only.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get secrets -A --no-headers | wc -l
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get secrets -A -o json \
+  | jq -r '.items[] | [.metadata.namespace, .type] | @tsv' \
+  | sort | uniq -c | sort -nr | head -40
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get externalsecret -A -o json \
+  | jq -r '.items[] | {namespace:.metadata.namespace,name:.metadata.name,conditions:(.status.conditions // [])}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clustersecretstore,secretstore -A
+```
+
+Evidence from this gate:
+
+```text
+Secrets total: 482
+ClusterSecretStore/vault-platform: Ready=True, Status=Valid
+SecretStore/openshift-logging/logging-local: Ready=True, Status=Valid
+ExternalSecret/eso-smoke: Ready=True
+ExternalSecret/logging-loki-s3: Ready=True
+ExternalSecret/stackrox/admission-control-tls: Ready=True
+ExternalSecret/stackrox/collector-tls: Ready=True
+ExternalSecret/stackrox/sensor-tls: Ready=True
+```
+
+Attestation:
+
+- Vault-backed External Secrets is active for the platform store and selected
+  platform secret bridges.
+- Operator-generated TLS and service secrets still exist in cluster, which is
+  expected for OpenShift and installed operators.
+- This supports the manual secrets evidence pack but does not claim full
+  externalization of every platform secret.
+
+## Logging, Image Policy, RHACS, And File Integrity
+
+Collect the supporting platform controls.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get apiserver cluster -o json \
+  | jq -r '{audit:.spec.audit, encryption:.spec.encryption}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging \
+  get lokistack,clusterlogforwarder,pods
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get image.config.openshift.io cluster -o json \
+  | jq -r '{allowedRegistriesForImport:.spec.allowedRegistriesForImport, registrySources:.spec.registrySources}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n stackrox get securedcluster,pods
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-file-integrity \
+  get fileintegrity,fileintegritynodestatus
+```
+
+Evidence from this gate:
+
+```text
+APIServer audit profile: WriteRequestBodies
+APIServer encryption: aesgcm
+LokiStack/logging-loki: present
+ClusterLogForwarder/instance: present
+openshift-logging pods: running
+Image registry sources: approved greenfield allow list, no insecure entries
+RHACS SecuredCluster: Available=True Progressing=False
+FileIntegrityNodeStatus: 6 Succeeded
+```
+
+## Residuals
+
+Carry these items forward after the evidence pack:
+
+- `ze` remains directly bound to `cluster-admin` as the solo lab break-glass
+  administrator.
+- `self-provisioners` remains enabled for `system:authenticated:oauth`.
+- Enterprise identity and tenant namespace templates are not yet installed.
+- External alert receiver integration is not yet verified.
+- Physical host and partition manual checks need out-of-band host evidence or
+  an explicit hardening/design decision.
+- MachineConfig-backed node hardening remains deferred to small batches with
+  MCP rollout validation.
+
+## Outcome
+
+The manual attestation evidence pack is complete for the current
+`spoke-dc-v7` greenfield baseline. It supports operational review of the 107
+manual Compliance Operator results without exposing secret material.
+
+Do not mark these manual checks as automatically remediated. Use this chapter
+as the evidence base, then open the first small MachineConfig-backed
+node-hardening gate.

@@ -1,0 +1,305 @@
+---
+title: "The mirror registry: Quay standalone, RadosGW on MinIO, and the bootstrap model"
+sidebar_label: "03 — The mirror registry"
+description: "The blob server every cluster image eventually hits. Why Quay standalone instead of operator-on-cluster, the config knobs that make it oc-mirror-friendly, the bootstrap model that organises namespaces and robots, and why the cluster pull credential is a user not a robot."
+estimated_minutes: 60
+last_updated: 2026-05-19
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const vm   = { background: "#fef3c7", border: "1px solid #b45309", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+export const ctrl = { background: "#e5e7eb", border: "1px solid #6b7280", borderRadius: 8, padding: 10, color: "#1f2937", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const proc = { background: "#fafafa", border: "1px solid #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 150, textAlign: "center", fontSize: 12 };
+export const ext  = { background: "#fafafa", border: "1.5px dashed #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 150, textAlign: "center", fontSize: 12 };
+
+export const flow = { style: { stroke: "#1f2937", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1f2937" }, labelStyle: { fill: "#1f2937", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+export const data = { style: { stroke: "#1d4ed8", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1d4ed8" }, labelStyle: { fill: "#1d4ed8", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+
+export const quayNodes = [
+  { id: "ha",    position: { x: 60,  y: 0   }, data: { label: "HAProxy edge\nquay.v7.comptech-lab.com:443\nwildcard cert" }, style: vm },
+  { id: "vm",    position: { x: 300, y: 0   }, data: { label: "gf-ocp-quay-01\nUbuntu 24.04 / podman\nUFW: 22 + 8080 (HAProxy only)" }, style: ctrl },
+  { id: "client",position: { x: 540, y: 0   }, data: { label: "oc-mirror / oc /\ncluster pull" }, style: ext },
+
+  { id: "quay",  position: { x: 300, y: 130 }, data: { label: "Quay container\nprojectquay/quay\n:host network" }, style: proc },
+  { id: "pg",    position: { x: 60,  y: 250 }, data: { label: "PostgreSQL\nlocal\ndb 'quay' + pg_trgm" }, style: proc },
+  { id: "redis", position: { x: 300, y: 250 }, data: { label: "Redis\nlocal\nrequirepass" }, style: proc },
+  { id: "minio", position: { x: 540, y: 250 }, data: { label: "MinIO bucket\nquay-storage\nRadosGWStorage" }, style: vm },
+
+  { id: "bk",    position: { x: 540, y: 370 }, data: { label: "MinIO bucket\nquay-backups\n90d lifecycle" }, style: vm },
+];
+
+export const quayEdges = [
+  { id: "e1", source: "client", target: "ha",    label: "TLS",          ...flow },
+  { id: "e2", source: "ha",     target: "vm",    label: "HTTP :8080",   ...flow },
+  { id: "e3", source: "vm",     target: "quay",  label: "systemd unit", ...flow },
+  { id: "e4", source: "quay",   target: "pg",    label: "127.0.0.1:5432", ...data },
+  { id: "e5", source: "quay",   target: "redis", label: "127.0.0.1:6379", ...data },
+  { id: "e6", source: "quay",   target: "minio", label: "S3 :9000",     ...data },
+  { id: "e7", source: "vm",     target: "bk",    label: "pg_dump + tar.gz.enc", ...data },
+];
+
+The mirror is the contract. Every image the cluster runs eventually comes from this VM. If the mirror is wrong, missing, or inaccessible, the cluster is wrong, missing, or down. This module shows the architecture, the config knobs that matter for `oc-mirror`, the bootstrap model that organises what's inside, and the backup design that means the registry isn't a single point of unrecoverable failure.
+
+## Architecture
+
+<Whiteboard client:load data={{ nodes: quayNodes, edges: quayEdges }} height={500} />
+
+The whole thing is one VM (`gf-ocp-quay-01`), 4 vCPU, 16 GiB RAM, 200 GiB qcow2 on `ubuntu-24.04-base.qcow2`. Four moving parts:
+
+- **Quay container** — `quay.io/projectquay/quay:${QUAY_VERSION}` running under a systemd unit, host network, mounts `/etc/quay/config/` read-only and `/var/lib/quay/storage` for any local scratch.
+- **PostgreSQL** — local, database `quay` owned by role `quay`, extension `pg_trgm` enabled at install time.
+- **Redis** — local, bound to `127.0.0.1` and `::1`, `requirepass` set.
+- **MinIO blob backend** — Quay's `DISTRIBUTED_STORAGE_CONFIG` uses the `RadosGWStorage` driver pointed at the `quay-storage` bucket on MinIO over the private service network (plain HTTP; TLS is at HAProxy for client traffic).
+
+The UFW posture on the VM:
+
+```text
+22/tcp   ALLOW  Anywhere
+8080/tcp ALLOW  30.30.200.102    # HAProxy only
+```
+
+Cluster nodes and CI runners never hit `:8080` directly — they all come in through HAProxy on `:443`.
+
+## Why standalone (not the Quay Operator on OpenShift)
+
+Project Quay also ships as an operator-managed deployment *on* OpenShift. The lab deliberately uses **standalone**. Three reasons:
+
+1. **Chicken-and-egg.** The registry has to exist *before* the cluster does, because the cluster pulls its release payload from the registry during install. Putting the mirror inside the cluster it serves is operationally fragile — a cluster you can't bootstrap because you can't pull because the cluster that hosts the mirror is the cluster you're trying to bootstrap.
+2. **Blast radius.** If you upgrade the cluster, you also have to upgrade Quay. If Quay's PG operand has a stuck PVC, your mirror is offline. Standalone keeps the blast radii separate.
+3. **Operational simplicity.** One VM, one systemd unit, one podman container. `journalctl -u quay` and `podman logs quay`. Backup is `pg_dump` + a tar of `/etc/quay/config`. Restore is the inverse.
+
+The trade is HA — a single Quay VM is a single point. The lab mitigates with daily encrypted backups to MinIO and a documented rebuild procedure; production deployments that need true HA either run Quay HA standalone (three VMs behind HAProxy) or use the operator on a *separate* management cluster that doesn't depend on the cluster it serves.
+
+## The config knobs that matter for `oc-mirror`
+
+`oc-mirror` v2 writes images into the registry using nested repository paths. `openshift-release/openshift/release-images` is a path with **two slashes after the namespace** — three path segments deep. Many registries refuse this by default. Quay refuses it unless you set:
+
+```yaml
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+```
+
+This is non-negotiable for `oc-mirror`. Without it the mirror pass returns `denied: requested access to the resource is denied` on what looks like a perfectly innocent push, and the diagnosis is non-obvious because the error message doesn't say "your registry is rejecting nested paths".
+
+Other config the lab pins:
+
+```yaml
+AUTHENTICATION_TYPE: Database
+CREATE_NAMESPACE_ON_PUSH: true        # oc-mirror creates namespaces as needed
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+    - RadosGWStorage
+    - access_key: <quay-storage-user>
+      secret_key: <quay-storage-pass>
+      bucket_name: quay-storage
+      hostname: minio.v7.comptech-lab.com
+      is_secure: false                # TLS terminated at HAProxy, internal HTTP
+      port: 9000
+      storage_path: /datastorage/registry
+      signature_version: v4
+DISTRIBUTED_STORAGE_PREFERENCE: [default]
+EXTERNAL_TLS_TERMINATION: true        # HAProxy holds the cert
+PREFERRED_URL_SCHEME: https
+SESSION_COOKIE_SECURE: true
+SECRET_KEY: <random>
+SERVER_HOSTNAME: 'quay.v7.comptech-lab.com'
+SETUP_COMPLETE: true
+SUPER_USERS:
+  - 'quayadmin'
+FEATURE_USER_INITIALIZE: true
+FEATURE_MAILING: false
+```
+
+`EXTERNAL_TLS_TERMINATION: true` plus `PREFERRED_URL_SCHEME: https` is the pair that tells Quay "you live behind a proxy, generate https:// URLs in webhooks and OCI references even though I'm listening HTTP." Getting one of these and not the other is a common cause of weird `http://` URLs appearing in cluster pull errors.
+
+## The install script, condensed
+
+The lab's `install-quay-standalone.sh` reads an env file (sourced, then deleted from the operator's history) and does, in order:
+
+```bash
+apt-get install -y ca-certificates curl jq podman postgresql postgresql-contrib redis-server skopeo ufw python3
+install -d -m 0755 /etc/quay/config /var/lib/quay/storage
+# create PG role + db
+# set redis bind 127.0.0.1 ::1, requirepass
+cat > /etc/quay/config/config.yaml <<EOF
+...                            # the config block above
+EOF
+podman pull quay.io/projectquay/quay:${QUAY_VERSION}
+cat > /etc/systemd/system/quay.service <<EOF
+[Unit]
+After=network-online.target postgresql.service redis-server.service
+[Service]
+Restart=always
+RestartSec=10
+ExecStartPre=-/usr/bin/podman rm -f quay
+ExecStart=/usr/bin/podman run --name quay --network host \\
+  -v /etc/quay/config:/conf/stack:ro \\
+  -v /var/lib/quay/storage:/datastorage \\
+  quay.io/projectquay/quay:${QUAY_VERSION}
+ExecStop=/usr/bin/podman stop -t 30 quay
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now quay
+# wait up to 3 minutes for /api/v1/discovery
+# call /api/v1/user/initialize to create the first superuser
+```
+
+The first superuser is created via `/api/v1/user/initialize` because `FEATURE_USER_INITIALIZE: true` plus a fresh Quay accepts exactly one such call. The response includes an OAuth access token used by the bootstrap-model seeder.
+
+## The bootstrap model
+
+A fresh registry is empty. Before `oc mirror --v2` runs, the registry needs the organisations, robot accounts, teams, and permissions the mirror will write into. The lab keeps this as code:
+
+```text
+data/quay/bootstrap-model.json
+```
+
+Five organisations:
+
+| Org | Purpose | Retention |
+| --- | --- | --- |
+| `openshift-release` | release payloads, nested release-images, release-metadata | Do not delete release payloads without an approved mirror-retention change |
+| `openshift-operators` | Red Hat + certified operator catalogs and bundles | Keep catalog and bundle history needed by supported OpenShift versions |
+| `platform` | CI tools, smoke-test images | Keep release tags; prune temporary CI tags |
+| `golden-images` | approved UBI/runtime base images | Keep promoted immutable tags |
+| `tenants` | future app-team namespace parent | Per-tenant policy on onboarding |
+
+Eight initial repositories, all `visibility: private`. Five robots and two teams:
+
+- `openshift-release+ocp_mirror` — pushes release payloads
+- `openshift-operators+ocp_mirror` — pushes operator catalogs and bundles
+- `platform+ci_push` — CI image pushes
+- `platform+read_only` — validation pulls
+- `golden-images+read_only` — validation pulls
+
+The two mirror robots are members of a namespace-local `mirror-creators` team with role `creator`. This is the key permission detail: it lets `oc-mirror` create nested repositories inside its namespace without needing super-admin. A common mistake is granting the mirror robot the global `admin` role; the lab does not.
+
+The seeder script (`seed-quay-internal-model.sh`) takes the model JSON and the OAuth token from initialize, then for each organisation/repository/robot/team/permission, calls the Quay API to bring the registry into the model's shape. Idempotent — run it twice, it does nothing the second time.
+
+## Robots vs cluster pull user
+
+A subtle but important pattern: **the cluster's pull credential is a normal Quay user, not a robot.**
+
+Why? Quay robots are namespace-scoped. A robot in `openshift-release` cannot read from `openshift-operators` and vice versa. The cluster's `pullSecret` in `install-config.yaml` is one credential for one hostname (`quay.v7.comptech-lab.com`), but the cluster needs to pull from *both* mirror namespaces (release payload *and* operator catalogs). A robot can't span both; a normal user can.
+
+The lab creates a user `ocp_cluster_pull`, grants it `read` on every repository in `openshift-release/*` and `openshift-operators/*`, and stores its credential at:
+
+```text
+secret/greenfield/quay/users/ocp_cluster_pull
+```
+
+For oc-mirror pushes, use the namespace-scoped robots. For cluster pulls, use the cluster-pull user. The `ensure-quay-cluster-pull-user.sh` script automates this — re-running it after every mirror pass picks up newly-created repos and grants the cluster-pull user `read` on them.
+
+## Pre-seeding repos from `oc-mirror`'s dry-run mapping
+
+For a production mirror, you don't want the first real push pass to also be the first repo-creation pass. `oc-mirror` writes a `mapping.txt` during its dry-run that lists every source→destination repository pair the real run will touch. The lab pre-creates each destination repo from that mapping before the real push:
+
+```bash
+seed-oc-mirror-repositories-from-mapping.sh \
+  --mapping working-dir/dry-run/mapping.txt \
+  --organization openshift-operators \
+  --robot openshift-operators+ocp_mirror
+```
+
+Three reasons this matters:
+
+1. **Repeatability.** Pre-creation makes the real push pass purely about blobs and manifests, not about API races during repo create + perm grant.
+2. **Permission propagation.** Quay's permission cache can lag a second or two after grants; pre-seeding moves that latency out of the critical path.
+3. **Auditability.** You can review the list of repos that will be created before they exist. A surprise nested path is much easier to catch this way than in the middle of a 30-minute push.
+
+## Backup design
+
+Quay being a single VM means backup is mandatory and disciplined. The lab's `quay-backup-to-minio.sh` runs daily via a systemd timer:
+
+```text
+pg_dump -Fc quay   →   /etc/quay/config/config.yaml + /etc/systemd/system/quay.service + manifest.json
+                       ↓
+                  tar -czf
+                       ↓
+                  openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000
+                       ↓
+                  sha256sum
+                       ↓
+                  mc cp → minio/quay-backups/quay/<UTC-timestamp>/
+```
+
+Three artefacts land per backup:
+
+```text
+quay-backups/quay/20260519T020000Z/quay-20260519T020000Z.tar.gz.enc
+quay-backups/quay/20260519T020000Z/quay-20260519T020000Z.tar.gz.enc.sha256
+```
+
+Custody: the backup passphrase lives at `secret/greenfield/quay/application/gf-ocp-quay-01` (alongside the application's own secrets). The MinIO user used for upload is `quay-backup`, separate from `quay-storage`, with `s3:PutObject` only on `quay-backups`. Lifecycle on the bucket expires current objects after 90 days and noncurrent versions after 90 days.
+
+Restore is rehearsed with `quay-restore-validate.sh`: pull the latest object, verify checksum, decrypt with the passphrase, restore the dump into a *temporary* PG database, query a few key tables (`user`, `repository`, `image`), drop the temp database. The script intentionally does **not** restore over production — it proves the backup is restorable, then disposes of the proof.
+
+The blobs themselves are not in the backup. They live in MinIO `quay-storage` directly, and MinIO's own bucket versioning + replication is the backup story for blobs.
+
+## Image layout (what's in the registry)
+
+After the bootstrap model is applied and one production mirror pass has run, the registry looks like this:
+
+```text
+quay.v7.comptech-lab.com/
+├── openshift-release/
+│   ├── release-images/                                  # flat release-payload path
+│   ├── openshift/release-images:4.20.18-x86_64          # oc-mirror v2 nested path
+│   └── release-metadata/                                # signatures + supporting metadata
+├── openshift-operators/
+│   ├── redhat/redhat-operator-index:v4.20               # operator index
+│   ├── redhat/certified-operator-index:v4.20            # certified operator index
+│   ├── appcafe/open-liberty/...                         # bundles + operand images
+│   ├── 3scale/...                                        # ...
+│   └── ...
+├── platform/
+│   ├── ci-tools
+│   └── smoke
+└── golden-images/
+    └── ubi9
+```
+
+The validated production-run numbers from the May 15, 2026 mirror pass: **193 / 193 release images, 582 / 582 operator images, 4 / 4 additional images**.
+
+## What can go wrong
+
+The three failure modes you'll meet during a real install:
+
+- **`FEATURE_EXTENDED_REPOSITORY_NAMES` not set** — `denied: requested access to the resource is denied` on a nested path push that "should" work. Diagnosis: try the push as the super-admin; if it fails too, it's the feature flag, not the robot's permissions.
+- **Cluster-pull user not granted read on a new repo** — `unauthorized: access to the requested resource is not authorized` on a fresh post-mirror node pull. Diagnosis: `oc-mirror` created a new repo this pass, `ensure-quay-cluster-pull-user.sh` hasn't been re-run yet. Re-run it.
+- **MinIO bucket lifecycle expiring the wrong thing** — `unknown blob` from Quay on a manifest that resolved fine yesterday. Diagnosis: a lifecycle rule with too-narrow a tag filter expired blobs that an operator bundle still references. Lifecycle rules on `quay-storage` are dangerous and the lab doesn't set any; lifecycle is for `quay-backups`, never for `quay-storage`.
+
+## Validation script
+
+```bash
+# Service health
+systemctl is-active quay postgresql redis-server
+curl -fsS http://127.0.0.1:8080/api/v1/discovery >/dev/null
+curl -fsS https://quay.v7.comptech-lab.com/api/v1/discovery >/dev/null
+
+# Bootstrap model applied
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://quay.v7.comptech-lab.com/api/v1/organization/openshift-release \
+  | jq '.name'
+
+# Backup ran today
+mc ls minio/quay-backups/quay/ | tail -3
+```
+
+## Exercise
+
+Take the running Quay you stood up at the end of Module 02. From a fresh VM (or your laptop):
+
+1. `podman login quay.v7.comptech-lab.com` as a robot account scoped to `platform`.
+2. `podman pull` a small image (e.g. `quay.io/skopeo/stable:latest` if your operator host has internet, or any image you already have in `golden-images/ubi9`).
+3. `podman tag` and `podman push quay.v7.comptech-lab.com/platform/smoke:exercise-03`.
+4. Switch credentials to a robot scoped only to `openshift-operators`. Try the same push. Confirm it's denied.
+5. Run the cluster-pull-user ensure script. Confirm that user can now `podman pull` from `platform/smoke:exercise-03`.
+
+If you can do all five, you understand the access model. Module 04 takes it further: how `oc-mirror` v2 actually fills this registry up.
+
+## What's next
+
+[Module 04 — `oc-mirror` v2 workflow](/learn/openshift-disconnected-deployment/oc-mirror-workflow) walks through ImageSet authoring, the dry-run / mapping pass, the real push, and the cluster-resources `oc-mirror` generates for the Day-1 baseline.

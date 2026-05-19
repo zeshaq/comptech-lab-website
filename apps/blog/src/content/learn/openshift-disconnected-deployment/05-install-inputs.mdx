@@ -1,0 +1,406 @@
+---
+title: "Install inputs: install-config, agent-config, and the four install-time gates"
+sidebar_label: "05 — Install inputs"
+description: "How the rendered install-config.yaml and agent-config.yaml turn a mirrored registry into an installable cluster. FIPS, TPM2 disk encryption, etcd encryption, and the OVN-Kubernetes IPv6 baseline. The render workflow that produces a bootable agent ISO without secrets ever landing in Git."
+estimated_minutes: 55
+last_updated: 2026-05-19
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const gate = { background: "#fee2e2", border: "1.5px solid #b91c1c", borderRadius: 8, padding: 8, color: "#7f1d1d", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const ctrl = { background: "#e5e7eb", border: "1px solid #6b7280", borderRadius: 8, padding: 10, color: "#1f2937", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const data = { background: "#fafafa", border: "1px solid #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+
+export const flow = { style: { stroke: "#1f2937", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1f2937" }, labelStyle: { fill: "#1f2937", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+
+export const renderNodes = [
+  { id: "tpl",   position: { x: 60,  y: 0 }, data: { label: "install-config.template.yaml\nagent-config.yaml\n99-master-tpm2-encryption.bu\n(in Git)" }, style: data },
+  { id: "vault", position: { x: 60,  y: 130 }, data: { label: "Vault\npull-secret-merged\nSSH key\nadditional-trust-bundle" }, style: data },
+  { id: "cr",    position: { x: 60,  y: 260 }, data: { label: "cluster-resources/\nidms-oc-mirror.yaml\nitms-oc-mirror.yaml\nsignature-configmaps/\nclustercatalog-*.yaml" }, style: data },
+
+  { id: "host",  position: { x: 340, y: 130 }, data: { label: "Bootstrap host\n(gf-ocp-bootstrap-01)\nrender step" }, style: ctrl },
+
+  { id: "out",   position: { x: 620, y: 0 }, data: { label: "install-config.yaml\nagent-config.yaml\nopenshift/99-*.yaml\nopenshift/idms-itms*.yaml\n(local-only)" }, style: data },
+  { id: "iso",   position: { x: 620, y: 150 }, data: { label: "agent.iso\nopenshift-install\nagent create image" }, style: ctrl },
+  { id: "auth",  position: { x: 620, y: 280 }, data: { label: "auth/kubeconfig\nauth/kubeadmin-password\n(post-install)" }, style: data },
+];
+
+export const renderEdges = [
+  { id: "e1", source: "tpl",   target: "host", label: "templates",         ...flow },
+  { id: "e2", source: "vault", target: "host", label: "in-memory secrets", ...flow },
+  { id: "e3", source: "cr",    target: "host", label: "mirror resources",  ...flow },
+  { id: "e4", source: "host",  target: "out",  label: "render",            ...flow },
+  { id: "e5", source: "out",   target: "iso",  label: "create image",      ...flow },
+  { id: "e6", source: "iso",   target: "auth", label: "wait-for install-complete", ...flow },
+];
+
+This is the module where the mirror becomes a cluster. You'll author two files — `install-config.yaml` and `agent-config.yaml` — that together turn the contents of the registry into a bootable agent ISO. Along the way you set four install-time gates that you can't easily change later: FIPS, etcd encryption, disk encryption, and the OVN-K + IPv6 stance.
+
+## What the render produces
+
+<Whiteboard client:load data={{ nodes: renderNodes, edges: renderEdges }} height={400} />
+
+A "render" is the step where templates plus secrets plus mirror outputs become a concrete set of files on the bootstrap host's filesystem, briefly. The output:
+
+```text
+~/ocp-clusters/gf-ocp-hub-dc-v7/
+├── install-config.yaml                # rendered, with real pull-secret + imageDigestSources
+├── agent-config.yaml                  # per-interface network config
+├── openshift/
+│   ├── 99-master-tpm2-encryption.yaml # MachineConfig for TPM2-backed LUKS
+│   ├── 99-worker-tpm2-encryption.yaml # (when there are workers)
+│   ├── idms-oc-mirror.yaml            # copied from oc-mirror cluster-resources/
+│   ├── itms-oc-mirror.yaml
+│   ├── cs-redhat-operator-index-v4-20.yaml
+│   └── signature-configmaps/
+├── gf-ocp-hub-dc-v7-agent.iso         # agent create image output
+└── auth/                              # populated post-install
+    ├── kubeconfig
+    └── kubeadmin-password
+```
+
+Three principles for the render:
+
+1. **Templates live in Git; secrets live in Vault; the rendered output is local-only.** A grep for the merged pull-secret across the operator workstation's tree finds zero hits — it exists only in the rendered file on the bootstrap host, briefly.
+2. **The render is idempotent and replayable.** Run it again, you get the same files. Lose the bootstrap host, you can re-render on a new one from the same templates and Vault.
+3. **The render captures install-time decisions.** The four gates (FIPS, etcd encryption, disk encryption, IPv6) bake into the cluster during install. They are hard to change later — sometimes impossible without a reinstall.
+
+## `install-config.yaml` — the headline file
+
+```yaml
+apiVersion: v1
+baseDomain: v7.comptech-lab.com
+metadata:
+  name: gf-ocp-hub-dc-v7
+
+controlPlane:
+  name: master
+  replicas: 3
+  architecture: amd64
+  hyperthreading: Enabled
+compute:
+  - name: worker
+    replicas: 0                    # compact cluster: 0 workers
+    architecture: amd64
+    hyperthreading: Enabled
+
+platform:
+  baremetal:
+    apiVIPs:
+      - 30.30.200.110
+    ingressVIPs:
+      - 30.30.200.111
+
+networking:
+  clusterNetwork:
+    - cidr: 10.128.0.0/14
+      hostPrefix: 23
+  serviceNetwork:
+    - 172.30.0.0/16
+  machineNetwork:
+    - cidr: 30.30.0.0/16
+  networkType: OVNKubernetes
+
+fips: true
+
+sshKey: |
+  ssh-rsa AAAA...
+
+pullSecret: |
+  { "auths": { ... } }
+
+additionalTrustBundle: |
+  -----BEGIN CERTIFICATE-----
+  MII...
+  -----END CERTIFICATE-----
+
+imageDigestSources:
+  - source: quay.io/openshift-release-dev/ocp-release
+    mirrors:
+      - quay.v7.comptech-lab.com/openshift-release/openshift/release-images
+  - source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+    mirrors:
+      - quay.v7.comptech-lab.com/openshift-release/openshift/release-images
+  - source: registry.redhat.io/openshift4
+    mirrors:
+      - quay.v7.comptech-lab.com/openshift-release/openshift4
+```
+
+The four blocks that matter for disconnected:
+
+- **`imageDigestSources`** — the embedded form of IDMS that the agent installer reads at bootstrap. This is the bridge that lets the install pull from your mirror without the cluster ever talking to `quay.io`.
+- **`pullSecret`** — the merged customer + mirror pull-secret. Rendered in-memory from Vault; never on disk except in this file.
+- **`additionalTrustBundle`** — the internal CA chain that signs the wildcard cert HAProxy fronts. Without this, the install fails on TLS verification when trying to pull the release.
+- **`fips: true`** — enabled at install time. **You cannot turn FIPS on or off later.** It's a Day-0 decision.
+
+### The `sshKey` gotcha
+
+If you set `fips: true`, the installer **rejects `ssh-ed25519` keys** in `sshKey`. FIPS-mode `crypto/ssh` only accepts RSA or ECDSA. Provide an RSA (2048+) or ECDSA (P-256+) public key. The lab learned this during the spoke install when a stock `~/.ssh/id_ed25519.pub` snuck into the template.
+
+### The `imageDigestSources` shape
+
+`imageDigestSources` does *not* support tag-pinned references — that's why ITMS exists as a separate cluster resource you apply post-install. For the install itself, every source-and-mirror pair is digest-pinned. The `oc-mirror` `cluster-resources/idms-oc-mirror.yaml` gives you the canonical list; copy entries into the install-config in roughly the same order.
+
+## `agent-config.yaml` — the network and identity file
+
+```yaml
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: gf-ocp-hub-dc-v7
+rendezvousIP: 30.30.200.113
+
+hosts:
+  - hostname: gf-ocp-hub-dc-v7-master-0
+    role: master
+    rootDeviceHints:
+      deviceName: /dev/vda
+    interfaces:
+      - name: enp2s0
+        macAddress: 52:54:00:c8:7a:00
+    networkConfig:
+      interfaces:
+        - name: enp2s0
+          type: ethernet
+          state: up
+          mac-address: 52:54:00:c8:7a:00
+          ipv4:
+            enabled: true
+            dhcp: false
+            address:
+              - ip: 30.30.200.113
+                prefix-length: 16
+          ipv6:
+            enabled: false
+      dns-resolver:
+        config:
+          server: [30.30.200.53]
+      routes:
+        config:
+          - destination: 0.0.0.0/0
+            next-hop-address: 30.30.0.1
+            next-hop-interface: enp2s0
+            table-id: 254
+
+  - hostname: gf-ocp-hub-dc-v7-master-1
+    role: master
+    interfaces:
+      - name: enp2s0
+        macAddress: 52:54:00:c8:7a:01
+    networkConfig: # ... same as above with .114
+  - hostname: gf-ocp-hub-dc-v7-master-2
+    role: master
+    interfaces:
+      - name: enp2s0
+        macAddress: 52:54:00:c8:7a:02
+    networkConfig: # ... same as above with .115
+```
+
+Three things to call out.
+
+### `rendezvousIP`
+
+Agent-based install picks one host to act as the temporary rendezvous (and bootstrap) for the rest of the cluster. The lab points it at master-0 (`.113` in this example). It needs to be one of the masters; the installer uses it during the assisted-service phase and tears that role down once the control plane elects.
+
+### MAC addresses match libvirt
+
+The MAC in `agent-config.yaml` must match the MAC libvirt assigns to the VM. The lab uses deterministic MACs (`52:54:00:<allocation-byte>:00..02` for hub masters, different prefix for spoke) so the same template renders against the same VMs every time. Module 06 covers the libvirt domain definitions.
+
+### IPv6 — the OVN-Kubernetes baseline
+
+`ipv6.enabled: false` per interface looks like "disable IPv6," but it's not. It tells NetworkManager: don't assign IPv6 addresses or routes on this physical interface. The **kernel IPv6 module stays loaded**, and OVN-Kubernetes happily uses link-local `fe80::/10` on its internal `ovn-k8s-mp0` and Geneve tunnels. This is what you want.
+
+What you **must not** do (any of these break OVN-K):
+
+```text
+# kernel argument — FORBIDDEN
+ipv6.disable=1
+
+# sysctl MachineConfig — FORBIDDEN
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+```
+
+If you do any of these, `ovnkube-controller` crash-loops on startup because it writes `net.ipv6.conf.all.forwarding=0` unconditionally and that write fails on a `/proc/sys/net/ipv6/conf/all/forwarding` that's been made read-only by the disable. This is the lab's incident #135, documented in [ADR 0026](/docs/openshift-platform/architecture-decisions/adr-0026-ipv6-baseline-for-ovn-kubernetes/).
+
+## The four install-time gates
+
+Five YAML lines that are very hard to undo.
+
+### FIPS
+
+```yaml
+fips: true
+```
+
+Enables FIPS-validated crypto throughout. Cannot be toggled after install. Required for FedRAMP-Moderate and most BFSI/healthcare PCI/HIPAA postures.
+
+Implications:
+
+- `ssh-ed25519` SSH keys are rejected at install.
+- Some operands (most prominent: older CockroachDB images) refuse to start because their static binary's TLS isn't FIPS-validated.
+- `oc adm release info` against a non-FIPS release on a FIPS cluster shows warnings; pin a FIPS-clean release explicitly.
+
+### etcd encryption at rest
+
+```yaml
+# install-config has no direct knob; applied post-install as:
+apiVersion: config.openshift.io/v1
+kind: APIServer
+metadata:
+  name: cluster
+spec:
+  encryption:
+    type: aescbc        # or aesgcm
+```
+
+Enabled post-install. Encrypts Secret, ConfigMap (selectively), Route, OAuthAccessToken, OAuthAuthorizeToken at rest in etcd. Costs ~5–10% on etcd I/O. Re-encryption when keys rotate takes ~15 minutes on a small cluster.
+
+The encryption keys themselves rotate weekly by default; they're stored in a managed Secret in `openshift-kube-apiserver` and never leave the cluster.
+
+### TPM2-backed LUKS disk encryption
+
+A MachineConfig delivered via a Butane source under `openshift/`:
+
+```yaml
+# openshift/99-master-tpm2-encryption.yaml (rendered from butane source)
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-master-tpm2-encryption
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      luks:
+        - clevis:
+            tpm2: true
+          device: /dev/disk/by-partlabel/root
+          name: root
+          options:
+            - --cipher
+            - aes-cbc-essiv:sha256
+          wipeVolume: true
+```
+
+This pins the root volume to the TPM2 device — the node only boots if the TPM2 vouches for the boot chain. Sealed against a `pcr=7` policy (firmware + Secure Boot + signed bootloader) by default.
+
+Two caveats:
+
+- The MachineConfig has to land in `openshift/` *before* `openshift-install agent create image`. After install it can be added, but a node has to be reformatted to take effect.
+- vTPM in libvirt requires `<features><tpm/></features>` plus a `tpm` device in the domain XML and the `swtpm` package on the hypervisor. Module 06 covers it.
+
+### IPv6 baseline
+
+Per-interface `ipv6.enabled: false` in `agent-config.yaml`, as covered above. The four invariants:
+
+1. `clusterNetwork` and `serviceNetwork` are IPv4-only.
+2. No admin-managed IPv6 on physical interfaces (link-local on Geneve tunnels is fine and required).
+3. No upstream DHCPv6 or Router-Advertisement on the lab fabric.
+4. No workload binds to an IPv6 podIP.
+
+## The render workflow
+
+A render-and-stop helper script does the assembly. The lab's `prepare-<cluster>.sh`:
+
+```bash
+set -euo pipefail
+
+CLUSTER=${1:?cluster name required}
+OUT=~/ocp-clusters/${CLUSTER}
+
+mkdir -p ${OUT}/openshift ${OUT}/auth
+cd ${OUT}
+
+# 1. Pull templates from Git
+cp ~/ocp-greenfield-deployment/plans/clusters/${CLUSTER}/install-config.template.yaml install-config.yaml
+cp ~/ocp-greenfield-deployment/plans/clusters/${CLUSTER}/agent-config.yaml .
+
+# 2. Substitute secrets from Vault (in-memory)
+PULL_SECRET=$(vault kv get -format=json secret/greenfield/clusters/${CLUSTER}/pull-secret | jq -r '.data.data.merged')
+SSH_KEY=$(vault kv get -field=public secret/greenfield/clusters/${CLUSTER}/ssh-key)
+TRUST_BUNDLE=$(vault kv get -field=ca_bundle secret/greenfield/clusters/${CLUSTER}/additional-trust-bundle)
+
+# 3. yq-substitute in place
+yq -i ".pullSecret = strenv(PULL_SECRET)" install-config.yaml
+yq -i ".sshKey = strenv(SSH_KEY)" install-config.yaml
+yq -i ".additionalTrustBundle = strenv(TRUST_BUNDLE)" install-config.yaml
+
+# 4. Pull oc-mirror generated cluster-resources
+cp ~/oc-mirror-workspace/production/working-dir/cluster-resources/idms-oc-mirror.yaml openshift/
+cp ~/oc-mirror-workspace/production/working-dir/cluster-resources/itms-oc-mirror.yaml openshift/
+cp ~/oc-mirror-workspace/production/working-dir/cluster-resources/cs-*.yaml openshift/
+cp -r ~/oc-mirror-workspace/production/working-dir/cluster-resources/signature-configmaps openshift/
+
+# 5. Render TPM2 MachineConfigs from butane
+butane plans/butane/99-master-tpm2-encryption.bu > openshift/99-master-tpm2-encryption.yaml
+
+# 6. Set tight permissions
+chmod 0600 install-config.yaml agent-config.yaml
+```
+
+The shell variables (`PULL_SECRET`, `SSH_KEY`, `TRUST_BUNDLE`) are exported and used by `yq`. They never hit disk on their own — the only place they materialise is inside `install-config.yaml`, which itself is `chmod 0600` and on the bootstrap host only.
+
+### Where the secrets *don't* go
+
+A useful negative grep, after render:
+
+```bash
+cd ~/ocp-greenfield-deployment
+grep -r "ssh-rsa AAAA"                # zero hits
+grep -r "auths.*registry.redhat.io"   # zero hits
+grep -r "BEGIN CERTIFICATE"           # zero hits in Git tree
+```
+
+If any of those return results, the render template is leaking. Fix the template, not the grep.
+
+## Validation before `agent create image`
+
+```bash
+cd ~/ocp-clusters/${CLUSTER}
+
+# Required files exist and are non-empty
+test -s install-config.yaml
+test -s agent-config.yaml
+test -d openshift && ls openshift/
+
+# Validate install-config against the installer
+openshift-install agent validate --dir .
+
+# Sanity: pull-secret is not the placeholder
+grep -q "REPLACE_WITH_PULL_SECRET" install-config.yaml && { echo "render failed: placeholder still present"; exit 1; }
+
+# Sanity: the mirror is reachable from this host
+curl -kf https://quay.v7.comptech-lab.com/api/v1/discovery >/dev/null
+oc adm release info \
+  --registry-config install-config.yaml \
+  $(awk '/release_image/{print $2}' /etc/openshift-release.image) >/dev/null
+```
+
+The `openshift-install agent validate` step doesn't do an end-to-end install but it catches most schema mistakes (bad CIDR overlap, missing required field, wrong YAML).
+
+## Common rendering mistakes
+
+- **Wrong CIDR overlap** — `machineNetwork` overlaps `clusterNetwork` or `serviceNetwork`. The installer refuses gracefully; rare in lab life but common when reusing CIDRs across environments.
+- **Mismatch between `agent-config` MAC and libvirt domain MAC** — the install rendezvous never elects because the masters can't find each other. Fix: regenerate one or the other so they match.
+- **`baseDomain` ≠ DNS zone** — `api.<cluster>.<basedomain>` has to resolve to the API VIP, in DNS, before bootstrap. If `baseDomain: v7.comptech-lab.com` but DNS only has zone `comptech-lab.com`, you'll watch the install hang on "Waiting for API."
+- **Tab characters in YAML** — `yq` writes spaces; humans copying snippets sometimes inject tabs. YAML refuses tabs. `yamllint install-config.yaml` is fast and worth running.
+
+## Exercise
+
+Render an `install-config.yaml` for a tiny one-master "SNO" (Single-Node OpenShift) topology using the v7 mirror. You'll need:
+
+- `controlPlane.replicas: 1`, `compute: []`.
+- A `BootstrapInPlace` block (SNO-specific) or `platform.none`.
+- `imageDigestSources` matching your mirror's release path.
+
+Validate it with `openshift-install agent validate --dir .`. Don't actually install; the goal is to know what the installer accepts.
+
+## What's next
+
+[Module 06 — Bootstrap and install](/learn/openshift-disconnected-deployment/bootstrap-and-install) takes the rendered inputs from this module and walks through agent ISO creation, KVM domain definition, iLO virtual-media for physical workers, the rendezvous-master mechanics, and the `wait-for bootstrap-complete` / `wait-for install-complete` handoff.

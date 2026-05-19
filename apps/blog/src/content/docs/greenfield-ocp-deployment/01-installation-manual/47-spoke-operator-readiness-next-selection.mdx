@@ -1,0 +1,210 @@
+---
+title: "Installation Manual - 47 Spoke operator readiness and next selection"
+sidebar_label: "47 Spoke operator readiness and next selection"
+description: "How the v7 operator baseline was checked after node hardening and why OADP was selected as the next governed operator gate."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the read-only operator readiness gate after the
+`spoke-dc-v7` coredump-family worker hardening sequence.
+
+The gate did not install an operator or change GitOps. It confirmed the live
+operator baseline, checked hub and spoke health, identified uninstalled
+operator candidates, and selected OADP as the next governed gate.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-34`, issue `#385` |
+| Gate purpose | Operator setup readiness and next-operator selection |
+| GitOps source | `https://github.com/zeshaq/openshift-platform-gitops` |
+| Live GitOps revision | `cfe7d9109cb4d74306b233fa8e89c509b5ed0df2` |
+| Evidence report | `reports/platform/spoke-dc-v7/20260517/operator-readiness-next-selection.md` |
+| Selected next gate | `OP-GF-SPOKEDCV7-35: OADP backup preflight and install plan for hub-dc-v7 and spoke-dc-v7` |
+
+## Access Path
+
+Run live validation from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Read-Only Validation
+
+Check cluster health, MCP state, ClusterOperators, GitOps, and operator
+Subscriptions.
+
+```bash
+for ctx in hub:$HUB_KUBECONFIG spoke:$SPOKE_KUBECONFIG; do
+  name=${ctx%%:*}
+  kube=${ctx#*:}
+  printf '## cluster=%s\n' "$name"
+
+  oc --kubeconfig "$kube" get clusterversion version \
+    -o jsonpath='version={.status.desired.version}{" "}{range .status.conditions[*]}{.type}={.status}{";"}{end}{"\n"}'
+
+  oc --kubeconfig "$kube" get nodes
+  oc --kubeconfig "$kube" get mcp
+  oc --kubeconfig "$kube" get co --no-headers \
+    | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+  oc --kubeconfig "$kube" get subscriptions.operators.coreos.com -A
+  oc --kubeconfig "$kube" -n openshift-gitops \
+    get applications.argoproj.io
+done
+```
+
+Check hub management services.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" get multiclusterengine,multiclusterhub -A
+oc --kubeconfig "$HUB_KUBECONFIG" get managedcluster
+oc --kubeconfig "$HUB_KUBECONFIG" -n stackrox get central,securedcluster
+```
+
+Check spoke storage, logging, file integrity, compliance, and RHACS secured
+cluster state.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage get noobaa noobaa
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage get storagecluster ocs-storagecluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage get cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage get cluster noobaa-db-pg-cluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage get pdb noobaa-db-pg-cluster-primary
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging get lokistack logging-loki
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-logging get clusterlogforwarder instance
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-file-integrity get fileintegrity
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance get compliancesuite,compliancescan
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n stackrox get securedcluster
+```
+
+## Observed Baseline
+
+`hub-dc-v7` was healthy:
+
+```text
+OpenShift 4.20.18
+3/3 compact nodes Ready
+ClusterOperators steady
+hub-dc-v7-bootstrap Synced/Healthy
+spoke-dc-v7-cluster-config Synced/Healthy
+```
+
+Installed hub operator baseline:
+
+```text
+advanced-cluster-management.v2.16.1
+multicluster-engine.v2.11.1
+openshift-gitops-operator.v1.20.3
+lvms-operator.v4.20.0
+cert-manager-operator.v1.19.0
+openshift-external-secrets-operator.v1.1.0
+rhacs-operator.v4.10.2
+```
+
+`spoke-dc-v7` was healthy:
+
+```text
+OpenShift 4.20.18
+6/6 nodes Ready
+ClusterOperators steady
+spoke-dc-v7-cluster-config Synced/Healthy
+master MCP updated and not degraded
+worker MCP rendered-worker-f0e88bd1790c27d2d60ef88b60ba0e6f updated and not degraded
+```
+
+Installed spoke operator baseline:
+
+```text
+local-storage-operator.v4.20.0-202604140241
+ODF dependency operators 4.20.10-rhodf
+cert-manager-operator.v1.19.0
+openshift-external-secrets-operator.v1.1.0
+rhacs-operator.v4.10.2
+compliance-operator.v1.9.0
+cluster-logging.v6.5.0
+loki-operator.v6.5.0
+file-integrity-operator.v1.3.8
+```
+
+Spoke storage and logging were healthy:
+
+```text
+NooBaa Ready
+StorageCluster Ready
+CephCluster HEALTH_OK
+CNPG 2/2
+LokiStack/logging-loki Ready=True
+ClusterLogForwarder/instance Ready=True
+```
+
+The NooBaa DB primary was still on `spoke-dc-v7-worker-2`, and
+`PDB/noobaa-db-pg-cluster-primary` still reported `disruptionsAllowed=0`.
+
+## Candidate Gap Check
+
+These operators were not installed during the readiness gate:
+
+```text
+redhat-oadp-operator
+gatekeeper-operator-product
+cluster-observability-operator
+netobserv-operator
+tempo-product
+opentelemetry-product
+openshift-pipelines-operator-rh
+container-security-operator
+security-profiles-operator
+cluster-kube-descheduler-operator
+```
+
+The v7 mirror package list already includes OADP:
+
+```text
+redhat-oadp-operator stable 1.5.5
+```
+
+The object-storage foundation already reserves the future OADP contract:
+
+```text
+bucket: ocp-oadp-backups
+user: oadp-backup
+vault path: secret/greenfield/object-storage/minio/users/oadp-backup
+```
+
+## Decision
+
+Select OADP as the next operator gate.
+
+```text
+OP-GF-SPOKEDCV7-35: OADP backup preflight and install plan for hub-dc-v7 and spoke-dc-v7
+```
+
+OADP should come before Gatekeeper, Container Security, Security Profiles,
+NetObserv, Tempo, OpenTelemetry, Pipelines, Kube Descheduler, and Cluster
+Observability because backup and restore coverage reduces risk before broader
+policy, telemetry, and workload-impacting operators are added.
+
+The next gate should be preflight-first. Validate catalog source, package pin,
+MinIO endpoint reachability from cluster pods, Vault/ESO secret delivery,
+`DataProtectionApplication` design, `BackupStorageLocation` design, schedule
+scope, and restore expectations before installing OADP.
+
+## Residuals
+
+- Do not patch `PDB/noobaa-db-pg-cluster-primary` as a default workaround.
+- Treat worker-2 as protected while it hosts the NooBaa DB primary.
+- Overall Compliance Operator suites remain `NON-COMPLIANT` due to unrelated
+  controls.
+- No OADP backup or restore has been validated yet on the v7 clusters.

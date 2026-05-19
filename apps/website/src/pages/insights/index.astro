@@ -1,0 +1,101 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import HeroBackground from "../../components/HeroBackground.astro";
+
+interface Post {
+  title: string;
+  link: string;
+  date: Date | null;
+  description: string;
+}
+
+async function fetchPosts(): Promise<Post[]> {
+  try {
+    const res = await fetch("https://blog.comptech-lab.com/rss.xml", {
+      headers: { "User-Agent": "comptech-lab-website/0.1" },
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
+    return items.map((item) => {
+      const get = (tag: string) => {
+        const m = item.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`));
+        if (!m) return "";
+        return m[1].replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "").trim();
+      };
+      const date = get("pubDate");
+      return {
+        title: get("title"),
+        link: get("link"),
+        description: get("description"),
+        date: date ? new Date(date) : null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+const posts = (await fetchPosts()).slice(0, 12);
+
+const fmt = (d: Date | null) =>
+  d ? d.toISOString().slice(0, 10) : "";
+---
+
+<Layout
+  title="Insights — CompTech Lab"
+  description="Technical writing by our principals on OpenShift, AI/ML, DevSecOps, identity, and integration."
+>
+  <section class="hero">
+    <HeroBackground variant="waves" />
+    <div class="container">
+      <span class="hero-eyebrow">Insights</span>
+      <h1 class="hero-title">Technical writing from our practice.</h1>
+      <p class="hero-lede">
+        Long-form notes on the platforms we work with &mdash; OpenShift, AI/ML, identity,
+        integration, security. Posts are published on the principals&rsquo; engineering blog;
+        the latest are surfaced below.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      {posts.length === 0 ? (
+        <p style="color: var(--color-muted);">
+          Posts could not be fetched at build time. Visit
+          <a href="https://blog.comptech-lab.com" target="_blank" rel="noopener" style="color: var(--color-accent);">the engineering blog</a>
+          directly.
+        </p>
+      ) : (
+        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1.5rem;">
+          {posts.map((p) => (
+            <li style="border-bottom: 1px solid var(--color-border); padding-bottom: 1.5rem;">
+              <a href={p.link} target="_blank" rel="noopener" style="text-decoration: none;">
+                <div style="display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap;">
+                  <span style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.8rem; color: var(--color-muted); min-width: 6rem;">
+                    {fmt(p.date)}
+                  </span>
+                  <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--color-ink); margin: 0;">
+                    {p.title} <span style="color: var(--color-accent); font-weight: 400;">↗</span>
+                  </h2>
+                </div>
+                {p.description && (
+                  <p style="margin: 0.5rem 0 0 7rem; color: var(--color-muted); font-size: 0.92rem; line-height: 1.55;">
+                    {p.description}
+                  </p>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p style="margin-top: 3rem;">
+        <a href="https://blog.comptech-lab.com" target="_blank" rel="noopener" class="btn btn-secondary">
+          All posts on the engineering blog ↗
+        </a>
+      </p>
+    </div>
+  </section>
+</Layout>

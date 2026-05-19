@@ -1,0 +1,203 @@
+---
+title: "Installation Manual - 95 Hub Gatekeeper operator-only install"
+sidebar_label: "95 Hub Gatekeeper operator-only install"
+description: "Install the Red Hat Gatekeeper Operator on hub-dc-v7 through GitOps while stopping before the Gatekeeper operand and policies."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `OP-GF-OPERATORS-04` hub Gatekeeper operator-only
+install gate.
+
+The gate installed the Red Hat Gatekeeper Operator on `hub-dc-v7` through
+platform GitOps. It did not create a `Gatekeeper` custom resource, constraint
+templates, constraints, or admission webhooks through a Gatekeeper operand.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-04` / `#416` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-03` / `#415` |
+
+## Intent
+
+The previous chapter validated the package and install shape. This gate moved
+one step forward by installing only the operator on the hub. The first
+admission-impacting step remains deferred until a later Gatekeeper operand
+gate.
+
+## Access Path
+
+Live checks and reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+Hub kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+```
+
+## Preflight
+
+Hub health before the install:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_co_count=0
+nonrunning_pod_count=0
+pending_csr_count=0
+```
+
+Hub Argo state before the install:
+
+```text
+hub-dc-v7-bootstrap Synced/Healthy at 11e76f466ddcccee78e6ea59f06c55ad775b3c25
+```
+
+Gatekeeper package metadata still matched the preflight:
+
+```text
+package=gatekeeper-operator-product
+source=cs-redhat-operator-index-v4-20/openshift-marketplace
+defaultChannel=stable
+currentCSV=gatekeeper-operator-product.v3.21.0
+version=3.21.0
+installModes=OwnNamespace:false,SingleNamespace:false,MultiNamespace:false,AllNamespaces:true
+```
+
+No existing Gatekeeper namespace, Subscription, CSV, webhook, or Gatekeeper
+CRD was present before the change.
+
+## GitOps Commit
+
+Platform GitOps commit:
+
+```text
+9ebf7c0 Add hub Gatekeeper operator install
+9ebf7c06d8de94d464a142e2edd2763727ba506d
+```
+
+Files changed:
+
+```text
+CHANGELOG.md
+clusters/hub-dc-v7/kustomization.yaml
+clusters/hub-dc-v7/operators/gatekeeper-operator/kustomization.yaml
+clusters/hub-dc-v7/operators/gatekeeper-operator/namespace.yaml
+clusters/hub-dc-v7/operators/gatekeeper-operator/operatorgroup.yaml
+clusters/hub-dc-v7/operators/gatekeeper-operator/subscription.yaml
+```
+
+## Objects Added
+
+The gate added only these objects:
+
+```text
+Namespace/openshift-gatekeeper-system
+OperatorGroup/openshift-gatekeeper-system/gatekeeper-system
+Subscription/openshift-gatekeeper-system/gatekeeper-operator-product
+```
+
+The Subscription is pinned to:
+
+```text
+source: cs-redhat-operator-index-v4-20
+sourceNamespace: openshift-marketplace
+channel: stable
+startingCSV: gatekeeper-operator-product.v3.21.0
+```
+
+The OperatorGroup uses `spec: {}` because the Gatekeeper CSV supports only
+the AllNamespaces install mode.
+
+## Validation Before Push
+
+Local render passed:
+
+```text
+oc kustomize clusters/hub-dc-v7
+```
+
+The rendered output contained the three intended operator objects and no
+`Gatekeeper` custom resource, `ConstraintTemplate`, or Gatekeeper constraint.
+
+`git diff --check` passed.
+
+Hub server-side split dry-runs passed:
+
+```text
+namespace/openshift-gatekeeper-system created (server dry run)
+operatorgroup.operators.coreos.com/gatekeeper-system created (server dry run)
+subscription.operators.coreos.com/gatekeeper-operator-product created (server dry run)
+```
+
+## Reconciliation
+
+The bootstrap clone was fast-forwarded:
+
+```text
+/home/ze/greenfield-ops/openshift-gitops -> 9ebf7c0
+```
+
+The hub Argo app was hard-refreshed and reconciled:
+
+```text
+hub-dc-v7-bootstrap sync=Synced health=Healthy rev=9ebf7c06d8de94d464a142e2edd2763727ba506d
+```
+
+## Final State
+
+Final hub health:
+
+```text
+version=4.20.18 available=True progressing=False failing=False
+nodes_ready=3/3
+nonsteady_co_count=0
+nonrunning_pod_count=0
+pending_csr_count=0
+```
+
+Gatekeeper operator state:
+
+```text
+namespace=openshift-gatekeeper-system phase=Active
+sub=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+csv=Succeeded reason=InstallSucceeded
+install-wtjf5 Complete
+gatekeeper-operator-controller-c7d5c4476-8vr54 Running
+```
+
+## Guardrails
+
+The operator-owned Gatekeeper CRD now exists:
+
+```text
+gatekeepers.operator.gatekeeper.sh/v1alpha1
+```
+
+The guardrail checks found:
+
+- no `Gatekeeper` custom resources;
+- no Gatekeeper `ConstraintTemplate` or constraint API resources;
+- no validating or mutating webhook configurations with `gatekeeper` in the
+  name.
+
+## Result
+
+The hub Gatekeeper operator-only install is complete.
+
+The next gate is:
+
+```text
+OP-GF-OPERATORS-05: spoke Gatekeeper operator-only GitOps install
+```
+
+Do not create the Gatekeeper operand or policies until both operator-only
+installs are complete and a separate operand/no-constraints gate is opened.

@@ -1,0 +1,112 @@
+---
+title: "Installation Manual - 88 Hub RBAC exception register design"
+sidebar_label: "88 Hub RBAC exception register design"
+description: "Read-only RBAC exception register and reduction design for hub-dc-v7."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the `hub-dc-v7` RBAC exception register and reduction
+design created after the RBAC least-privilege inventory.
+
+No live cluster state was changed.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-17` / `#409` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-16` / `#408` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Current Compliance State
+
+Read-only validation before and after evidence collection confirmed:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| `hub-dc-v7-bootstrap` | `Synced/Healthy` at `12c68aee6d6a77dfcc197926d4f36594ea224625` |
+| ClusterOperators | steady |
+| Non-running pods | none |
+| `ComplianceScan/ocp4-cis` | `DONE / COMPLIANT` |
+| `ComplianceScan/ocp4-cis-node-master` | `DONE / COMPLIANT` |
+| Compliance result counts | `PASS=162`, `MANUAL=21`, `FAIL=0` |
+
+## Accepted Exceptions
+
+| ID | Area | Disposition |
+| --- | --- | --- |
+| `RBAC-EX-001` | Argo CD application-controller cluster-admin | Accepted current GitOps bootstrap exception. |
+| `RBAC-EX-002` | `User::ze` break-glass/admin broad access | Accepted lab break-glass/admin exception. |
+| `RBAC-EX-003` | GitOps service ClusterRole reads Secrets | Accepted GitOps operator/service exception. |
+| `RBAC-EX-004` | RHACS/StackRox broad operator and sensor RBAC | Accepted vendor/platform exception. |
+| `RBAC-EX-005` | ACM/MCE/Hypershift/governance broad RBAC | Accepted platform control-plane exception. |
+| `RBAC-EX-006` | ACM addon metrics Roles include Secret read verbs | Conditional platform exception. |
+| `RBAC-EX-007` | OpenShift core/operator broad RBAC | No-change system exception. |
+
+## Low-Risk Cleanup Candidate
+
+The only plausible low-risk cleanup candidate is:
+
+```text
+RBAC-CLEAN-001: namespace system:deployers RoleBindings and empty deployer ServiceAccounts
+```
+
+Supporting evidence:
+
+- `deploymentconfigs_total=0`;
+- each target `deployer` ServiceAccount has `0` referenced Secrets;
+- each target `deployer` ServiceAccount has `0` imagePullSecrets;
+- no target RoleBinding or ServiceAccount ownerReferences were reported.
+
+The target namespaces are the current non-system platform namespaces where the
+namespace-local `deployer` ServiceAccount is bound to
+`ClusterRole/system:deployer`.
+
+Do not delete these from this design gate. The next gate must be a read-only
+preflight that confirms they are still unused and not immediately recreated by
+namespace defaults or operators.
+
+## Reduction Design
+
+Near-term no-change areas:
+
+- Argo CD application-controller cluster-admin;
+- `User::ze` break-glass/admin bindings;
+- GitOps service Secret read access;
+- RHACS/StackRox operator, sensor, Central, and SCC-related RBAC;
+- ACM/MCE/Hypershift/governance control-plane RBAC;
+- OpenShift core/operator RBAC.
+
+Preflight requirements for any later `system:deployers` cleanup:
+
+1. Confirm hub health and Argo `Synced/Healthy`.
+2. Confirm CIS counts remain `PASS=162`, `MANUAL=21`, `FAIL=0`.
+3. Confirm `deploymentconfigs_total=0`.
+4. Confirm target `deployer` ServiceAccounts remain empty and unused.
+5. Confirm no ownerReferences appeared.
+6. Export object names for rollback, without Secret values or full Secret
+   manifests.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-18: hub system:deployers cleanup preflight
+```

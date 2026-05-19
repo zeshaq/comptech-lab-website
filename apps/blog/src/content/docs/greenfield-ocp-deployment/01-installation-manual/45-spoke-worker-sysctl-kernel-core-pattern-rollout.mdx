@@ -1,0 +1,356 @@
+---
+title: "Installation Manual - 45 Spoke worker sysctl kernel core pattern rollout"
+sidebar_label: "45 Spoke worker sysctl kernel core pattern rollout"
+description: "How the spoke-dc-v7 worker sysctl kernel core pattern MachineConfig was rolled out and validated."
+last_reviewed: 2026-05-17
+draft: false
+---
+
+This chapter records the separate worker MachineConfig rollout for
+`rhcos4-high-worker-sysctl-kernel-core-pattern` on `spoke-dc-v7`.
+
+The target control writes:
+
+```text
+/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf
+kernel.core_pattern = |/bin/false
+```
+
+After the rollout and a fresh Compliance Operator scan, the target rule
+reports `PASS`.
+
+## Target State
+
+| Item | Value |
+| --- | --- |
+| Governance issue | `OP-GF-SPOKEDCV7-32`, issue `#382` |
+| Cluster | `spoke-dc-v7` |
+| ComplianceScan | `rhcos4-high-worker` |
+| Target ComplianceCheckResult | `rhcos4-high-worker-sysctl-kernel-core-pattern` |
+| MachineConfig | `75-worker-sysctl-kernel-core-pattern` |
+| Worker render | `rendered-worker-318451b7f36fb50c086630f75ba86cbf` |
+| GitOps commit | `a9e32bb9df2d9404a77ddf701314f9db63ed12ce` |
+| Evidence report | `reports/compliance/spoke-dc-v7/20260517/worker-sysctl-kernel-core-pattern-rollout.md` |
+
+## Access Path
+
+Run operational commands from the bootstrap VM through `dl385-2`.
+
+```bash
+ssh ze@dl385-2
+ssh gf-ocp-bootstrap-01
+
+export HUB_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dc-v7/auth/kubeconfig
+export SPOKE_KUBECONFIG=/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+Do not print kubeconfigs, kubeadmin passwords, pull secrets, PAT values,
+repository private keys, Secret data, or full Secret manifests.
+
+## Guardrails
+
+This gate applied only `sysctl-kernel-core-pattern`.
+
+Do not combine it with:
+
+```text
+rhcos4-high-worker-service-systemd-coredump-disabled
+```
+
+That remaining control masks `systemd-coredump.socket` and
+`systemd-coredump.service`, so it needs a separate tracked decision.
+
+This gate also did not patch `PDB/noobaa-db-pg-cluster-primary` and did not run
+a live drain command.
+
+## Pre-Apply Validation
+
+Validate Argo, cluster health, MCPs, and storage before applying the
+MachineConfig.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+```
+
+Observed before apply:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at 4cb4b1f1d3c86ac4a438b245872aa54ec1f29cdb
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-f1aa66fe95ca8d25bf47a620cb280b66 Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa=True/SystemPhaseReady
+StorageCluster=Ready
+CephCluster=Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-1 targetPrimary=noobaa-db-pg-cluster-1
+```
+
+The target file was absent before rollout, and every worker still used the
+default systemd-coredump core pattern.
+
+```text
+kernel.core_pattern=|/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h
+/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf absent
+```
+
+Server-side dry-run apply of the full node-hardening kustomization succeeded:
+
+```text
+machineconfig.machineconfiguration.openshift.io/75-worker-sysctl-kernel-core-pattern created (server dry run)
+```
+
+Pre-apply server-side dry-run drain posture:
+
+| Worker | Result | Notes |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-1` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-2` | fail | hosted protected NooBaa DB primary |
+
+## GitOps Change
+
+Add the MachineConfig to the active platform GitOps repository.
+
+```text
+clusters/spoke-dc-v7/node-hardening/machineconfig-worker-sysctl-kernel-core-pattern.yaml
+clusters/spoke-dc-v7/node-hardening/kustomization.yaml
+```
+
+The MachineConfig writes:
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 75-worker-sysctl-kernel-core-pattern
+  labels:
+    machineconfiguration.openshift.io/role: worker
+    compliance.comptech-lab.com/gate: OP-GF-SPOKEDCV7-32
+spec:
+  config:
+    ignition:
+      version: 3.1.0
+    storage:
+      files:
+        - path: /etc/sysctl.d/75-sysctl_kernel_core_pattern.conf
+          mode: 420
+          overwrite: true
+          contents:
+            source: "data:,kernel.core_pattern%20%3D%20%7C/bin/false%0A"
+```
+
+Commit:
+
+```text
+a9e32bb9df2d9404a77ddf701314f9db63ed12ce Add spoke worker kernel core pattern hardening
+```
+
+Fast-forward the bootstrap GitOps clone and refresh Argo CD.
+
+```bash
+cd /home/ze/greenfield-ops/openshift-gitops
+git pull --ff-only
+
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  annotate applications.argoproj.io spoke-dc-v7-cluster-config \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+## Rollout Watch
+
+Watch Argo CD and the worker MCP until every worker reaches the new render.
+
+```bash
+oc --kubeconfig "$HUB_KUBECONFIG" -n openshift-gitops \
+  get applications.argoproj.io spoke-dc-v7-cluster-config \
+  -o jsonpath='sync={.status.sync.status} health={.status.health.status} revision={.status.sync.revision}{"\n"}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp worker \
+  -o jsonpath='config={.status.configuration.name} updated={.status.conditions[?(@.type=="Updated")].status} updating={.status.conditions[?(@.type=="Updating")].status} degraded={.status.conditions[?(@.type=="Degraded")].status} ready={.status.readyMachineCount} updatedCount={.status.updatedMachineCount} machineCount={.status.machineCount}{"\n"}'
+```
+
+Observed:
+
+```text
+spoke-dc-v7-cluster-config Synced/Healthy at a9e32bb9df2d9404a77ddf701314f9db63ed12ce
+worker MCP rendered-worker-318451b7f36fb50c086630f75ba86cbf Updated=True Updating=False Degraded=False 3/3
+```
+
+Rollout order:
+
+1. `spoke-dc-v7-worker-2`
+2. `spoke-dc-v7-worker-1`
+3. `spoke-dc-v7-worker-0`
+
+Rollout completed at `2026-05-17T16:12:55Z`.
+
+CNPG automatically moved the NooBaa DB primary away from updating workers. No
+direct PDB patch was made.
+
+## Host Validation
+
+Validate the rendered MachineConfig and host state.
+
+```bash
+worker_render=$(oc --kubeconfig "$SPOKE_KUBECONFIG" \
+  get mcp worker -o jsonpath='{.status.configuration.name}')
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" get machineconfig "$worker_render" -o json \
+  | jq -r 'any(.spec.config.storage.files[]?; .path == "/etc/sysctl.d/75-sysctl_kernel_core_pattern.conf")'
+
+for node in spoke-dc-v7-worker-0 spoke-dc-v7-worker-1 spoke-dc-v7-worker-2; do
+  oc --kubeconfig "$SPOKE_KUBECONFIG" debug "node/$node" --quiet -- \
+    chroot /host sh -c \
+    'printf "kernel.core_pattern="; sysctl -n kernel.core_pattern; printf "file="; cat /etc/sysctl.d/75-sysctl_kernel_core_pattern.conf'
+done
+```
+
+Observed on all workers:
+
+```text
+kernel.core_pattern=|/bin/false
+file=kernel.core_pattern = |/bin/false
+```
+
+## Final Health
+
+Validate final platform and storage state.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" get clusterversion version
+oc --kubeconfig "$SPOKE_KUBECONFIG" get nodes
+oc --kubeconfig "$SPOKE_KUBECONFIG" get mcp
+oc --kubeconfig "$SPOKE_KUBECONFIG" get co --no-headers \
+  | awk '$3!="True" || $4!="False" || $5!="False" {print}'
+
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get noobaa noobaa storagecluster ocs-storagecluster cephcluster ocs-storagecluster-cephcluster
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get cluster noobaa-db-pg-cluster \
+  -o jsonpath='ready={.status.readyInstances}/{.status.instances} currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary}{"\n"}'
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-storage \
+  get pods -l cnpg.io/cluster=noobaa-db-pg-cluster -o wide
+```
+
+Observed:
+
+```text
+OpenShift 4.20.18 Available=True Progressing=False Failing=False
+all six nodes Ready
+master MCP rendered-master-394597acba416ab151cf83289fece615 Updated=True Updating=False Degraded=False 3/3
+worker MCP rendered-worker-318451b7f36fb50c086630f75ba86cbf Updated=True Updating=False Degraded=False 3/3
+nonsteady ClusterOperators=0
+NooBaa Ready Available=True Progressing=False Degraded=False
+StorageCluster Ready Available=True Progressing=False Degraded=False
+CephCluster Ready HEALTH_OK
+CNPG=2/2 currentPrimary=noobaa-db-pg-cluster-2 targetPrimary=noobaa-db-pg-cluster-2
+```
+
+Final NooBaa DB placement:
+
+```text
+noobaa-db-pg-cluster-1 replica on spoke-dc-v7-worker-1
+noobaa-db-pg-cluster-2 primary on spoke-dc-v7-worker-2
+```
+
+Post-rollout server-side dry-run drain:
+
+| Worker | Result | Notes |
+| --- | --- | --- |
+| `spoke-dc-v7-worker-0` | pass | no NooBaa DB primary |
+| `spoke-dc-v7-worker-1` | pass | hosts NooBaa DB replica |
+| `spoke-dc-v7-worker-2` | fail | hosts protected NooBaa DB primary |
+
+The worker-2 dry-run failed because evicting
+`openshift-storage/noobaa-db-pg-cluster-2` would violate
+`PDB/noobaa-db-pg-cluster-primary`.
+
+## Compliance Rescan
+
+Trigger a one-off rescan of the existing worker high scan.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  annotate compliancescan rhcos4-high-worker \
+  compliance.openshift.io/rescan= --overwrite
+```
+
+Watch scan state.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancescan rhcos4-high-worker \
+  -o jsonpath='phase={.status.phase} result={.status.result} start={.status.startTimestamp} end={.status.endTimestamp}{"\n"}'
+```
+
+Observed:
+
+```text
+phase=DONE result=NON-COMPLIANT start=2026-05-17T16:16:59Z end=2026-05-17T16:19:12Z
+```
+
+The overall scan remains `NON-COMPLIANT` because unrelated worker findings
+still fail.
+
+Validate the target result.
+
+```bash
+oc --kubeconfig "$SPOKE_KUBECONFIG" -n openshift-compliance \
+  get compliancecheckresult rhcos4-high-worker-sysctl-kernel-core-pattern -o json \
+  | jq -r '{
+      name: .metadata.name,
+      status: .status,
+      checkStatus: .metadata.labels["compliance.openshift.io/check-status"],
+      severity: .severity,
+      id: .id
+    }'
+```
+
+Observed:
+
+```json
+{
+  "name": "rhcos4-high-worker-sysctl-kernel-core-pattern",
+  "status": "PASS",
+  "checkStatus": "PASS",
+  "severity": "medium",
+  "id": "xccdf_org.ssgproject.content_rule_sysctl_kernel_core_pattern"
+}
+```
+
+Related coredump-family results:
+
+```text
+rhcos4-high-worker-coredump-disable-backtraces          PASS  medium
+rhcos4-high-worker-coredump-disable-storage            PASS  medium
+rhcos4-high-worker-disable-users-coredumps             PASS  medium
+rhcos4-high-worker-sysctl-kernel-core-pattern          PASS  medium
+rhcos4-high-worker-service-systemd-coredump-disabled   FAIL  medium
+```
+
+## Residuals
+
+- `rhcos4-high-worker-service-systemd-coredump-disabled` is the remaining
+  coredump-family worker failure.
+- Keep that remaining control separate because it masks
+  `systemd-coredump.socket` and `systemd-coredump.service`.
+- Worker-2 currently hosts the protected NooBaa DB primary and is not
+  drainable under server-side dry-run.
+- Do not patch `PDB/noobaa-db-pg-cluster-primary` directly as the default
+  workaround.

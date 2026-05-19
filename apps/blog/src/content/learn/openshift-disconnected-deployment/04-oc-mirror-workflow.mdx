@@ -1,0 +1,321 @@
+---
+title: "oc-mirror v2 workflow: ImageSet, dry-run, push, and the cluster-resources it generates"
+sidebar_label: "04 — oc-mirror v2 workflow"
+description: "How oc-mirror v2 actually fills the registry. ImageSet authoring, the dry-run / mapping.txt pass, the push, the workspace layout, and the cluster-resources (IDMS, ITMS, CatalogSources, signature ConfigMaps) the cluster needs on Day 1."
+estimated_minutes: 60
+last_updated: 2026-05-19
+---
+
+import Whiteboard from "../../../components/Whiteboard";
+
+export const proc = { background: "#e5e7eb", border: "1px solid #6b7280", borderRadius: 8, padding: 10, color: "#1f2937", width: 180, textAlign: "center", fontWeight: 600, fontSize: 12 };
+export const data = { background: "#fafafa", border: "1px solid #9ca3af", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+export const ext  = { background: "#fef3c7", border: "1px solid #b45309", borderRadius: 8, padding: 8, color: "#1f2937", width: 170, textAlign: "center", fontSize: 12 };
+
+export const flow = { style: { stroke: "#1f2937", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1f2937" }, labelStyle: { fill: "#1f2937", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+export const pull = { animated: true, style: { stroke: "#1d4ed8", strokeDasharray: "5,5", strokeWidth: 1.5 }, markerEnd: { type: "arrowclosed", color: "#1d4ed8" }, labelStyle: { fill: "#1d4ed8", fontSize: 11 }, labelBgStyle: { fill: "#fafafa" } };
+
+export const mirrorNodes = [
+  { id: "git", position: { x: 60,   y: 0 }, data: { label: "GitLab\nmirror-config repo\nimageset-config.yaml" }, style: data },
+  { id: "rh",  position: { x: 60,   y: 130 }, data: { label: "registry.redhat.io\nquay.io" }, style: ext },
+
+  { id: "host",position: { x: 300, y: 65 }, data: { label: "Mirror runner\noc mirror v2" }, style: proc },
+
+  { id: "wd",  position: { x: 540, y: 0 }, data: { label: "working-dir/\ndry-run/mapping.txt\nblob cache\ncluster-resources/" }, style: data },
+  { id: "quay",position: { x: 540, y: 130 }, data: { label: "Quay registry\nopenshift-release/\nopenshift-operators/" }, style: ext },
+
+  { id: "cr",  position: { x: 540, y: 280 }, data: { label: "cluster-resources/\nIDMS, ITMS\nCatalogSource\nClusterCatalog\nsignature configmaps" }, style: data },
+  { id: "ops", position: { x: 300, y: 280 }, data: { label: "platform-gitops repo\nclusters/<cluster>/platform/\nimage-mirrors + catalogs" }, style: data },
+  { id: "cluster", position: { x: 60, y: 280 }, data: { label: "Cluster (Day 1)\napplies IDMS/ITMS/catalogs" }, style: ext },
+];
+
+export const mirrorEdges = [
+  { id: "e1", source: "git",  target: "host",   label: "1. read ImageSet", ...flow },
+  { id: "e2", source: "rh",   target: "host",   label: "2. pull sources",  ...pull },
+  { id: "e3", source: "host", target: "wd",     label: "3. dry-run + cache", ...flow },
+  { id: "e4", source: "host", target: "quay",   label: "4. push real run", ...flow },
+  { id: "e5", source: "host", target: "cr",     label: "5. write cluster-resources", ...flow },
+  { id: "e6", source: "cr",   target: "ops",    label: "6. commit to GitOps", ...flow },
+  { id: "e7", source: "ops",  target: "cluster",label: "7. Argo applies",  ...pull },
+];
+
+`oc-mirror` is the tool that moves OpenShift content from the public-internet side into your mirror. The v2 variant (since OCP 4.16) is a rewrite that materially changes the workflow — explicit dry-run, content-addressable on-disk cache, generated cluster-resources, no more `OperatorImageDeclarationSpec`. This module is the v2 workflow end to end.
+
+## The workflow at a glance
+
+<Whiteboard client:load data={{ nodes: mirrorNodes, edges: mirrorEdges }} height={460} />
+
+Seven steps. The ImageSet is the *spec*; everything else is mechanical.
+
+## The ImageSet
+
+`oc-mirror`'s input is one YAML file:
+
+```yaml
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  platform:
+    architectures:
+      - amd64
+    channels:
+      - name: stable-4.20
+        minVersion: 4.20.18
+        maxVersion: 4.20.18
+    graph: false
+  operators:
+    - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.20
+      packages:
+        - name: openshift-gitops-operator
+          channels:
+            - name: latest
+              minVersion: 1.20.3
+              maxVersion: 1.20.3
+        - name: advanced-cluster-management
+          channels:
+            - name: release-2.16
+              minVersion: 2.16.1
+              maxVersion: 2.16.1
+        - name: openshift-pipelines-operator-rh
+          channels:
+            - name: pipelines-1.22
+              minVersion: 1.22.0
+              maxVersion: 1.22.0
+        - name: odf-operator
+          channels:
+            - name: stable-4.20
+              minVersion: 4.20.10
+              maxVersion: 4.20.10
+        # ...
+    - catalog: registry.redhat.io/redhat/certified-operator-index:v4.20
+      packages:
+        - name: cloudnative-pg
+          channels:
+            - name: stable-v1
+              minVersion: 1.29.0
+              maxVersion: 1.29.0
+  additionalImages:
+    - name: registry.access.redhat.com/ubi9/ubi:latest
+    - name: registry.access.redhat.com/ubi9/ubi-micro:latest
+```
+
+Three blocks: `platform` (the release payload), `operators` (catalogs and the packages in them), and `additionalImages` (anything that isn't an OpenShift release or operator).
+
+A few rules the lab learned the hard way:
+
+- **Pin `minVersion == maxVersion` everywhere.** Floating channels are how disconnected clusters silently drift onto new digests nobody reviewed. Module 09 expands on this.
+- **`graph: false`.** Don't mirror the update graph unless you're going to mirror new versions too. A mirrored graph that points at versions you didn't mirror produces an upgrade screen that lies to your admins.
+- **Mirror `ubi9/ubi` and `ubi9/ubi-micro`.** Many operands and tenants base on these; if they're not in the mirror, half the bundles look fine and the other half `ImagePullBackOff`.
+- **Don't add `kubevirt-hyperconverged` or `rhods-operator` "just in case".** They are *massive*. Add them when you actually need them.
+
+The ImageSet **lives in Git** — typically a `mirror-config` repo separate from the GitOps repo, so mirror changes go through MR review and the reviewer can see exactly what the next mirror pass will pull.
+
+## Authentication: the merged authfile
+
+`oc-mirror` needs credentials for two registries:
+
+1. **Source** — `registry.redhat.io`, `registry.connect.redhat.com`, `quay.io`. From your Red Hat customer pull-secret.
+2. **Destination** — `quay.v7.comptech-lab.com`. From the namespace-scoped mirror robots (`openshift-release+ocp_mirror`, `openshift-operators+ocp_mirror`).
+
+The two get merged into a single authfile:
+
+```bash
+mkdir -p ~/.docker
+jq -s '.[0] * .[1]' \
+  <(vault kv get -format=json secret/greenfield/redhat/pull-secret-customer | jq '.data.data') \
+  <(vault kv get -format=json secret/greenfield/quay/robots/openshift-release/ocp_mirror | jq '.data.data') \
+  > ~/.docker/oc-mirror-authfile.json
+chmod 0600 ~/.docker/oc-mirror-authfile.json
+```
+
+The merged authfile lives only on the mirror runner, mode 0600, and is referenced by `--authfile` on every `oc-mirror` invocation. **It never goes into Git.** If shell history would include the merge command, prefer a script that runs it.
+
+## The dry-run pass
+
+Step 3 in the diagram. Before the real push, `oc-mirror` does a dry-run that computes the source→destination mapping without pulling blobs:
+
+```bash
+oc mirror \
+  --v2 \
+  --config ./imageset-config.yaml \
+  --workspace file:///home/ze/oc-mirror-workspace/production \
+  --authfile ~/.docker/oc-mirror-authfile.json \
+  --dry-run \
+  docker://quay.v7.comptech-lab.com
+```
+
+What lands in the workspace after dry-run:
+
+```text
+oc-mirror-workspace/production/
+└── working-dir/
+    ├── dry-run/
+    │   └── mapping.txt              # source → destination pairs
+    ├── release-filters/
+    └── operator-catalogs/
+```
+
+`mapping.txt` is the most useful file in the workspace. It lists every image the next real run would push, by digest. The lab does three things with it:
+
+1. **Review.** Diff against the previous run's `mapping.txt`. New entries? Expected? Removed entries? Worrying.
+2. **Pre-seed repos.** Feed it to `seed-oc-mirror-repositories-from-mapping.sh` (covered in Module 03) so the real run doesn't race on repo create + perm grant.
+3. **Archive.** Stash `mapping.txt` alongside the run output. It's the contemporaneous record of *what this mirror pass put in the registry*.
+
+## The real push
+
+Step 4. Same command, no `--dry-run`:
+
+```bash
+oc mirror \
+  --v2 \
+  --config ./imageset-config.yaml \
+  --workspace file:///home/ze/oc-mirror-workspace/production \
+  --authfile ~/.docker/oc-mirror-authfile.json \
+  docker://quay.v7.comptech-lab.com
+```
+
+This is the long pass — 30 minutes to several hours depending on how much you're mirroring. The first pass for a fleet typically does 700–1500 images and a couple hundred GB of blob; subsequent passes are incremental against the on-disk cache.
+
+Output is streamed; landing-zone status hits `working-dir/`:
+
+```text
+oc-mirror-workspace/production/working-dir/
+├── cluster-resources/
+│   ├── idms-oc-mirror.yaml
+│   ├── itms-oc-mirror.yaml
+│   ├── cs-redhat-operator-index-v4-20.yaml
+│   ├── cs-certified-operator-index-v4-20.yaml
+│   ├── clustercatalog-redhat-operator-index-v4-20.yaml
+│   ├── clustercatalog-certified-operator-index-v4-20.yaml
+│   └── signature-configmaps/
+│       ├── signature-bundle-0.yaml
+│       └── ...
+├── docker-v2/                       # on-disk blob cache (don't delete between runs)
+├── hold-release/                    # post-process holding area
+└── ...
+```
+
+The `cluster-resources/` directory is the bridge from "mirror is full" to "cluster knows how to use the mirror." Five resource types.
+
+## The generated cluster-resources
+
+### `idms-oc-mirror.yaml` — `ImageDigestMirrorSet`
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: idms-release-0
+spec:
+  imageDigestMirrors:
+    - source: quay.io/openshift-release-dev/ocp-release
+      mirrors:
+        - quay.v7.comptech-lab.com/openshift-release/openshift/release-images
+    - source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+      mirrors:
+        - quay.v7.comptech-lab.com/openshift-release/openshift/release-images
+    - source: registry.redhat.io/openshift4
+      mirrors:
+        - quay.v7.comptech-lab.com/openshift-release/openshift4
+```
+
+This is the file that does the rewriting magic. Each entry says "any pod that references `<source>@sha256:...` should instead pull `<mirror>@sha256:...` with the same digest." The MachineConfig Operator rolls these into every node's `/etc/containers/registries.conf.d/...`.
+
+### `itms-oc-mirror.yaml` — `ImageTagMirrorSet`
+
+The same shape as IDMS but for tag-pinned references (some catalog index images are pulled by tag, not digest). The lab almost never has anything in ITMS for routine releases; ITMS earns its keep for the catalog indexes specifically.
+
+### `cs-redhat-operator-index-v4-20.yaml` — `CatalogSource`
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: cs-redhat-operator-index-v4-20
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: quay.v7.comptech-lab.com/openshift-operators/redhat/redhat-operator-index@sha256:...
+  displayName: Mirrored Red Hat Operators v4.20
+  publisher: Red Hat
+  updateStrategy:
+    registryPoll:
+      interval: 30m
+```
+
+This tells OLM where the operator index lives. The lab disables the default external OperatorHub sources (Module 07) and operates exclusively from these mirrored catalog sources.
+
+### `clustercatalog-*.yaml` — `ClusterCatalog`
+
+The OLM v1 analogue of `CatalogSource`. OpenShift 4.20 ships both OLM v0 (`Subscription`-driven) and OLM v1 (`ClusterCatalog`-driven). The lab uses v0 for installs and pinning; v1 ClusterCatalogs are present so the OLM v1 stack has indexes too (and disables the built-in `openshift-*` ClusterCatalogs that point at upstream URLs the cluster can't reach).
+
+### `signature-configmaps/` — signature ConfigMaps
+
+These contain the **release image signatures** so the cluster can verify it pulled a Red Hat–signed release. They install into `openshift-config-managed` and are referenced by `ConfigMap.openshift.io/config.signature` annotations. Apply them *before* IDMS, so signature verification works during the bootstrap rollout.
+
+## What the bootstrap consumer sees
+
+The render step in Module 05 takes `oc-mirror`'s output and produces:
+
+- **`imageDigestSources` block** for `install-config.yaml` — a compressed view of IDMS that the agent installer reads at bootstrap time.
+- **`additionalTrustBundle`** — the internal CA that signs the wildcard cert HAProxy uses to front Quay (the installer needs to trust Quay's cert).
+- **Day-1 manifests under `openshift/`** — copies of IDMS, ITMS, CatalogSources, signature ConfigMaps, dropped into the agent ISO so they apply during install rather than after.
+
+After install-complete, the *durable* home for these resources is the GitOps repo, under `clusters/<cluster>/platform/image-mirrors/` and `clusters/<cluster>/platform/catalogs/`. Module 08 covers the handoff.
+
+## Operational hygiene around the workspace
+
+A few habits worth instilling:
+
+- **Don't delete `working-dir/docker-v2/`.** It's the content-addressable cache that makes the next pass incremental. Delete it and you re-download everything.
+- **Do version-control `imageset-config.yaml`.** The Git history of the ImageSet is the audit trail of what your cluster mirror has ever contained.
+- **Don't version-control `working-dir/`.** It's huge and machine-specific. `.gitignore` it.
+- **Do archive `mapping.txt` and the generated `cluster-resources/`.** A small dated copy in `data/oc-mirror/cluster-resources/<UTC-timestamp>/` lets you reconstruct what shipped on what day even if `working-dir/` is later wiped.
+
+## A note on `oc-mirror` v1 (legacy)
+
+The v1 workflow used `--from`/`--to` plus a tar archive (`mirror_seq*.tar`) and produced a different `ImageContentSourcePolicy` (ICSP) instead of `ImageDigestMirrorSet`. v1 is deprecated and **ICSP is removed in OCP 4.18+** — you must use v2 + IDMS/ITMS. If you're reading older blog posts that reference ICSP, mentally translate ICSP→IDMS and treat them as the same idea with new types.
+
+## Run on a schedule
+
+Once the initial mirror is healthy, the lab runs `oc-mirror` in a Tekton pipeline (or a systemd timer for very small fleets) on a weekly cadence:
+
+1. **Refresh authfile** from Vault.
+2. **Pull latest ImageSet** from GitLab `mirror-config` repo.
+3. **Dry-run** → diff `mapping.txt` against last run.
+4. If diff has *removed* entries (e.g. a channel dropped a version), pause and alert.
+5. If diff has only *new* entries, **pre-seed repos**.
+6. **Real push.**
+7. **Re-run** `ensure-quay-cluster-pull-user.sh` so the cluster-pull user can read the new repos.
+8. **Commit the new `cluster-resources/`** to GitOps with a referenceable MR.
+
+Module 10 expands on the Day-2 mechanics; this is the executive summary.
+
+## What can go wrong
+
+The four failure modes you'll meet:
+
+- **Source 401/403** — pull-secret stale. Re-merge from Vault. The Red Hat pull-secret on `console.redhat.com` rotates if not used.
+- **Destination 403 with `denied`** — robot doesn't have write on the namespace. Or `FEATURE_EXTENDED_REPOSITORY_NAMES` is off.
+- **Operator package not found** — package name typo, or the package isn't in the catalog version you pinned. `oc-mirror list operators --catalog <index> --package <name>` is the diagnosis.
+- **Out of disk on the mirror runner** — `working-dir/docker-v2/` grows. The cache is content-addressed so it dedupes well across passes, but big additions (RHODS, NVIDIA GPU, OpenShift AI) can be hundreds of GB. Size the runner accordingly.
+
+## Exercise
+
+Author a minimal ImageSet that mirrors *only* `ubi9/ubi-micro` as an additional image:
+
+```yaml
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  additionalImages:
+    - name: registry.access.redhat.com/ubi9/ubi-micro:latest
+```
+
+Run dry-run, look at `working-dir/dry-run/mapping.txt` — there should be one entry. Run the real pass. Confirm with `skopeo inspect docker://quay.v7.comptech-lab.com/openshift-release/ubi9/ubi-micro:latest` that it's there. Inspect the generated `cluster-resources/` — for a single additional image, IDMS is empty and the only artefact of note is the mapping.
+
+Now add the `platform` release block pinning `4.20.18`. Re-run dry-run. Count the entries in `mapping.txt`. It's about 200. Welcome to a real mirror.
+
+## What's next
+
+[Module 05 — Install inputs](/learn/openshift-disconnected-deployment/install-inputs) covers `install-config.yaml`, `agent-config.yaml`, the four install-time gates (FIPS, TPM2 disk encryption, etcd encryption, OVN-K + IPv6), and the render workflow that turns Vault secrets + the mirror's cluster-resources into a bootable agent ISO.

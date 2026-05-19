@@ -1,0 +1,100 @@
+---
+title: "Installation Manual - 51 Vault replacement single phase start"
+sidebar_label: "51 Vault replacement start"
+description: "Single-phase recovery plan for replacing the lost-custody greenfield v7 Vault."
+---
+
+The old `dl385` host held the greenfield Vault custody directory. That host is
+gone, and the checked current hosts do not have the recovery material. The
+current Vault service is healthy, but it is locked from an administrator
+custody perspective.
+
+This chapter starts the replacement path as a single governed phase.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-VAULTRECOVERY-1` / `#389` |
+| Milestone | `Workspace Governance` |
+| ADR | `ADR 0028: Greenfield Vault Replacement After Custody Loss` |
+| Existing controls | ADR 0016 and ADR 0025 |
+
+## Operating Decision
+
+Build a parallel replacement Vault and migrate by rotating credentials from
+source systems. Do not attempt an in-place rebuild behind
+`vault.v7.comptech-lab.com`.
+
+The current Vault remains read-only legacy by default. Do not restart, destroy,
+or mutate it during the default recovery path.
+
+## Single Phase, Hard Checkpoints
+
+The phase is single tracked work, but it has hard checkpoints:
+
+1. Tracking and ADR.
+2. Static consumer and path inventory.
+3. Replacement Vault topology and IP/DNS allocation.
+4. New custody creation and redundant custody proof.
+5. Secret recreation by rotation from source systems.
+6. OADP dedicated policy/role/store.
+7. ESO consumer migration one class at a time.
+8. DNS or GitOps endpoint promotion.
+9. Locked Vault retirement after dependency checks.
+
+## Initial OpenShift Inventory
+
+GitOps currently defines `ClusterSecretStore/vault-platform` for both v7
+clusters.
+
+| Cluster | Endpoint | Auth mount | Role |
+| --- | --- | --- | --- |
+| `hub-dc-v7` | `https://vault.v7.comptech-lab.com:8200` | `kubernetes-hub-dc-v7` | `eso-secrets` |
+| `spoke-dc-v7` | `https://vault.v7.comptech-lab.com:8200` | `kubernetes-spoke-dc-v7` | `eso-secrets` |
+
+Vault-backed OpenShift paths found in GitOps:
+
+```text
+greenfield/openshift/hub-dc-v7/eso-smoke
+greenfield/openshift/hub-dc-v7/rhacs/admin
+greenfield/openshift/hub-dc-v7/rhacs/init-bundle
+greenfield/openshift/spoke-dc-v7/eso-smoke
+greenfield/openshift/spoke-dc-v7/rhacs/init-bundle
+```
+
+The spoke logging `ExternalSecret/logging-loki-s3` uses a local Kubernetes
+provider store to reshape the NooBaa OBC Secret and does not read Vault
+directly.
+
+## Service Path Contracts
+
+The greenfield deployment docs and scripts list additional Vault path contracts
+for bootstrap, MinIO, Quay, GitLab, NetBox, Nexus, and oc-mirror. These are
+contracts only; no secret values were read.
+
+Priority path for the current OADP blocker:
+
+```text
+secret/greenfield/object-storage/minio/users/oadp-backup
+```
+
+## Validation Note
+
+A read-only live ESO status check was attempted through
+`dl385-2 -> gf-ocp-bootstrap-01`, but the expected kubeconfig paths were not
+present:
+
+```text
+/home/ze/ocp-clusters/hub-dc-v7/auth/kubeconfig
+/home/ze/ocp-clusters/spoke-dc-v7/auth/kubeconfig
+```
+
+Before migration validation, restore or identify the current v7 kubeconfig
+custody path on the bootstrap VM.
+
+## Next Action
+
+Allocate replacement Vault hostnames and IPs without changing
+`vault.v7.comptech-lab.com`. Then create the new custody path and prove it
+before seeding any replacement secrets.

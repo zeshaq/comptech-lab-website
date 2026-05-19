@@ -1,24 +1,45 @@
-# comptech-lab-website
+# comptech-lab
 
-Source of **https://www.comptech-lab.com** — the CompTech Lab consulting site. Astro 5 + MDX + React islands, deployed to Cloudflare Pages on every push to `main`.
+Federated monorepo for **www.comptech-lab.com** (the CompTech Lab consulting site) and **blog.comptech-lab.com** (the engineering notes blog).
 
-## Quick start
+## Layout
 
-```bash
-npm install
-npm run dev      # http://localhost:4321
-npm run build    # → dist/
+```
+.
+├── apps/
+│   ├── website/         → https://www.comptech-lab.com
+│   └── blog/            → https://blog.comptech-lab.com
+└── .github/workflows/
+    ├── deploy-website.yml   (triggered by apps/website/** changes)
+    └── deploy-blog.yml      (triggered by apps/blog/** changes)
 ```
 
-Build before committing — MDX parse errors only surface at build time.
+Each app is an independent Astro 5 project with its own `package.json`, `node_modules`, build pipeline, and Cloudflare Pages project. Changes to one app only redeploy that app — path filters on the workflows handle isolation.
+
+## Local development
+
+```bash
+# Website
+cd apps/website && npm install && npm run dev   # http://localhost:4321
+
+# Blog
+cd apps/blog && npm install && npm run dev      # http://localhost:4321
+```
+
+Run only one dev server at a time (both default to port 4321), or pass `--port` to the second one.
 
 ## Deploy
 
-Pushing to `main` triggers `.github/workflows/deploy.yml` → builds → uploads to Cloudflare Pages project `comptech-lab`. The custom domain `www.comptech-lab.com` is bound in the Cloudflare Pages dashboard.
+Pushing to `main` triggers the workflow for whichever app changed. Both deploy via `cloudflare/wrangler-action@v3` using the GitHub Actions secrets:
 
-## Stack
+| Secret | Used by |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | both deploy workflows |
+| `CLOUDFLARE_ACCOUNT_ID` | both deploy workflows |
 
-- Astro 5 + MDX + `@xyflow/react` (interactive diagrams)
-- Tailwind v4 via `@tailwindcss/vite`
-- Pagefind for client-side search
-- Cloudflare Pages + Pages Functions (contact form)
+Cloudflare Pages projects:
+
+| App | Project | Custom domain |
+|---|---|---|
+| website | `comptech-lab` | `www.comptech-lab.com` |
+| blog | `comptech-lab-blog` | `blog.comptech-lab.com` |

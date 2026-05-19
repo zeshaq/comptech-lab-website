@@ -1,0 +1,151 @@
+---
+title: "Installation Manual - 78 Hub NetworkPolicy namespace classification"
+sidebar_label: "78 Hub NetworkPolicy namespace classification"
+description: "Read-only classification of hub-dc-v7 namespace ownership and NetworkPolicy coverage for the remaining CIS finding."
+last_reviewed: 2026-05-19
+draft: false
+---
+
+This chapter records the read-only `hub-dc-v7` NetworkPolicy namespace
+classification gate.
+
+The gate did not apply NetworkPolicies. It classified namespace ownership and
+risk before any remediation for the remaining hub CIS finding:
+
+```text
+ocp4-cis-configure-network-policies-namespaces
+```
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-7` / `#399` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-COMPLIANCE-6` / `#398` |
+
+## Access Path
+
+All live checks used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> hub-dc-v7 kubeconfig
+```
+
+No Secret values, kubeconfigs, tokens, pull secrets, PAT values, MinIO keys,
+or full Secret manifests were printed.
+
+## Live Health
+
+Read-only validation at `2026-05-19T11:23:33Z`:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3/3` Ready |
+| ClusterOperators | steady |
+| MachineConfigPools | steady |
+| Hub Argo CD | Synced/Healthy at `d6688ad` |
+| Target CIS check | FAIL |
+
+Current all-object ComplianceCheckResult counts:
+
+| Status | Count |
+| --- | ---: |
+| PASS | 161 |
+| FAIL | 1 |
+| MANUAL | 21 |
+
+## Coverage Snapshot
+
+| Metric | Count |
+| --- | ---: |
+| Total namespaces | 99 |
+| Total NetworkPolicies | 84 |
+| Namespaces with NetworkPolicy | 18 |
+| Namespaces without NetworkPolicy | 81 |
+
+Namespaces already covered:
+
+```text
+assisted-installer
+external-secrets
+openshift-catalogd
+openshift-cloud-controller-manager
+openshift-cloud-controller-manager-operator
+openshift-cloud-credential-operator
+openshift-cluster-csi-drivers
+openshift-cluster-olm-operator
+openshift-cluster-storage-operator
+openshift-cluster-version
+openshift-gitops
+openshift-machine-api
+openshift-marketplace
+openshift-operator-controller
+openshift-operator-lifecycle-manager
+openshift-operators
+platform-bootstrap
+stackrox
+```
+
+## Non-System Focus Set
+
+The live inventory found 16 non-`kube-*` and non-`openshift*` namespaces
+without NetworkPolicy:
+
+| Namespace | Classification |
+| --- | --- |
+| `cert-manager` | product-specific policy design |
+| `cert-manager-operator` | platform-owned operator namespace |
+| `default` | low-risk default-deny candidate |
+| `external-secrets-operator` | platform-owned operator namespace |
+| `hive` | ACM/Hive product-specific policy design |
+| `hypershift` | ACM/Hypershift product-specific policy design |
+| `local-cluster` | low-risk placeholder policy candidate |
+| `multicluster-engine` | ACM/MCE product-specific policy design |
+| `open-cluster-management` | ACM hub product-specific policy design |
+| `open-cluster-management-agent` | ACM agent product-specific policy design |
+| `open-cluster-management-agent-addon` | ACM addon product-specific policy design |
+| `open-cluster-management-global-set` | low-risk placeholder policy candidate |
+| `open-cluster-management-hub` | ACM hub product-specific policy design |
+| `open-cluster-management-policies` | low-risk placeholder policy candidate |
+| `rhacs-operator` | platform-owned operator namespace |
+| `spoke-dc-v7` | low-risk placeholder policy candidate |
+
+## Decision
+
+Do not bulk-apply generated or default NetworkPolicies across all uncovered
+namespaces.
+
+Use a staged remediation path:
+
+1. Start with no-workload placeholder/default namespaces:
+   `default`, `local-cluster`, `open-cluster-management-global-set`,
+   `open-cluster-management-policies`, and `spoke-dc-v7`.
+2. Then review explicit manifests for platform-owned operator namespaces:
+   `cert-manager-operator`, `external-secrets-operator`, and
+   `rhacs-operator`.
+3. Defer ACM/MCE/Hive/Hypershift and OpenShift core namespaces until their
+   product traffic expectations are reviewed.
+
+Avoid allow-all policies as the default pattern. They may satisfy a scanner,
+but they do not materially improve isolation.
+
+## Next Gate
+
+Recommended next gate:
+
+```text
+OP-GF-COMPLIANCE-8: preflight hub NetworkPolicy remediation set
+```
+
+Suggested scope:
+
+- propose GitOps manifests for the five low-risk placeholder/default
+  namespaces;
+- inspect services, routes, webhooks, and endpoints in the three
+  platform-owned operator namespaces;
+- keep ACM/MCE/Hive/Hypershift and OpenShift core namespaces out of the
+  first remediation set.

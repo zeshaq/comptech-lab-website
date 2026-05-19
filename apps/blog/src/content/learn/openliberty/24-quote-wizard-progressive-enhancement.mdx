@@ -1,0 +1,223 @@
+---
+title: "Quote wizard with progressive enhancement"
+sidebar_label: "24 — Quote wizard (progressive enhancement)"
+description: "The first real flow on the customer portal: a three-field quote form that works without JavaScript, with `use:enhance` upgrading it to client-side navigation when JS is available. SvelteKit form actions + the BFF helper. Slice 19 in the insurance-app repo."
+estimated_minutes: 50
+last_updated: 2026-05-17
+prereqs: ["23 — Customer portal foundation"]
+---
+
+The customer portal has a header, a session, and a BFF. Time for the
+first real flow. The "Get a quote" page is the easiest one to write
+*and* the most subtle, because the right answer involves a SvelteKit
+idiom most React-trained engineers don't reach for by default:
+**HTML form actions with progressive enhancement**.
+
+Companion commit: `47cd8ff` in `insurance-app`.
+
+## Why progressive enhancement, not "submit then re-render"
+
+The dominant frontend pattern in 2026 is still: form posts to a JSON
+endpoint, JavaScript prevents-default, fetches, and re-renders. That
+works — and it also leaves a page that does **nothing** with
+JavaScript disabled, slow networks, or a hydration race condition. For
+a quote form, where "nothing" means a prospective customer can't get a
+price, that's a bad failure mode.
+
+SvelteKit's form actions invert the default. The page is a plain
+`<form method="POST">` that the server already knows how to handle.
+`use:enhance` then upgrades it: when JS is loaded, it intercepts the
+submit, posts in the background, and applies the returned `form` blob
+to the page without a navigation. **Both code paths run the same server
+action** — that's the load-bearing detail.
+
+```svelte
+<form method="POST" use:enhance>
+  <input name="vehicleVin" required maxlength="17" />
+  <input name="driverAge"  type="number" required min="16" max="99" />
+  <select name="coverageType">…</select>
+  <button>Calculate premium</button>
+</form>
+```
+
+Disable JavaScript in DevTools, submit the form: the page reloads with
+the quote tile filled in. Re-enable, submit again: same page, no
+reload, same data. One contract.
+
+## The form action
+
+`+page.server.ts` exports a default action. SvelteKit calls it for any
+`POST` to the page route. Validation, normalization, BFF call, and
+error mapping all live in one function:
+
+```ts
+// gui/customer-app/src/routes/quote/+page.server.ts
+import { fail, type Actions } from '@sveltejs/kit';
+import { libertyJson } from '$lib/server/liberty';
+
+export const actions: Actions = {
+  default: async ({ request, locals }) => {
+    const data = await request.formData();
+    const values = {
+      vehicleVin:   String(data.get('vehicleVin')   ?? '').trim(),
+      driverAge:    String(data.get('driverAge')    ?? '').trim(),
+      coverageType: String(data.get('coverageType') ?? '').trim(),
+    };
+
+    if (!values.vehicleVin || !values.driverAge || !values.coverageType) {
+      return fail(400, { values, error: 'All three fields are required.' });
+    }
+    const age = parseInt(values.driverAge, 10);
+    if (Number.isNaN(age) || age < 16 || age > 99) {
+      return fail(400, { values, error: 'Driver age must be between 16 and 99.' });
+    }
+    if (!['BASIC', 'STANDARD', 'PREMIUM'].includes(values.coverageType)) {
+      return fail(400, { values, error: 'Coverage must be BASIC, STANDARD, or PREMIUM.' });
+    }
+
+    const session = await locals.auth();
+    const opts = session?.user
+      ? { userId: session.user.id ?? undefined, userEmail: session.user.email ?? undefined }
+      : {};
+
+    try {
+      const quote = await libertyJson<Quote>('POST', '/api/quotes', {
+        body: { vehicleVin: values.vehicleVin, driverAge: age, coverageType: values.coverageType },
+        ...opts,
+      });
+      return { values, quote };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('429')) {
+        return fail(429, { values, error: 'Too many quotes for this VIN in the last minute. Try a different VIN or wait a bit.' });
+      }
+      return fail(502, { values, error: msg });
+    }
+  },
+};
+```
+
+Four things are happening that won't be obvious from the code alone:
+
+1. **`return { values, quote }`** is the success path. The returned
+   object becomes `form` on the page. Without `use:enhance` the browser
+   re-navigates and the new `form` is rendered server-side; with it,
+   SvelteKit applies the result client-side. Same shape either way.
+2. **`fail(400, …)`** returns the same shape with an HTTP error status.
+   The form gets re-rendered with `form.error` set and the previously-
+   typed values pre-filled. Validation feedback comes free.
+3. **`values` always echoes the submitted form fields**, including on
+   failure. This is what makes a form feel right after a validation
+   error — the user doesn't have to re-type anything.
+4. **Anonymous-by-default but identity-aware.** Get-a-quote precedes
+   login, matching the typical insurer flow. If a session does happen
+   to exist, the BFF propagates `X-User-Id` / `X-User-Email` so the
+   audit log captures it.
+
+## Rendering the result
+
+The Svelte side reads both `data` (server-rendered page data) and
+`form` (action result). Svelte 5's `$props()` rune unpacks both at
+once:
+
+```svelte
+<script lang="ts">
+  import { enhance } from '$app/forms';
+  import type { ActionData, PageData } from './$types';
+  let { data, form }: { data: PageData; form: ActionData } = $props();
+</script>
+
+{#if form?.error}
+  <div class="bg-red-50 border-l-4 border-red-600 p-4 text-red-900 text-sm">
+    <strong>Couldn't calculate a quote.</strong> {form.error}
+  </div>
+{/if}
+
+{#if form?.quote}
+  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+    <p class="text-4xl font-semibold text-emerald-900">${form.quote.premium}</p>
+    <p class="text-xs text-emerald-700">valid until {form.quote.validUntil}</p>
+    <a href={`/policies/bind?quoteId=${form.quote.id}`}>Accept and bind</a>
+  </div>
+{/if}
+```
+
+The pre-fill happens with `value={form?.values?.vehicleVin ?? ''}` on
+each `<input>`. After a validation error, the form re-renders with the
+exact strings the user submitted. Type-coercion (string → number for
+age) happens server-side in the action; the input keeps the original
+text.
+
+## The teaching moment students remember
+
+The handout for this chapter explicitly asks students to disable
+JavaScript and submit the form. Two things they invariably comment on:
+
+- The page reload "feels slow" the first time and "feels normal" the
+  second time. (Browser caching the static assets.)
+- The form **works**. Most have never seen a 2026 frontend that does
+  this.
+
+Then re-enable JS and submit again. Same form, same result, no flash.
+The pattern hides three things — fetch + JSON + state update — behind
+six characters of Svelte (`use:enhance`).
+
+## Pulling the rate-limit thread
+
+The `'429'` error branch in the action surfaces a slice-1-through-5
+behavior the rest of the curriculum talked about but couldn't *show*
+without a UI. The quote endpoint has a sliding-window rate limit per
+VIN: 5 quotes/minute. Submit the same VIN six times in a row:
+
+```bash
+for i in 1 2 3 4 5 6 7; do
+  curl -s -o /tmp/r -w "%{http_code} " -X POST http://localhost:3000/quote \
+    -d "vehicleVin=1HGBH41JXMN109186&driverAge=35&coverageType=STANDARD"
+done
+echo
+# 200 200 200 200 200 429 429
+```
+
+In the UI, that becomes the red box: "Too many quotes for this VIN in
+the last minute." The cache-then-rate-limit chain isn't a story
+anymore; it's a thing students see.
+
+## What about client-side validation?
+
+Deliberately absent for this slice. HTML5 validation (`required`,
+`maxlength="17"`, `min="16"`) covers 90% of bad input before it ever
+hits the server, and the server validation in the action covers the
+rest. Adding a JavaScript validation library would double-encode the
+rules — a recipe for the two layers drifting apart silently.
+
+The pattern to copy in later forms: HTML5 validation in the markup,
+authoritative validation server-side, *no* JavaScript validation
+library.
+
+## Verify
+
+Open `https://my.insurance-app.comptech-lab.com/quote` (assuming
+[chapter 27](/learn/openliberty/real-human-oidc) is done; if not,
+`http://localhost:3000/quote`). DevTools → Network:
+
+1. `POST /quote` returns `200` with a SvelteKit form-action body.
+2. The response body is something like `{"type":"success","status":200,"data":"[{...}]"}` — that's the
+   serialized action result with `values` + `quote`.
+3. Disable JS; resubmit. The `POST /quote` now returns a full HTML
+   document (status 200) with the quote tile inlined. Same data,
+   different envelope.
+4. Submit the same VIN six times; the sixth comes back with the 429
+   error box visible.
+
+## What you have
+
+- A real flow on the customer portal, working with or without
+  JavaScript.
+- The SvelteKit form-actions + `use:enhance` pattern, which subsequent
+  chapters reuse without ceremony.
+- Validation rules expressed once on the server.
+- The first concrete demonstration that the slice-1-through-5 Quote
+  service (Redis cache, rate limit, MI mediation) is actually behaving
+  as advertised, from the UI side.
+
+Next: [25 — Policies, bind, and the visible Idempotency-Key →](/learn/openliberty/policies-bind-idempotency)
