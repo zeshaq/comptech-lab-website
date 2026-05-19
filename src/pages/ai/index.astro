@@ -1,0 +1,778 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const tabs = [
+  { id: "overview",   eyebrow: "01", label: "Overview" },
+  { id: "strategy",   eyebrow: "02", label: "Strategy & Readiness" },
+  { id: "platforms",  eyebrow: "03", label: "AI Platforms" },
+  { id: "inference",  eyebrow: "04", label: "LLM Inference" },
+  { id: "rag",        eyebrow: "05", label: "RAG & Agentic AI" },
+  { id: "mlops",      eyebrow: "06", label: "MLOps & Lifecycle" },
+  { id: "governance", eyebrow: "07", label: "Security & Governance" },
+];
+---
+
+<Layout
+  title="AI practice — CompTech Lab"
+  description="A detailed look at the seven aspects of our AI practice: strategy, AI platforms (OpenShift AI, NVIDIA AI Enterprise, Kubeflow), LLM inference, RAG and agentic AI, MLOps, and AI security and governance."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">AI practice</span>
+      <h1 class="hero-title">A specialist AI practice for regulated workloads.</h1>
+      <p class="hero-lede">
+        Seven aspects, one operating discipline. From strategy and readiness through AI
+        platforms, LLM inference, retrieval and agentic patterns, MLOps, and AI security and
+        governance &mdash; delivered as engineering work, on the platforms your auditors
+        already trust.
+      </p>
+      <div class="hero-actions">
+        <a href="/contact/" class="btn btn-primary">Discuss an AI engagement</a>
+        <a href="#strategy" class="btn btn-secondary">Explore the practice</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top: 1.5rem;">
+    <div class="container">
+      <div class="tabs" data-tabs>
+        <div class="tab-bar" role="tablist" aria-label="AI practice aspects">
+          {tabs.map((t, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              class="tab-button"
+              aria-controls={`panel-${t.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? "0" : "-1"}
+              data-tab-target={t.id}
+            >
+              <span class="tab-button-eyebrow">{t.eyebrow}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <!-- ===== 01 Overview ===== -->
+        <div
+          class="tab-panel is-active"
+          id="panel-overview"
+          role="tabpanel"
+          aria-labelledby="tab-overview"
+          tabindex="0"
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">01 — Overview</span>
+          </div>
+          <h2 class="tab-section-title">AI as engineering work, not slideware.</h2>
+          <p class="tab-section-lede">
+            Many regulated organisations have launched AI programmes that produced demos that
+            never reached production &mdash; or worse, reached production without an audit
+            posture. We build AI capability that ships <em>and</em> survives the audit cycle,
+            on the platforms your security and operations teams already trust.
+          </p>
+
+          <div class="tab-grid tab-grid-3">
+            <div class="tab-callout">
+              <p class="tab-callout-title">Strategy &amp; readiness</p>
+              <p>Use-case discovery, build-vs-buy, ROI modelling, AI governance setup, pilot design.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">AI platforms</p>
+              <p>OpenShift AI, NVIDIA AI Enterprise, Kubeflow, GPU operator, multi-tenancy, model registry.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">LLM inference</p>
+              <p>vLLM, Triton, NVIDIA NIM, TGI, Ollama. Quantisation, batching, KV-cache, sizing.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">RAG &amp; agentic AI</p>
+              <p>Vector stores, retrieval evaluation, MCP, multi-agent patterns, guardrails.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">MLOps &amp; lifecycle</p>
+              <p>Feature stores, training pipelines, model registry, continuous evaluation, drift.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Security &amp; governance</p>
+              <p>Model-risk management, identity-bound AI, audit trails, regulator readiness, AI red teaming.</p>
+            </div>
+          </div>
+
+          <h3 class="tab-h3">Engagement archetypes</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Engagement type</th>
+                <th>Typical scope</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>AI readiness &amp; strategy</strong></td>
+                <td>Use-case discovery, build-vs-buy mapping, ROI modelling, AI governance design, pilot definition</td>
+                <td>4&ndash;8 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>AI platform stand-up</strong></td>
+                <td>OpenShift AI or NVIDIA AI Enterprise deployment, tenancy model, GPU operator, model registry, dashboards</td>
+                <td>8&ndash;14 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>LLM inference platform</strong></td>
+                <td>vLLM/Triton/NIM deployment, model serving, quantisation, sizing, multi-model routing, observability</td>
+                <td>6&ndash;10 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>RAG application build</strong></td>
+                <td>Vector store, embedding pipelines, retrieval evaluation, re-ranking, integration with content sources behind identity</td>
+                <td>10&ndash;16 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Agentic application build</strong></td>
+                <td>MCP servers, multi-agent design, tool wiring, guardrails, evaluation harness, audit trail</td>
+                <td>12&ndash;18 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>MLOps practice bring-up</strong></td>
+                <td>Pipeline, registry, evaluation, monitoring, drift detection, A/B testing, rollback path</td>
+                <td>8&ndash;14 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>AI governance &amp; assurance</strong></td>
+                <td>Model-risk framework, regulator mapping (EU AI Act, NIST AI RMF), red-teaming programme, audit-evidence capture</td>
+                <td>6&ndash;10 weeks</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">What makes us different</h3>
+          <ul class="tab-list">
+            <li><strong>Platform-anchored AI.</strong> We deploy AI workloads on the same OpenShift fleets your other regulated workloads already run on &mdash; with the same identity boundary, the same supply chain, the same RHACS posture.</li>
+            <li><strong>Audit posture by design.</strong> Every model call and every tool call is traceable to an authenticated identity and captured in an audit trail. Production agentic features survive internal audit because the audit was designed into the build.</li>
+            <li><strong>Build vs buy, honestly.</strong> When a third-party API solves the problem cleanly, we say so. When the answer requires self-hosted inference for data-sovereignty reasons, we build that. We don't pitch every customer the same stack.</li>
+            <li><strong>Documented handover.</strong> The model registry, the evaluation harness, the prompt repository, the runbook set &mdash; all owned by your team at the end of the engagement.</li>
+          </ul>
+        </div>
+
+        <!-- ===== 02 Strategy & Readiness ===== -->
+        <div
+          class="tab-panel"
+          id="panel-strategy"
+          role="tabpanel"
+          aria-labelledby="tab-strategy"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">02 — AI Strategy &amp; Readiness</span>
+          </div>
+          <h2 class="tab-section-title">Decide what to build &mdash; and what not to.</h2>
+          <p class="tab-section-lede">
+            Most regulated organisations have more AI use cases than budget. The hard work is
+            not generating ideas; it's <em>picking</em> the ones with a real ROI, an
+            implementable data model, and an audit posture that survives. We do that work
+            before any model serves its first token.
+          </p>
+
+          <h3 class="tab-h3">Use-case discovery</h3>
+          <p>
+            A structured discovery workshop programme that produces a ranked, scoped backlog
+            &mdash; not a brainstorm wall:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Business-process inventory.</strong> Where is human time spent today on bounded, knowledge-intensive work? That's the surface where AI usually earns its keep.</li>
+            <li><strong>Data-readiness probe.</strong> Does the data exist? Is it accessible? Is the lineage clean enough for audit? Many "obvious" use cases die here &mdash; better here than after engineering invests.</li>
+            <li><strong>Regulatory probe.</strong> What does your regulator say about AI-augmented decisions in this workflow? Some use cases are off-limits; some need specific documentation; some are wide open.</li>
+            <li><strong>Build-vs-buy mapping.</strong> Does a SaaS API solve this cleanly? Does data-sovereignty require self-hosting? Is the workflow generic enough to commodify?</li>
+            <li><strong>ROI model.</strong> Conservative, time-to-value, and risk-adjusted &mdash; not best-case slideware.</li>
+          </ul>
+
+          <h3 class="tab-h3">AI governance setup</h3>
+          <p>
+            Before any model reaches production, the governance model needs to exist. We help
+            stand up:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Model-risk policy.</strong> What classes of model are allowed, what review path each requires, who signs off on production rollout.</li>
+            <li><strong>Data-governance policy.</strong> What data can train what kind of model, what consent posture is required, how training-data lineage is captured.</li>
+            <li><strong>Use-case approval workflow.</strong> A documented gate &mdash; with the security, audit, and business stakeholders explicitly involved &mdash; that a use case must clear before engineering invests.</li>
+            <li><strong>Vendor-AI policy.</strong> When the AI is a third-party SaaS: what data may leave the organisation, under what contractual posture, with what auditability requirements.</li>
+            <li><strong>AI red-teaming charter.</strong> Where AI red-teaming sits in the SDLC, who runs it, what findings are blocking.</li>
+          </ul>
+
+          <h3 class="tab-h3">Pilot design</h3>
+          <p>
+            Pilots that produce decisions, not demos. We design pilots to test the <em>riskiest
+            assumption</em> in the use case &mdash; usually data quality or model behaviour
+            at the edges &mdash; not the showcase-friendly path:
+          </p>
+          <ul class="tab-list">
+            <li>A bounded scope (single workflow, single user cohort, single quarter).</li>
+            <li>Measurable success criteria defined before the pilot starts.</li>
+            <li>An explicit rollback path if the criteria are missed.</li>
+            <li>A decision moment at the end &mdash; ship, iterate, or kill.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a strategy &amp; readiness engagement</h4>
+            <ul>
+              <li>A ranked, scoped use-case backlog with build-vs-buy decisions per item</li>
+              <li>ROI models for the top 3&ndash;5 candidates, conservative and risk-adjusted</li>
+              <li>An AI-governance policy set: model risk, data, vendor AI, red teaming</li>
+              <li>A use-case approval workflow operating in your existing change-management system</li>
+              <li>One or more pilot designs with measurable success criteria and rollback paths</li>
+              <li>An AI readiness assessment against your regulatory profile</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 03 AI Platforms ===== -->
+        <div
+          class="tab-panel"
+          id="panel-platforms"
+          role="tabpanel"
+          aria-labelledby="tab-platforms"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">03 — AI Platforms</span>
+          </div>
+          <h2 class="tab-section-title">AI workloads on the platform your auditors trust.</h2>
+          <p class="tab-section-lede">
+            We deploy AI platforms on the same OpenShift fleets that host your other regulated
+            workloads &mdash; with the same identity boundary, the same GitOps delivery path,
+            and the same security posture. AI is a workload class, not a separate organisation.
+          </p>
+
+          <h3 class="tab-h3">Platform options we operate</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Strengths</th>
+                <th>When we choose it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>OpenShift AI</strong></td>
+                <td>Integrates with existing OpenShift fleets, GitOps-native, multi-tenant by design, vendor-supported, on-prem and disconnected operation</td>
+                <td>Default for organisations already on OpenShift; required for fully-disconnected and sovereign-data deployments</td>
+              </tr>
+              <tr>
+                <td><strong>NVIDIA AI Enterprise</strong></td>
+                <td>Curated NIM catalog of pre-optimised inference models, vendor-supported, layered cleanly on OpenShift</td>
+                <td>When the inference catalog or NVIDIA AI Workbench tooling earns its licence cost in your context</td>
+              </tr>
+              <tr>
+                <td><strong>Kubeflow</strong></td>
+                <td>Open-source, pipeline-centric, strong notebook integration, mature multi-tenant model</td>
+                <td>Training-heavy practices, organisations preferring an open-source-anchored stack</td>
+              </tr>
+              <tr>
+                <td><strong>Cloud-managed alternatives</strong></td>
+                <td>AWS SageMaker / Bedrock, Azure ML / OpenAI on Azure, Google Vertex AI &mdash; managed, integrated with hyperscaler IAM</td>
+                <td>When data-sovereignty allows it and the operating overhead of self-hosting is not justified</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">GPU operations</h3>
+          <ul class="tab-list">
+            <li><strong>NVIDIA GPU Operator</strong> &mdash; driver, CUDA runtime, container toolkit, MIG configuration, monitoring agent &mdash; all managed.</li>
+            <li><strong>Node Feature Discovery</strong> &mdash; nodes labelled by GPU model, memory, NVLink topology so workloads schedule onto the right hardware.</li>
+            <li><strong>MIG partitioning</strong> &mdash; carve A100 / H100 GPUs into independent slices for smaller workloads.</li>
+            <li><strong>Time-slicing &amp; sharing</strong> &mdash; multiple workloads on a single GPU where MIG is not viable.</li>
+            <li><strong>Scheduling discipline</strong> &mdash; gang scheduling for distributed training (Volcano, Kueue), priority and pre-emption policies for inference workloads.</li>
+            <li><strong>Cost &amp; utilisation reporting</strong> &mdash; per-tenant GPU consumption tied to your FinOps reporting.</li>
+          </ul>
+
+          <h3 class="tab-h3">Multi-tenancy and platform governance</h3>
+          <ul class="tab-list">
+            <li><strong>Tenant boundaries.</strong> Namespace-per-tenant with network policy and quota; multi-cluster separation where regulator or risk profile requires.</li>
+            <li><strong>Model registry.</strong> OpenShift AI registry, MLflow, or a custom registry on top of your existing artifact store &mdash; with version-controlled lineage, evaluation metadata, and signing.</li>
+            <li><strong>Notebook tenancy.</strong> Per-user or per-team notebook servers with bounded resources, RBAC tied to your identity provider.</li>
+            <li><strong>Inference tenancy.</strong> Multi-model serving with per-tenant rate limits, isolation by GPU slice or by node, observability per tenant.</li>
+            <li><strong>Cost attribution.</strong> Every GPU-second attributable to a tenant, surfaced in FinOps.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an AI platform engagement</h4>
+            <ul>
+              <li>A working AI platform (OpenShift AI, NVIDIA AI Enterprise, or Kubeflow) deployed and integrated with your fleet</li>
+              <li>GPU operator, NFD, MIG configuration, and scheduling discipline in place</li>
+              <li>A multi-tenant operating model tied to your identity provider and your FinOps reporting</li>
+              <li>A model registry with version control, lineage, and signing</li>
+              <li>Notebook and inference tenancy with documented quotas, RBAC, and isolation</li>
+              <li>Runbooks for the failure modes that matter: driver mismatches, GPU pre-emption, registry corruption, capacity exhaustion</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 04 LLM Inference ===== -->
+        <div
+          class="tab-panel"
+          id="panel-inference"
+          role="tabpanel"
+          aria-labelledby="tab-inference"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">04 — LLM Inference</span>
+          </div>
+          <h2 class="tab-section-title">Serving LLMs at the throughput, latency, and cost the workload deserves.</h2>
+          <p class="tab-section-lede">
+            Most inference deployments are either dramatically under-utilised or struggling at
+            their throughput ceiling. The difference between the two is engineering &mdash;
+            inference stack selection, quantisation discipline, batching strategy, and
+            scheduling rigour. We do that engineering.
+          </p>
+
+          <h3 class="tab-h3">Inference stack selection</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Stack</th>
+                <th>Strengths</th>
+                <th>Typical fit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>vLLM</strong></td>
+                <td>State-of-the-art throughput via PagedAttention and continuous batching, broad model support, OpenAI-compatible API</td>
+                <td>Default for high-throughput open-weights LLM serving</td>
+              </tr>
+              <tr>
+                <td><strong>NVIDIA NIM</strong></td>
+                <td>Pre-optimised, vendor-supported inference microservices with NVIDIA-tuned models out of the box</td>
+                <td>When the curated catalog and vendor support earn their licence cost</td>
+              </tr>
+              <tr>
+                <td><strong>NVIDIA Triton</strong></td>
+                <td>Multi-framework (TensorRT-LLM, PyTorch, ONNX), strong batching scheduler, broad model-format support</td>
+                <td>Mixed-framework deployments; classical-ML and LLM co-tenancy on the same server</td>
+              </tr>
+              <tr>
+                <td><strong>Text Generation Inference (TGI)</strong></td>
+                <td>Hugging-Face native, strong streaming, decent throughput for medium-scale</td>
+                <td>Hugging-Face-anchored organisations, medium-scale deployments</td>
+              </tr>
+              <tr>
+                <td><strong>Ollama</strong></td>
+                <td>Operationally simple, single-node, GGUF-native, good for prototyping and air-gapped experimentation</td>
+                <td>Pilots, developer environments, air-gapped sandbox</td>
+              </tr>
+              <tr>
+                <td><strong>llama.cpp / GGUF</strong></td>
+                <td>CPU-friendly, broad hardware support, useful where GPU access is constrained</td>
+                <td>Edge inference, CPU-only environments, smaller-context workloads</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Quantisation, batching, KV cache</h3>
+          <ul class="tab-list">
+            <li><strong>Quantisation.</strong> GPTQ, AWQ, FP8, INT4, GGUF &mdash; selected by model family, deployment target, and acceptable quality loss. Benchmarked against full-precision baseline on your evaluation set, not on generic benchmarks.</li>
+            <li><strong>Continuous batching.</strong> vLLM / Triton continuous batching tuned for your request-arrival pattern. Static batching used only where latency requirements force it.</li>
+            <li><strong>KV-cache management.</strong> PagedAttention configuration, prefix caching for repeated context, cache eviction policy tied to your priority model.</li>
+            <li><strong>Speculative decoding.</strong> Where the model and traffic shape allow, draft-model speculation for latency-bound paths.</li>
+            <li><strong>Tensor / pipeline parallelism.</strong> Multi-GPU serving for models that don't fit on a single device, with documented latency and throughput trade-offs.</li>
+          </ul>
+
+          <h3 class="tab-h3">Sizing and capacity planning</h3>
+          <p>
+            We size inference clusters the way we size any platform &mdash; empirically, against
+            traffic shaped to look like yours, with documented headroom for failure modes:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Workload shaping.</strong> Token-in / token-out distribution, request arrival pattern, latency expectation per route.</li>
+            <li><strong>Throughput benchmarking</strong> on your hardware, at your context length, with your quantisation choice.</li>
+            <li><strong>Failure-mode planning.</strong> GPU failure, node failure, model-server crash, traffic spike. Documented capacity headroom for each.</li>
+            <li><strong>Cost-per-token modelling</strong> for build-vs-buy decisions and for transparent FinOps reporting.</li>
+          </ul>
+
+          <h3 class="tab-h3">Multi-model routing &amp; OpenAI-compatible APIs</h3>
+          <p>
+            Production AI applications rarely depend on a single model. We design and operate
+            the routing layer that maps application calls to the right backend &mdash; the
+            right model, the right region, the right tenant:
+          </p>
+          <ul class="tab-list">
+            <li>OpenAI-compatible API gateway in front of vLLM / NIM / Triton (LiteLLM-style or custom).</li>
+            <li>Per-tenant rate limits, quota, fallback chains, retry semantics.</li>
+            <li>Observability: tokens-in, tokens-out, latency, error rate, cost, per route and per tenant.</li>
+            <li>Routing rules that can A/B test models without application changes.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an LLM inference engagement</h4>
+            <ul>
+              <li>An inference platform (vLLM, NIM, Triton, or mix) deployed and tuned for your workload mix</li>
+              <li>Quantisation, batching, and KV-cache configuration justified against your evaluation set</li>
+              <li>Documented sizing for current traffic with headroom and failure-mode capacity</li>
+              <li>An OpenAI-compatible API gateway with per-tenant quotas and observability</li>
+              <li>Throughput, latency, and cost-per-token dashboards tied to your FinOps reporting</li>
+              <li>Runbooks for failure modes: model crash, GPU loss, traffic spike, version rollback</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 05 RAG & Agentic AI ===== -->
+        <div
+          class="tab-panel"
+          id="panel-rag"
+          role="tabpanel"
+          aria-labelledby="tab-rag"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">05 — RAG &amp; Agentic AI</span>
+          </div>
+          <h2 class="tab-section-title">Retrieval-grounded, identity-bound, evaluated end-to-end.</h2>
+          <p class="tab-section-lede">
+            The interesting problems in modern AI applications are rarely in the model itself.
+            They are in the retrieval (what context did the model see?), the tool wiring (what
+            could it do?), and the evaluation (did it actually work for users, or only in the
+            demo?). We design those layers as an engineering discipline.
+          </p>
+
+          <h3 class="tab-h3">RAG architecture</h3>
+          <ul class="tab-list">
+            <li><strong>Vector stores.</strong> Pinecone, Weaviate, Milvus, Qdrant, pgvector &mdash; selected by latency, scale, data-sovereignty, and operating-overhead profile. Self-hosted by default for regulated workloads.</li>
+            <li><strong>Embedding pipelines.</strong> Source ingestion, chunking strategy (size, overlap, semantic boundaries), embedding model selection, batch vs streaming, re-embedding triggers when documents update.</li>
+            <li><strong>Hybrid search.</strong> Vector + BM25 keyword fusion for the queries where pure vectors lose &mdash; named entities, code identifiers, exact phrases.</li>
+            <li><strong>Re-ranking.</strong> Cross-encoder re-rank of the top-N candidates from first-stage retrieval, where the latency budget allows.</li>
+            <li><strong>Metadata filtering.</strong> Pre-filter by tenant, document type, date, classification &mdash; cheaper than letting the LLM filter in context.</li>
+            <li><strong>Citation discipline.</strong> Every model answer references the chunks it used, surfaced to the user, retained for audit.</li>
+          </ul>
+
+          <h3 class="tab-h3">Retrieval evaluation</h3>
+          <p>
+            Retrieval quality is testable and should be tested before retrieval changes ship:
+          </p>
+          <ul class="tab-list">
+            <li>A labelled evaluation set built with subject-matter experts, not synthesised by an LLM.</li>
+            <li>Metrics that match what users actually need: recall@k, MRR, nDCG &mdash; with the trade-offs across them documented for your workload.</li>
+            <li>An automated evaluation harness that runs on every retrieval-stack change, blocking regressions.</li>
+            <li>Production sampling: a portion of real queries logged (with consent), re-scored, used to refresh the eval set.</li>
+          </ul>
+
+          <h3 class="tab-h3">Agentic AI</h3>
+          <p>
+            Agents are not magic. They are LLM calls with tools, loops, and state &mdash; and
+            every one of those is a place where production behaviour diverges from demo
+            behaviour. We design agentic applications to be observable, bounded, and
+            rollback-able:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Pattern selection.</strong> Single-agent ReAct, multi-agent collaboration, reflexion, plan-execute-replan &mdash; matched to the workflow, not to the latest paper.</li>
+            <li><strong>Tool wiring via MCP.</strong> Each capability the agent uses is an MCP server &mdash; separately deployed, audit-logged, identity-bound. A misbehaving tool gets disabled at the MCP layer without rebuilding the agent.</li>
+            <li><strong>Guardrails.</strong> Input filtering, output filtering, prompt-injection defences, jailbreak detection &mdash; with explicit policies for when an agent escalates to a human.</li>
+            <li><strong>Bounded autonomy.</strong> Step budgets, cost budgets, and explicit human-in-the-loop gates for high-impact actions.</li>
+            <li><strong>Evaluation harness.</strong> Scripted scenarios that test agent behaviour on the cases that matter, including adversarial inputs. Runs on every prompt or tool change.</li>
+            <li><strong>Rollback path.</strong> Every agent run can be reverted &mdash; either by undoing the tool calls, or by routing the case back to a fully-human flow with the agent's context preserved for the human reviewer.</li>
+          </ul>
+
+          <h3 class="tab-h3">Identity-bound AI</h3>
+          <p>
+            Agents that reach backend systems do so under an authenticated identity that
+            mirrors the human user the agent is acting on behalf of &mdash; or under a
+            distinct service identity with the same governance treatment:
+          </p>
+          <ul class="tab-list">
+            <li>Agent identities provisioned via SCIM from the same directory of record as humans.</li>
+            <li>OAuth2 token exchange when the agent needs to act on a user's behalf.</li>
+            <li>Per-tool authorisation policies enforced at the MCP layer.</li>
+            <li>Audit trail correlating: user → agent run → tool call → backend record change.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a RAG or agentic engagement</h4>
+            <ul>
+              <li>A production RAG or agentic application integrated with your content sources, behind your identity provider</li>
+              <li>Vector store, embedding pipeline, hybrid search, and re-ranking tuned to your queries</li>
+              <li>A retrieval-evaluation harness with a labelled eval set, blocking regressions</li>
+              <li>MCP servers for every tool the agent uses, each separately audited</li>
+              <li>Guardrails, bounded autonomy, and a documented rollback path</li>
+              <li>An audit trail correlating user → agent → tool → backend, accepted by your audit function</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 06 MLOps & Lifecycle ===== -->
+        <div
+          class="tab-panel"
+          id="panel-mlops"
+          role="tabpanel"
+          aria-labelledby="tab-mlops"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">06 — MLOps &amp; Model Lifecycle</span>
+          </div>
+          <h2 class="tab-section-title">Models in production behave nothing like models on a laptop.</h2>
+          <p class="tab-section-lede">
+            The MLOps discipline is the difference between a model that shipped and a model
+            that <em>keeps</em> working. We build pipeline, registry, evaluation, monitoring,
+            and rollback into a coherent practice your team can own.
+          </p>
+
+          <h3 class="tab-h3">Data &amp; feature pipelines</h3>
+          <ul class="tab-list">
+            <li><strong>Data platform.</strong> Apache Spark, lakehouse table formats (Iceberg, Delta), MinIO or S3 for object storage. Built on the same fleet as the model serving so handoffs are simple.</li>
+            <li><strong>Feature stores.</strong> Feast or platform-native equivalents, with explicit feature lineage and freshness SLAs.</li>
+            <li><strong>Streaming features</strong> via Kafka and Spark Streaming for use cases where stale features lose accuracy.</li>
+            <li><strong>Data contracts.</strong> Schema, ownership, breaking-change policy &mdash; explicit between upstream producers and the ML team.</li>
+            <li><strong>PII handling.</strong> Tokenisation, masking, or full removal at ingestion, with the residual-risk decision documented.</li>
+          </ul>
+
+          <h3 class="tab-h3">Training &amp; experimentation</h3>
+          <ul class="tab-list">
+            <li><strong>Kubeflow Pipelines</strong> or Argo Workflows for reproducible training and evaluation runs.</li>
+            <li><strong>Distributed training</strong> via Ray, PyTorch DDP / FSDP, DeepSpeed where model and dataset scale demand it.</li>
+            <li><strong>Experiment tracking.</strong> MLflow, Weights &amp; Biases, or Kubeflow-native &mdash; with hyperparameters, code commit, dataset version, and metrics tied together.</li>
+            <li><strong>Notebook discipline.</strong> Per-user notebooks for exploration, with a documented promotion path to checked-in pipeline code.</li>
+            <li><strong>Fine-tuning.</strong> LoRA, QLoRA, full fine-tunes &mdash; chosen by data volume, target hardware, and licence posture.</li>
+          </ul>
+
+          <h3 class="tab-h3">Model registry &amp; deployment</h3>
+          <ul class="tab-list">
+            <li><strong>Versioned registry.</strong> Every production model has a registry entry with version, hash, training data version, evaluation metrics, and signing.</li>
+            <li><strong>Promotion path.</strong> Dev → staging → production with documented gates &mdash; evaluation thresholds, security scan, governance sign-off.</li>
+            <li><strong>Canary and shadow deploys.</strong> Route a fraction of traffic to the candidate while the incumbent serves &mdash; or shadow-traffic the candidate offline while real users see the incumbent. Both with full metric comparison.</li>
+            <li><strong>A/B testing.</strong> Statistical-power planning, holdout discipline, decision-by-metric &mdash; not by gut feel.</li>
+            <li><strong>Rollback.</strong> One-command rollback to the prior version, runbook-rehearsed.</li>
+          </ul>
+
+          <h3 class="tab-h3">Monitoring &amp; drift</h3>
+          <ul class="tab-list">
+            <li><strong>Operational metrics.</strong> Latency, error rate, throughput, GPU utilisation, cost-per-call &mdash; in the same dashboards as the rest of the platform.</li>
+            <li><strong>Quality metrics.</strong> Live evaluation against a held-out set, ongoing labelled-data collection from production sampling, business-outcome metrics where available.</li>
+            <li><strong>Data drift.</strong> Distribution shift in input features, statistically tested with documented thresholds.</li>
+            <li><strong>Concept drift.</strong> Shift in target / label distribution, detected via labelled feedback or downstream signal.</li>
+            <li><strong>Cost drift.</strong> Cost-per-call trends with alerts on unexpected growth &mdash; the metric that most often catches misuse before the bill arrives.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an MLOps engagement</h4>
+            <ul>
+              <li>Reproducible training and evaluation pipelines in Kubeflow or Argo</li>
+              <li>A versioned model registry with lineage, evaluation metadata, and signing</li>
+              <li>A documented promotion path from dev to production with explicit gates</li>
+              <li>Canary, shadow, and A/B-testing patterns running on real traffic</li>
+              <li>Operational, quality, and drift monitoring tied to your incident-response loop</li>
+              <li>Rollback runbooks rehearsed for every model in production</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 07 Security & Governance ===== -->
+        <div
+          class="tab-panel"
+          id="panel-governance"
+          role="tabpanel"
+          aria-labelledby="tab-governance"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">07 — AI Security &amp; Governance</span>
+          </div>
+          <h2 class="tab-section-title">AI workloads that survive internal audit and the next regulator visit.</h2>
+          <p class="tab-section-lede">
+            AI workloads expand the attack surface in ways traditional appsec doesn't fully
+            cover &mdash; prompt injection, training-data poisoning, tool-misuse via agents,
+            opaque decision paths, model-output leakage. We design the controls that close
+            those gaps and produce the evidence auditors will accept.
+          </p>
+
+          <h3 class="tab-h3">Model-risk management</h3>
+          <ul class="tab-list">
+            <li><strong>Model classification.</strong> Each model categorised by impact (advisory vs decisioning, internal vs customer-facing, regulated vs non-regulated) with the corresponding review and approval path.</li>
+            <li><strong>Use-case approval gate.</strong> Documented sign-off path before any model reaches production &mdash; security, audit, business owner, model-risk function.</li>
+            <li><strong>Periodic re-review.</strong> Annual or triggered re-evaluation of production models against drift, regulatory change, and incident learning.</li>
+            <li><strong>Model inventory.</strong> A single, authoritative list of every model in production, with owner, classification, last review date, and live metrics.</li>
+          </ul>
+
+          <h3 class="tab-h3">AI-specific threats</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Threat</th>
+                <th>Mitigation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Prompt injection</strong></td>
+                <td>Input sanitisation, system-prompt isolation from untrusted content, tool-call confirmation for high-impact actions, output filtering, monitoring for jailbreak signatures</td>
+              </tr>
+              <tr>
+                <td><strong>Indirect / cross-domain injection</strong></td>
+                <td>Treat retrieved content as untrusted; never grant tool execution authority from retrieved instructions; explicit tool-grant policies per MCP server</td>
+              </tr>
+              <tr>
+                <td><strong>Data leakage via output</strong></td>
+                <td>Output filtering for PII, secrets, regulated content; retrieval-source classification policies; audit log of every model output</td>
+              </tr>
+              <tr>
+                <td><strong>Training-data poisoning</strong></td>
+                <td>Training-data provenance and lineage, signed dataset versions, anomaly detection on training-data updates, restricted ingest sources</td>
+              </tr>
+              <tr>
+                <td><strong>Tool misuse via agents</strong></td>
+                <td>MCP-layer authorisation, step budgets, human-in-the-loop gates for high-impact actions, audit trail per tool call</td>
+              </tr>
+              <tr>
+                <td><strong>Membership inference / model extraction</strong></td>
+                <td>Rate limiting, anomaly detection on query patterns, output randomisation where applicable, differential privacy in training where the use case allows</td>
+              </tr>
+              <tr>
+                <td><strong>Hallucination on regulated content</strong></td>
+                <td>Mandatory citations, RAG-grounded answers, post-generation verification against retrieved sources, human review for high-impact outputs</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">AI red teaming</h3>
+          <ul class="tab-list">
+            <li><strong>Programme structure.</strong> Where AI red teaming sits in the SDLC, who runs it (in-house team or external), what findings are blocking for production rollout.</li>
+            <li><strong>Adversarial-prompt libraries.</strong> Maintained over time, with attempted attacks mapped to mitigations.</li>
+            <li><strong>Automated harness.</strong> Re-runs the red-team library against every prompt or tool change, blocking regressions.</li>
+            <li><strong>Manual deep dives.</strong> Quarterly hands-on red-team exercises against production-shaped systems, with findings landing in the engineering backlog.</li>
+          </ul>
+
+          <h3 class="tab-h3">Regulatory and assurance posture</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Framework</th>
+                <th>Where it bites</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>EU AI Act</strong></td>
+                <td>Risk classification, conformity assessments, transparency obligations for high-risk systems, prohibited-use clarity</td>
+              </tr>
+              <tr>
+                <td><strong>NIST AI RMF</strong></td>
+                <td>Govern / map / measure / manage functions, profile-driven control selection</td>
+              </tr>
+              <tr>
+                <td><strong>ISO/IEC 42001</strong></td>
+                <td>AI management system standard, audit-ready certification path</td>
+              </tr>
+              <tr>
+                <td><strong>Sector regulators</strong></td>
+                <td>Central-bank IT guidance on AI-assisted decisions, insurance-regulator guidance on AI underwriting and claims, telecom regulator guidance on AI in customer-facing channels</td>
+              </tr>
+              <tr>
+                <td><strong>Privacy regimes</strong></td>
+                <td>GDPR Article 22 (automated decisions), training-data lineage, data-subject rights against model-derived attributes</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Audit-evidence capture</h3>
+          <ul class="tab-list">
+            <li>Every model call captured: input, output, model version, retrieval context, latency, cost, user identity.</li>
+            <li>Every tool call captured: tool, input, output, calling agent identity, downstream effects.</li>
+            <li>Evaluation runs versioned alongside the model, signed, retained per regulatory requirement.</li>
+            <li>Model-risk decisions captured in the model registry: classification, approval, conditions of use, expiration.</li>
+            <li>Incidents captured in the same incident system as the rest of the platform &mdash; AI is not a separate failure domain for audit.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an AI governance engagement</h4>
+            <ul>
+              <li>A model-risk management framework mapped to your regulatory profile</li>
+              <li>An authoritative model inventory with classification, owner, and review cadence</li>
+              <li>AI-specific threat-mitigation controls deployed and tested</li>
+              <li>An AI red-teaming programme with library, harness, and the first round of exercises completed</li>
+              <li>Audit-evidence capture wired through model calls, tool calls, and evaluation runs</li>
+              <li>A residual-risk register accepted by your audit and model-risk functions</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
+    <div class="container" style="text-align: center;">
+      <span class="section-eyebrow" style="color: var(--color-accent);">Start an AI engagement</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have an AI programme that needs to survive audit?</h2>
+      <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
+        Send us a short note describing the use case and the regulatory context. We'll write
+        back with a concrete first-two-weeks scope and a definition of done for the
+        engagement.
+      </p>
+      <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+        <a href="/contact/" class="btn btn-primary">Contact us</a>
+        <a href="/security/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">Security practice</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector("[data-tabs]");
+    if (!root) return;
+    const buttons = Array.from(root.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(root.querySelectorAll(".tab-panel"));
+
+    function activate(id, opts = {}) {
+      buttons.forEach((b) => {
+        const active = b.dataset.tabTarget === id;
+        b.setAttribute("aria-selected", active ? "true" : "false");
+        b.setAttribute("tabindex", active ? "0" : "-1");
+      });
+      panels.forEach((p) => {
+        const active = p.id === `panel-${id}`;
+        p.classList.toggle("is-active", active);
+        if (active) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
+      });
+      if (opts.updateHash) {
+        history.replaceState(null, "", `#${id}`);
+      }
+      if (opts.focus) {
+        const btn = buttons.find((b) => b.dataset.tabTarget === id);
+        btn && btn.focus();
+      }
+    }
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => activate(btn.dataset.tabTarget, { updateHash: true }));
+    });
+
+    root.addEventListener("keydown", (e) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      const current = document.activeElement;
+      const idx = buttons.indexOf(current);
+      if (idx === -1) return;
+      e.preventDefault();
+      let nextIdx = idx;
+      if (e.key === "ArrowLeft")  nextIdx = (idx - 1 + buttons.length) % buttons.length;
+      if (e.key === "ArrowRight") nextIdx = (idx + 1) % buttons.length;
+      if (e.key === "Home")       nextIdx = 0;
+      if (e.key === "End")        nextIdx = buttons.length - 1;
+      activate(buttons[nextIdx].dataset.tabTarget, { updateHash: true, focus: true });
+    });
+
+    const initial = (location.hash || "").replace(/^#/, "");
+    if (initial && buttons.some((b) => b.dataset.tabTarget === initial)) {
+      activate(initial);
+    }
+  })();
+</script>
