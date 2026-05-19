@@ -1,0 +1,151 @@
+---
+/**
+ * Full-bleed hero slider with IBM-style dark overlay over a rotating
+ * background photo. Three slides, auto-advance every 6 seconds,
+ * manual next/prev + dot indicators, keyboard support, pauses on hover.
+ *
+ * Imports the historical CompTech slider photography but presents it
+ * inside the new IBM Carbon visual language: gray-100 gradient, Plex
+ * Sans Light display headlines, blue accent stripe, Carbon plate.
+ */
+
+interface Slide {
+  image: string;
+  eyebrow: string;
+  title: string;
+  lede: string;
+  cta?: { href: string; label: string };
+  secondary?: { href: string; label: string };
+}
+
+const slides: Slide[] = [
+  {
+    image: "/images/hero/slide-01.jpeg",
+    eyebrow: "Systems integration for regulated industries",
+    title: "Cloud-driven change — engineered to ship.",
+    lede:
+      "Cloud platforms, security, AI, and data for banking, insurance, telecom, defense, and public sector. Delivered against documented outcomes, not against open-ended retainers.",
+    cta: { href: "/services/", label: "Our services" },
+    secondary: { href: "/case-studies/", label: "Engagement profiles" },
+  },
+  {
+    image: "/images/hero/slide-02.jpeg",
+    eyebrow: "Since 1989",
+    title: "Three decades of platform engineering.",
+    lede:
+      "Founded in Dhaka in 1989, CompTech has grown into one of South Asia’s most established systems integrators — trusted by banks, government agencies, and development organisations to operate the platforms that matter.",
+    cta: { href: "/about/", label: "About CompTech" },
+    secondary: { href: "/partnerships/", label: "Technology partners" },
+  },
+  {
+    image: "/images/hero/slide-03.jpeg",
+    eyebrow: "AI · Security · Cloud · Data",
+    title: "Your cloud journey, simplified.",
+    lede:
+      "From OpenShift fleets to LLM inference, lakehouse architectures to identity-bound agentic AI — we design and operate the systems that ship regulated workloads.",
+    cta: { href: "/contact/", label: "Start a conversation" },
+    secondary: { href: "/capabilities/", label: "Capabilities map" },
+  },
+];
+---
+
+<section class="hero hero-slider" data-hero-slider aria-roledescription="carousel" aria-label="CompTech Lab introduction">
+  {slides.map((s, i) => (
+    <div
+      class={`hero-slide ${i === 0 ? "is-active" : ""}`}
+      data-slide-index={i}
+      role="group"
+      aria-roledescription="slide"
+      aria-label={`${i + 1} of ${slides.length}`}
+      aria-hidden={i === 0 ? "false" : "true"}
+    >
+      <div class="hero-slide-bg" style={`background-image: url('${s.image}');`}></div>
+      <div class="hero-slide-overlay"></div>
+      <div class="container hero-slide-content">
+        <span class="hero-eyebrow">{s.eyebrow}</span>
+        <h1 class="hero-title">{s.title}</h1>
+        <p class="hero-lede">{s.lede}</p>
+        <div class="hero-actions">
+          {s.cta && <a href={s.cta.href} class="btn btn-primary">{s.cta.label}</a>}
+          {s.secondary && <a href={s.secondary.href} class="btn btn-secondary">{s.secondary.label}</a>}
+        </div>
+      </div>
+    </div>
+  ))}
+
+  {/* Carbon plate corner mark — consistent with other hero variants */}
+  <div class="hero-slider-mark" aria-hidden="true">
+    <span></span><span></span>
+    <span></span><span></span>
+  </div>
+
+  {/* Top-left accent stripe */}
+  <div class="hero-slider-stripe" aria-hidden="true"></div>
+
+  {/* Slide controls — dots + arrows */}
+  <div class="hero-slider-controls">
+    <button type="button" class="hero-slider-arrow hero-slider-prev" aria-label="Previous slide" data-slider-prev>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="hero-slider-dots" role="tablist" aria-label="Choose slide">
+      {slides.map((_, i) => (
+        <button
+          type="button"
+          class={`hero-slider-dot ${i === 0 ? "is-active" : ""}`}
+          role="tab"
+          aria-label={`Go to slide ${i + 1}`}
+          aria-selected={i === 0 ? "true" : "false"}
+          data-slider-goto={i}
+        ></button>
+      ))}
+    </div>
+    <button type="button" class="hero-slider-arrow hero-slider-next" aria-label="Next slide" data-slider-next>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector("[data-hero-slider]");
+    if (!root) return;
+    const slides = Array.from(root.querySelectorAll(".hero-slide"));
+    const dots = Array.from(root.querySelectorAll("[data-slider-goto]"));
+    const prev = root.querySelector("[data-slider-prev]");
+    const next = root.querySelector("[data-slider-next]");
+    let current = 0;
+    let timer = null;
+    const interval = 6000;
+    let paused = false;
+
+    function show(i) {
+      current = (i + slides.length) % slides.length;
+      slides.forEach((slide, idx) => {
+        const active = idx === current;
+        slide.classList.toggle("is-active", active);
+        slide.setAttribute("aria-hidden", active ? "false" : "true");
+      });
+      dots.forEach((dot, idx) => {
+        const active = idx === current;
+        dot.classList.toggle("is-active", active);
+        dot.setAttribute("aria-selected", active ? "true" : "false");
+      });
+    }
+    function step(delta) { show(current + delta); restart(); }
+    function restart() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (!paused) timer = setInterval(() => show(current + 1), interval);
+    }
+    prev && prev.addEventListener("click", () => step(-1));
+    next && next.addEventListener("click", () => step(1));
+    dots.forEach((dot, idx) => dot.addEventListener("click", () => { show(idx); restart(); }));
+    root.addEventListener("mouseenter", () => { paused = true; restart(); });
+    root.addEventListener("mouseleave", () => { paused = false; restart(); });
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft")  { e.preventDefault(); step(-1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+    });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { paused = true; }
+    restart();
+  })();
+</script>

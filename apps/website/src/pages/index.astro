@@ -3,8 +3,18 @@ import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
 import DotGrid from "../components/DotGrid.astro";
 import HeroBackground from "../components/HeroBackground.astro";
+import HeroSlider from "../components/HeroSlider.astro";
 import { getCollection } from "astro:content";
 import { SERVICE_ICONS, INDUSTRY_ICONS, PHASE_ICONS } from "../utils/icons";
+
+const stats = [
+  { n: "1989",  label: "Founded in Dhaka" },
+  { n: "150+",  label: "Engineers and specialists" },
+  { n: "50+",   label: "Multi-cloud certified engineers" },
+  { n: "200+",  label: "Projects delivered" },
+  { n: "70%",   label: "Repeat-client rate" },
+  { n: "10+",   label: "Industries served" },
+];
 
 const services = (await getCollection("services", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.order - b.data.order
@@ -28,19 +38,17 @@ const phases = [
 ---
 
 <Layout>
-  <section class="hero">
-    <HeroBackground variant="orbits" />
+  <HeroSlider />
+
+  <section class="section" style="background: var(--color-ink); color: #ffffff; padding-top: 3rem; padding-bottom: 3rem; border-bottom: 1px solid #393939;">
     <div class="container">
-      <span class="hero-eyebrow">Systems integration for regulated industries</span>
-      <h1 class="hero-title">Cloud platforms, security, AI, and data &mdash; engineered to ship.</h1>
-      <p class="hero-lede">
-        CompTech Lab designs, deploys, and hands over the cloud and container platforms that
-        anchor regulated workloads in banking, insurance, telecom, defense, and public sector.
-        We deliver against documented outcomes, not against open-ended retainers.
-      </p>
-      <div class="hero-actions">
-        <a href="/services/" class="btn btn-primary">Our services</a>
-        <a href="/case-studies/" class="btn btn-secondary">Engagement profiles</a>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem 1rem; align-items: start;" class="stats-grid">
+        {stats.map((s) => (
+          <div>
+            <div style="font-family: var(--font-sans); font-size: 2.25rem; font-weight: 300; letter-spacing: -0.025em; line-height: 1; color: #ffffff;">{s.n}</div>
+            <div style="margin-top: 0.55rem; font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.4;">{s.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   </section>

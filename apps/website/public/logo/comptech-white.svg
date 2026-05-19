@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="320" viewBox="0 0 1400 320" role="img" aria-labelledby="title desc">
+  <title id="title">CompTech</title>
+  <desc id="desc">CompTech wordmark, white — COMP in extra bold and TECH in light.</desc>
+  <g transform="translate(0 210)">
+    <text x="0" y="0"
+          font-family="'IBM Plex Sans', Inter, 'Helvetica Neue', Arial, sans-serif"
+          font-size="150"
+          letter-spacing="1"
+          fill="#ffffff">
+      <tspan font-weight="900">COMP</tspan><tspan dx="8" font-weight="300">TECH</tspan>
+    </text>
+  </g>
+</svg>

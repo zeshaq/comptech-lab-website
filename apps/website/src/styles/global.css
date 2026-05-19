@@ -121,6 +121,23 @@ html, body {
   line-height: 1;
 }
 
+.topnav-brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+  flex-shrink: 0;
+}
+
+.topnav-brand-suffix {
+  font-size: 1rem;
+  font-weight: 300;
+  color: var(--color-muted);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
 .topnav-links {
   display: none;
   align-items: center;
@@ -232,6 +249,247 @@ html, body {
 .topnav-mobile-panel .topnav-link {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+/* ===== Stats grid (home, about) ===== */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem 1rem;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* ===== Hero slider ===== */
+
+.hero-slider {
+  position: relative;
+  min-height: 560px;
+  padding: 0;
+  background: #000000;
+  overflow: hidden;
+  border-bottom: none;
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .hero-slider { min-height: 640px; }
+}
+
+@media (min-width: 1280px) {
+  .hero-slider { min-height: 720px; }
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.hero-slide.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.hero-slide-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+.hero-slide-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(
+      100deg,
+      rgba(0, 0, 0, 0.85) 0%,
+      rgba(22, 22, 22, 0.78) 30%,
+      rgba(22, 22, 22, 0.55) 55%,
+      rgba(22, 22, 22, 0.3) 75%,
+      rgba(22, 22, 22, 0.2) 100%
+    );
+}
+
+.hero-slide-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 5rem 0 6rem;
+}
+
+@media (min-width: 768px) {
+  .hero-slide-content { padding: 7rem 0 8rem; }
+}
+
+@media (min-width: 1280px) {
+  .hero-slide-content { padding: 8rem 0 9rem; }
+}
+
+.hero-slider .hero-eyebrow {
+  color: #78a9ff;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.hero-slider .hero-title {
+  color: #ffffff;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  font-size: 2.4rem;
+  max-width: 22ch;
+  margin: 0 0 1.5rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+@media (min-width: 768px) {
+  .hero-slider .hero-title { font-size: 3.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .hero-slider .hero-title { font-size: 4rem; }
+}
+
+@media (min-width: 1440px) {
+  .hero-slider .hero-title { font-size: 4.75rem; }
+}
+
+.hero-slider .hero-lede {
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 56ch;
+  margin: 0 0 2.5rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+@media (min-width: 768px) {
+  .hero-slider .hero-lede { font-size: 1.15rem; }
+}
+
+.hero-slider .btn-secondary {
+  background: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.hero-slider .btn-secondary:hover {
+  background: #ffffff;
+  color: #161616;
+  border-color: #ffffff;
+}
+
+/* Carbon plate */
+.hero-slider-mark {
+  position: absolute;
+  left: 2.5rem;
+  bottom: 5.5rem;
+  display: grid;
+  grid-template-columns: 22px 22px;
+  grid-template-rows: 22px 22px;
+  gap: 2px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.hero-slider-mark span {
+  display: block;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hero-slider-mark span:nth-child(1) { background: #0f62fe; }
+.hero-slider-mark span:nth-child(4) { background: rgba(15, 98, 254, 0.5); }
+
+/* Top-left accent stripe */
+.hero-slider-stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80px;
+  height: 3px;
+  background: #0f62fe;
+  z-index: 3;
+}
+
+/* Slider controls */
+.hero-slider-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.5rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.hero-slider-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 0;
+}
+
+.hero-slider-arrow:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ffffff;
+}
+
+.hero-slider-dots {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.hero-slider-dot {
+  width: 28px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+.hero-slider-dot:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.hero-slider-dot.is-active {
+  background: #0f62fe;
+  width: 48px;
 }
 
 /* ===== Footer ===== */
