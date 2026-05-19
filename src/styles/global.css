@@ -332,10 +332,44 @@ html, body {
   height: 100%;
 }
 
+/* Dark fade that protects the text area on the left while leaving the
+   right-side shapes visible. Two stacked gradients: a horizontal one for
+   wide screens, a radial one for narrow screens. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(
+      100deg,
+      #161616 0%,
+      #161616 28%,
+      rgba(22, 22, 22, 0.92) 42%,
+      rgba(22, 22, 22, 0.55) 58%,
+      rgba(22, 22, 22, 0.15) 75%,
+      transparent 88%
+    );
+}
+
+/* On narrow viewports the right-side shapes don't really have room to
+   breathe — soften the fade so the whole hero just feels darker. */
+@media (max-width: 768px) {
+  .hero::before {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(22, 22, 22, 0.55) 0%,
+        rgba(22, 22, 22, 0.3) 100%
+      );
+  }
+}
+
 .hero .container,
 .hero > .container {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 /* Hero text on dark */
