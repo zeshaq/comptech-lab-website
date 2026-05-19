@@ -1,0 +1,866 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const tabs = [
+  { id: "overview",   eyebrow: "01", label: "Overview" },
+  { id: "soc",        eyebrow: "02", label: "SOC & Detection" },
+  { id: "vapt",       eyebrow: "03", label: "VAPT & Vuln Mgmt" },
+  { id: "network",    eyebrow: "04", label: "Network Security" },
+  { id: "iam",        eyebrow: "05", label: "Identity & Access" },
+  { id: "appsec",     eyebrow: "06", label: "AppSec & DevSecOps" },
+  { id: "compliance", eyebrow: "07", label: "Compliance & Audit" },
+];
+---
+
+<Layout
+  title="Security practice — CompTech Lab"
+  description="A detailed look at the seven aspects of our security practice: SOC and detection engineering, VAPT and vulnerability management, network security and segmentation, identity and access, AppSec and DevSecOps, and compliance and audit."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">Security practice</span>
+      <h1 class="hero-title">A specialist security practice for regulated workloads.</h1>
+      <p class="hero-lede">
+        Seven aspects, one operating discipline. From SOC build-out and detection engineering
+        through to VAPT, network segmentation, identity, application security, and audit-grade
+        compliance posture &mdash; delivered as engineering work, not as a quarterly slide.
+      </p>
+      <div class="hero-actions">
+        <a href="/contact/" class="btn btn-primary">Discuss a security engagement</a>
+        <a href="#soc" class="btn btn-secondary">Explore the practice</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top: 1.5rem;">
+    <div class="container">
+      <div class="tabs" data-tabs>
+        <div class="tab-bar" role="tablist" aria-label="Security practice aspects">
+          {tabs.map((t, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              class="tab-button"
+              aria-controls={`panel-${t.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? "0" : "-1"}
+              data-tab-target={t.id}
+            >
+              <span class="tab-button-eyebrow">{t.eyebrow}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <!-- ===== 01 Overview ===== -->
+        <div
+          class="tab-panel is-active"
+          id="panel-overview"
+          role="tabpanel"
+          aria-labelledby="tab-overview"
+          tabindex="0"
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">01 — Overview</span>
+          </div>
+          <h2 class="tab-section-title">Security as engineering work.</h2>
+          <p class="tab-section-lede">
+            Most regulated organisations have already invested in security tools. What they
+            often lack is the engineering discipline that makes those tools produce trustworthy
+            outputs week after week &mdash; detections that fire, runbooks that match the
+            system, and audit evidence captured at the source. CompTech Lab brings that
+            discipline.
+          </p>
+
+          <div class="tab-grid tab-grid-3">
+            <div class="tab-callout">
+              <p class="tab-callout-title">SOC &amp; detection</p>
+              <p>SIEM/XDR build-out, detection-as-code, SOAR workflows, threat hunting, incident response runbooks.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">VAPT &amp; vuln mgmt</p>
+              <p>Web/network/cloud penetration testing, continuous scanning programmes, purple-team loops, remediation tracking.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Network security</p>
+              <p>Cisco Nexus EVPN/VXLAN, multi-tenant segmentation, next-gen firewalls, NAC, micro-segmentation.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Identity &amp; access</p>
+              <p>Federated identity, SCIM, OIDC/SAML, MFA, ZTNA, privileged access, workload identity.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">AppSec &amp; DevSecOps</p>
+              <p>SAST, SCA, SBOMs, image signing, container runtime security (RHACS), DAST programmes.</p>
+            </div>
+            <div class="tab-callout">
+              <p class="tab-callout-title">Compliance &amp; audit</p>
+              <p>Control-framework mapping (PCI, ISO, NIST), continuous compliance, evidence at source.</p>
+            </div>
+          </div>
+
+          <h3 class="tab-h3">Engagement archetypes</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Engagement type</th>
+                <th>Typical scope</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Full SOC build-out</strong></td>
+                <td>SIEM platform, detection content, SOAR workflows, case management, IR runbooks, on-call structure</td>
+                <td>12&ndash;20 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Identity bring-up</strong></td>
+                <td>WSO2 IS or Ping Identity platform, federation, SCIM, MFA, application onboarding</td>
+                <td>4&ndash;8 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Network segmentation programme</strong></td>
+                <td>Cisco Nexus fabric design, tenant VRFs, services-VRF route-leak controls, firewall policy</td>
+                <td>10&ndash;16 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>DevSecOps integration</strong></td>
+                <td>Pipeline security (SAST/SCA/SBOM/signing), RHACS deploy and tune, DAST programme stand-up</td>
+                <td>8&ndash;14 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>VAPT engagement</strong></td>
+                <td>Scoped penetration test, vulnerability scan baseline, remediation tracking, retest cycle</td>
+                <td>4&ndash;8 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Compliance-evidence alignment</strong></td>
+                <td>Control mapping (PCI / ISO / regulator), evidence capture at source, audit-cycle support</td>
+                <td>6&ndash;10 weeks</td>
+              </tr>
+              <tr>
+                <td><strong>Managed SOC (bridge)</strong></td>
+                <td>Bounded, time-boxed operations of a defined SOC scope while your team builds capability</td>
+                <td>3&ndash;12 months</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">What makes us different</h3>
+          <ul class="tab-list">
+            <li><strong>Engineering-first.</strong> We treat detection content, network policy, and identity rules as code. They live in Git, are reviewed in pull requests, and are reconciled against running systems by automation.</li>
+            <li><strong>Evidence at the source.</strong> Audit evidence is captured where it is produced &mdash; commits, scan reports, RHACS runtime alerts, identity audit logs &mdash; not reconstructed at audit time.</li>
+            <li><strong>Documented handover.</strong> Every engagement ends with runbooks indexed by failure mode, an ADR set covering non-obvious decisions, and a residual-risk register your audit function can sign for.</li>
+            <li><strong>Bounded scope.</strong> We don't run open-ended retainers. Managed services exist as a bounded bridge, not a permanent dependency.</li>
+          </ul>
+        </div>
+
+        <!-- ===== 02 SOC & Detection ===== -->
+        <div
+          class="tab-panel"
+          id="panel-soc"
+          role="tabpanel"
+          aria-labelledby="tab-soc"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">02 — SOC &amp; Detection Engineering</span>
+          </div>
+          <h2 class="tab-section-title">A SOC that produces trustworthy signal.</h2>
+          <p class="tab-section-lede">
+            Building a SOC is straightforward. Building one whose detections fire on the cases
+            that matter, whose analysts trust the alerts, and whose runbooks survive staff
+            turnover &mdash; that is engineering work. We design the SOC operating model and
+            its detection content as code, anchored on the platforms you already run.
+          </p>
+
+          <h3 class="tab-h3">SOC architecture</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Technologies we operate</th>
+                <th>What we deliver</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>SIEM</strong></td>
+                <td>Splunk Enterprise/Cloud, Wazuh, Elastic Security</td>
+                <td>Log source onboarding plan, parsing/normalisation, retention policy, search-time taxonomy</td>
+              </tr>
+              <tr>
+                <td><strong>NSM &amp; IDS</strong></td>
+                <td>Security Onion (Zeek, Suricata, Stenographer), Cisco Secure Network Analytics</td>
+                <td>Sensor placement, traffic capture posture, signature management, alert tuning</td>
+              </tr>
+              <tr>
+                <td><strong>XDR &amp; EDR</strong></td>
+                <td>Cisco XDR, Cisco Secure Endpoint, Microsoft Defender, CrowdStrike</td>
+                <td>Agent rollout plan, policy baselines, response actions, integration with SIEM/SOAR</td>
+              </tr>
+              <tr>
+                <td><strong>SOAR &amp; case management</strong></td>
+                <td>Shuffle, TheHive, Cortex, Splunk SOAR</td>
+                <td>Playbook design, automation of triage steps, case lifecycle, evidence capture</td>
+              </tr>
+              <tr>
+                <td><strong>Threat intelligence</strong></td>
+                <td>Cisco Talos, MISP, commercial feeds</td>
+                <td>Feed selection, IOC enrichment pipelines, false-positive controls</td>
+              </tr>
+              <tr>
+                <td><strong>Vulnerability surface</strong></td>
+                <td>Greenbone (OpenVAS), Tenable Nessus, RHACS image risk</td>
+                <td>Scan orchestration, remediation tracking, exception process, SLA reporting</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Detection engineering as code</h3>
+          <p>
+            Detections are content. Content has a lifecycle: research, develop, test, deploy,
+            tune, retire. We run that lifecycle as a software-engineering practice:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Detection-as-code repositories</strong> &mdash; rules versioned in Git, peer-reviewed, deployed via CI to the SIEM/XDR.</li>
+            <li><strong>MITRE ATT&amp;CK mapping</strong> &mdash; every detection labelled with the techniques it covers, gap analysis run against the matrix quarterly.</li>
+            <li><strong>Test fixtures</strong> &mdash; replayable attack-sample inputs that validate detection behaviour before promotion.</li>
+            <li><strong>Tuning loop</strong> &mdash; false-positive rate tracked per detection, with documented thresholds for tuning, retirement, or escalation to engineering.</li>
+            <li><strong>Coverage reporting</strong> &mdash; what we detect, what we don't, what the gaps mean for your risk picture.</li>
+          </ul>
+
+          <h3 class="tab-h3">Incident response</h3>
+          <ul class="tab-list">
+            <li><strong>Runbooks indexed by failure mode</strong> &mdash; not generic wiki pages, but procedures verified against the live system.</li>
+            <li><strong>On-call structure</strong> &mdash; tiers, escalation paths, rotation patterns, postmortem cadence.</li>
+            <li><strong>Tabletop and red-team exercises</strong> &mdash; quarterly drills that reveal what the runbooks haven't yet covered.</li>
+            <li><strong>Forensic readiness</strong> &mdash; pre-staged collection capability, chain-of-custody discipline, evidence retention aligned with regulatory hold requirements.</li>
+          </ul>
+
+          <h3 class="tab-h3">Threat hunting</h3>
+          <p>
+            Detections only fire on known patterns. Threat hunting closes the gap by
+            hypothesis-driven investigation against the data you've already collected. We
+            stand up a hunting practice with:
+          </p>
+          <ul class="tab-list">
+            <li>A hunt-hypothesis backlog driven by threat intelligence and observed attacker behaviour.</li>
+            <li>Documented hunt procedures, with queries, expected results, and findings published per hunt.</li>
+            <li>A feedback loop into detection engineering &mdash; hunts that find something become detections.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a SOC engagement</h4>
+            <ul>
+              <li>A production-shaped SIEM/XDR platform with documented log sources and retention</li>
+              <li>A starter detection-content repository with MITRE ATT&amp;CK coverage map</li>
+              <li>SOAR playbooks for triage, enrichment, and routine response actions</li>
+              <li>Runbook set indexed by failure mode, verified against the live system</li>
+              <li>On-call structure, postmortem template, and the first quarter of postmortems</li>
+              <li>SLO-driven SOC operations dashboard, tied to actual business risk &mdash; not vanity metrics</li>
+              <li>Quarterly threat-hunt schedule and the first round of completed hunts</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 03 VAPT & Vulnerability Management ===== -->
+        <div
+          class="tab-panel"
+          id="panel-vapt"
+          role="tabpanel"
+          aria-labelledby="tab-vapt"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">03 — VAPT &amp; Vulnerability Management</span>
+          </div>
+          <h2 class="tab-section-title">Find it before someone else does &mdash; then close the loop.</h2>
+          <p class="tab-section-lede">
+            Vulnerability discovery without remediation tracking is theatre. We run penetration
+            tests, vulnerability scans, and purple-team exercises as engineering programmes:
+            scoped, repeatable, with findings landed directly in your engineering team's bug
+            queue and closure tracked to production.
+          </p>
+
+          <h3 class="tab-h3">Penetration testing</h3>
+          <p>
+            Every test is scoped to the question that justifies it. We work to PTES, OWASP, and
+            NIST SP 800-115 methodology where relevant, but the deliverable is always findings
+            your engineers can act on &mdash; not a pile of CVSS numbers.
+          </p>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Scope</th>
+                <th>Standards / frameworks</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Web application</strong></td>
+                <td>Public web apps, customer portals, internal apps, APIs (REST, GraphQL, SOAP)</td>
+                <td>OWASP Top 10, OWASP ASVS, OWASP API Security Top 10</td>
+              </tr>
+              <tr>
+                <td><strong>Network &amp; infrastructure</strong></td>
+                <td>External perimeter, internal network, segmentation validation, Active Directory</td>
+                <td>PTES, NIST 800-115</td>
+              </tr>
+              <tr>
+                <td><strong>Cloud</strong></td>
+                <td>AWS / Azure / GCP misconfigurations, IAM weaknesses, container/Kubernetes attack surface</td>
+                <td>CIS Benchmarks, NIST 800-204</td>
+              </tr>
+              <tr>
+                <td><strong>Mobile</strong></td>
+                <td>iOS and Android applications, mobile API back-ends, jailbreak/root-detection bypass</td>
+                <td>OWASP MASVS, MSTG</td>
+              </tr>
+              <tr>
+                <td><strong>Red team</strong></td>
+                <td>Goal-oriented adversary simulation, blended phishing + infrastructure + lateral movement</td>
+                <td>MITRE ATT&amp;CK</td>
+              </tr>
+              <tr>
+                <td><strong>Purple team</strong></td>
+                <td>Collaborative red+blue exercise focused on detection improvement, not "did red win"</td>
+                <td>Custom playbooks aligned to your detection coverage</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Continuous vulnerability management</h3>
+          <p>
+            Point-in-time scans age fast. We design the programme as a continuous operating
+            loop: scan, triage, route, fix, verify, report.
+          </p>
+          <ul class="tab-list">
+            <li><strong>Tooling.</strong> Greenbone (OpenVAS), Tenable Nessus, Qualys VMDR for infrastructure. Acunetix or Invicti for web DAST. Trivy and RHACS for container images.</li>
+            <li><strong>Asset coverage.</strong> Inventory-driven, not scan-target-driven. We integrate with your CMDB / Nautobot / cloud inventory so coverage gaps surface.</li>
+            <li><strong>Triage.</strong> Findings routed to the team that owns the asset, with SLAs by severity. False-positive feedback closes the loop on tuning.</li>
+            <li><strong>Remediation tracking.</strong> Open / fixing / fixed / risk-accepted, with explicit owners and dates. No "open forever" findings.</li>
+            <li><strong>Risk-acceptance discipline.</strong> Documented, time-boxed, with a re-review trigger. Audit-ready by default.</li>
+            <li><strong>Reporting.</strong> SLA compliance, mean-time-to-remediate, top recurring root causes &mdash; the metrics that drive engineering action, not vanity numbers.</li>
+          </ul>
+
+          <h3 class="tab-h3">Purple-team operating loops</h3>
+          <p>
+            The lab discipline that scales: blue team writes a detection, red team designs an
+            attack that should trigger it, both sides watch the evidence together, gaps go
+            into the engineering backlog. Then repeat &mdash; weekly, monthly, quarterly,
+            depending on the scope.
+          </p>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a VAPT engagement</h4>
+            <ul>
+              <li>Pentest reports written for engineers &mdash; reproducible findings, remediation guidance, and proof-of-fix retest</li>
+              <li>A vulnerability management operating model with SLAs, routing rules, and reporting</li>
+              <li>Continuous-scan tooling deployed and integrated with your CMDB and ticketing</li>
+              <li>Purple-team exercise outputs &mdash; what we tried, what fired, what didn't, and the engineering backlog that closes the gap</li>
+              <li>An exception/risk-acceptance register that your audit function will accept</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 04 Network Security ===== -->
+        <div
+          class="tab-panel"
+          id="panel-network"
+          role="tabpanel"
+          aria-labelledby="tab-network"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">04 — Network Security &amp; Segmentation</span>
+          </div>
+          <h2 class="tab-section-title">Cisco data-centre security and segmentation done as engineering.</h2>
+          <p class="tab-section-lede">
+            Network segmentation is where most regulated organisations have either over-promised
+            and under-delivered, or built so much complexity that nobody dares change anything.
+            We design segmentation as a tractable engineering problem &mdash; with desired state
+            in Git, validation as code, and route-leak controls you can prove are working.
+          </p>
+
+          <h3 class="tab-h3">Cisco data-centre fabric</h3>
+          <p>
+            We design and operate Cisco Nexus 9000 fabrics with MP-BGP EVPN overlays and VXLAN
+            tenant segments &mdash; the production pattern for modern multi-tenant data centres.
+            Multisite EVPN/VXLAN with border gateways extends this across data centres for
+            DR and active-active patterns.
+          </p>
+          <ul class="tab-list">
+            <li><strong>Nexus 9000 / NX-OS</strong> &mdash; spine-and-leaf topology, BGP underlay, MP-BGP EVPN overlay, VXLAN data plane.</li>
+            <li><strong>Multi-tenant segmentation</strong> &mdash; tenant VRFs per business unit, L3VNI / L2VNI mapping, anycast gateway, ARP suppression.</li>
+            <li><strong>Services VRF and route-leak controls</strong> &mdash; explicit, named prefix advertisement between tenant and services VRFs, with daily validation that only approved prefixes are visible across the boundary.</li>
+            <li><strong>Multisite design</strong> &mdash; border gateway placement, control-plane separation, traffic engineering across DCI.</li>
+            <li><strong>Nexus Dashboard &amp; NDFC</strong> &mdash; controller-based operations for fleets where manual NX-OS doesn't scale.</li>
+            <li><strong>ACI / APIC</strong> &mdash; alternative model where application-centric policy is the right primitive.</li>
+          </ul>
+
+          <h3 class="tab-h3">GitOps-managed network state</h3>
+          <p>
+            The hardest part of multi-tenant fabrics is not building one &mdash; it's keeping
+            the running configuration matched to a designed intent six months later. We treat
+            network state as code:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Nautobot</strong> as the network source-of-truth (devices, interfaces, IP plan, VRFs, prefixes).</li>
+            <li><strong>Oxidized</strong> for automated config backup with drift detection per device.</li>
+            <li><strong>Batfish</strong> for offline policy analysis &mdash; "if this change deploys, will the route-leak controls still hold?" answerable before the change ships.</li>
+            <li><strong>Daily validation jobs</strong> &mdash; checks for approved prefix visibility, denied prefix absence, route-map attachment, backup freshness. Failures alert the SOC.</li>
+            <li><strong>Ansible automation</strong> for the change path itself, with idempotent playbooks and reviewed pull requests as the entry point.</li>
+          </ul>
+
+          <h3 class="tab-h3">Perimeter, NAC, and micro-segmentation</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Cisco / vendor options</th>
+                <th>Typical placement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Next-gen firewall</strong></td>
+                <td>Cisco Secure Firewall (FTDv), FMC, ASAv, Palo Alto, Fortinet</td>
+                <td>Internet edge, DMZ, tenant boundaries, partner edge</td>
+              </tr>
+              <tr>
+                <td><strong>Network access control</strong></td>
+                <td>Cisco ISE, 802.1X, MAB, TACACS+, TrustSec/SGT</td>
+                <td>Wired and wireless campus access, device profiling, RADIUS</td>
+              </tr>
+              <tr>
+                <td><strong>Workload segmentation</strong></td>
+                <td>Cisco Secure Workload (formerly Tetration), VMware NSX</td>
+                <td>East-west micro-segmentation for application boundaries</td>
+              </tr>
+              <tr>
+                <td><strong>SD-WAN security</strong></td>
+                <td>Cisco Catalyst SD-WAN, Meraki MX, Cisco Secure Access (SSE)</td>
+                <td>Branch and remote-site connectivity with integrated security</td>
+              </tr>
+              <tr>
+                <td><strong>ZTNA / SSE</strong></td>
+                <td>Cisco Secure Access, Cisco Duo, Cisco Umbrella</td>
+                <td>Remote user access, DNS-layer security, SaaS gating</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a network segmentation engagement</h4>
+            <ul>
+              <li>A Nexus fabric design document and built fabric, validated end-to-end</li>
+              <li>Tenant VRFs and services-VRF route-leak controls, with daily validation in place</li>
+              <li>Nautobot / Oxidized / Batfish source-of-truth, GitOps-managed in your repositories</li>
+              <li>Firewall and NAC policy mapped to your tenant model and validated against test traffic</li>
+              <li>Runbooks for adding a tenant, refreshing hardware, and recovering from common failure modes</li>
+              <li>ADR set covering segmentation choices and the trade-offs we considered</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 05 IAM ===== -->
+        <div
+          class="tab-panel"
+          id="panel-iam"
+          role="tabpanel"
+          aria-labelledby="tab-iam"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">05 — Identity &amp; Access Management</span>
+          </div>
+          <h2 class="tab-section-title">Identity is platform, not application.</h2>
+          <p class="tab-section-lede">
+            Most identity problems are not technology problems &mdash; they are platform-shape
+            problems. We design identity as the boundary your platform is built around, not as
+            an application your team integrates with after the fact.
+          </p>
+
+          <h3 class="tab-h3">Federation and SSO</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Stack</th>
+                <th>Strengths</th>
+                <th>When we choose it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>WSO2 Identity Server</strong></td>
+                <td>Self-hosted, deeply customisable, strong adaptive-auth and fine-grained authorisation. SCIM, OIDC, SAML, OAuth2 well-supported.</td>
+                <td>Regulated on-prem deployments, sovereign data residency, organisations preferring an open-source-anchored stack.</td>
+              </tr>
+              <tr>
+                <td><strong>Ping Identity</strong></td>
+                <td>Enterprise-grade SaaS or hybrid, mature adaptive auth, strong directory integration, large partner ecosystem.</td>
+                <td>BFSI and large enterprises with hybrid identity needs and an existing Ping investment.</td>
+              </tr>
+              <tr>
+                <td><strong>Keycloak</strong></td>
+                <td>Open-source, container-native, lightweight, good for self-hosted lightweight scenarios.</td>
+                <td>Smaller deployments, dev/test environments, organisations not requiring full enterprise feature sets.</td>
+              </tr>
+              <tr>
+                <td><strong>Cisco Duo</strong></td>
+                <td>Excellent MFA and device-trust posture, native to many Cisco environments, easy ZTNA path.</td>
+                <td>MFA rollouts on top of existing IdPs, Cisco-heavy environments, ZTNA programmes.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Lifecycle and provisioning</h3>
+          <ul class="tab-list">
+            <li><strong>Directory of record.</strong> One authoritative source &mdash; HR system or Active Directory &mdash; with everything else downstream.</li>
+            <li><strong>SCIM provisioning.</strong> Joiner / mover / leaver flows automated end-to-end. No orphan accounts, no stale entitlements.</li>
+            <li><strong>Role and group governance.</strong> Roles modelled deliberately, not accreted. Reviews on a quarterly cadence with evidence captured automatically.</li>
+            <li><strong>Privileged access management.</strong> Time-bound, just-in-time elevation. Vault dynamic credentials for service-level access. Session recording for admin sessions where regulators require it.</li>
+            <li><strong>Service identities.</strong> Workload identity via SPIFFE/SPIRE or platform-native mechanisms (Kubernetes service accounts, AWS IAM Roles for Service Accounts, Azure managed identities).</li>
+          </ul>
+
+          <h3 class="tab-h3">Authentication and authorisation flows</h3>
+          <ul class="tab-list">
+            <li><strong>OIDC and OAuth2</strong> &mdash; canonical for modern web and mobile applications, with token-exchange patterns for service-to-service.</li>
+            <li><strong>SAML</strong> &mdash; canonical for enterprise SaaS integrations.</li>
+            <li><strong>MFA strategy.</strong> Push (Duo, Auth0, Okta-style), TOTP for fallback, FIDO2 / passkeys where the regulator and user base allow.</li>
+            <li><strong>Step-up authentication.</strong> Context-aware elevation for sensitive operations (high-value transactions, admin actions).</li>
+            <li><strong>Authorisation.</strong> Fine-grained where it earns its keep &mdash; OPA / Rego, XACML, or platform-native ABAC. We don't over-engineer.</li>
+          </ul>
+
+          <h3 class="tab-h3">Zero-trust network access</h3>
+          <p>
+            For remote and partner access, we replace flat-VPN topologies with identity-bound
+            application access:
+          </p>
+          <ul class="tab-list">
+            <li>Cisco Secure Access or Zscaler Private Access for the ZTNA layer.</li>
+            <li>Cisco Duo for device trust and MFA.</li>
+            <li>Cisco Umbrella for DNS-layer protection and SaaS visibility.</li>
+            <li>Integration with your IdP so policy is identity-driven, not subnet-driven.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of an IAM engagement</h4>
+            <ul>
+              <li>A working IdP platform (WSO2 IS, Ping, or Keycloak), federated to your apps</li>
+              <li>SCIM lifecycle automated end-to-end with the directory of record</li>
+              <li>MFA rolled out with documented enrolment, exception, and recovery flows</li>
+              <li>Privileged access management posture with audit-grade session capture</li>
+              <li>Role and group governance model, with the first quarterly review run jointly</li>
+              <li>Runbooks for the failure modes that matter: lost MFA, IdP outage, expired certs, breach response</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 06 AppSec & DevSecOps ===== -->
+        <div
+          class="tab-panel"
+          id="panel-appsec"
+          role="tabpanel"
+          aria-labelledby="tab-appsec"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">06 — Application Security &amp; DevSecOps</span>
+          </div>
+          <h2 class="tab-section-title">Shift left in the pipeline. Shift right at runtime.</h2>
+          <p class="tab-section-lede">
+            Application security is platform engineering with a security framing. We integrate
+            SAST, SCA, SBOMs, image signing, policy gates, runtime security, and DAST as a
+            coherent pipeline &mdash; not as a stack of bolt-on tools each fired by a different
+            team.
+          </p>
+
+          <h3 class="tab-h3">Shift-left: pipeline-integrated security</h3>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>Tools we operate</th>
+                <th>What we deliver</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>SAST</strong></td>
+                <td>Semgrep, SonarQube, Checkmarx, GitHub Advanced Security</td>
+                <td>Ruleset tuned to your stack, false-positive baseline, PR-blocking gate where appropriate</td>
+              </tr>
+              <tr>
+                <td><strong>SCA</strong></td>
+                <td>Snyk, Trivy, Dependabot, Renovate</td>
+                <td>Dependency policy, automated updates, vulnerability-to-CVE mapping, exception process</td>
+              </tr>
+              <tr>
+                <td><strong>SBOM</strong></td>
+                <td>Syft, CycloneDX, SPDX</td>
+                <td>SBOMs produced at build, stored alongside images, queryable for supply-chain incidents</td>
+              </tr>
+              <tr>
+                <td><strong>Container image scanning</strong></td>
+                <td>Trivy, Clair, RHACS image scanner</td>
+                <td>Image-risk gate at build and at admission, base-image policy, layer-level findings</td>
+              </tr>
+              <tr>
+                <td><strong>Image signing</strong></td>
+                <td>cosign / sigstore, Notary v2</td>
+                <td>Signed images, verified at admission, key custody integrated with Vault / KMS</td>
+              </tr>
+              <tr>
+                <td><strong>Policy as code</strong></td>
+                <td>Open Policy Agent (OPA), Conftest, Kyverno</td>
+                <td>Reusable policy bundles, CI-time validation, admission-time enforcement</td>
+              </tr>
+              <tr>
+                <td><strong>Secrets scanning</strong></td>
+                <td>Gitleaks, TruffleHog, GitHub secret scanning</td>
+                <td>Pre-commit hooks, CI-time scans, push protection, rotation playbooks</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Shift-right: runtime security</h3>
+          <p>
+            What the pipeline missed is what runtime has to catch. We deploy and tune the
+            runtime layer to your environment, not to the vendor defaults:
+          </p>
+          <ul class="tab-list">
+            <li><strong>RHACS (StackRox)</strong> &mdash; admission policies, network baselines, runtime detection, image-risk gates. Integrated with SIEM/SOAR.</li>
+            <li><strong>Falco</strong> &mdash; eBPF-based runtime detection, useful where RHACS isn't deployed.</li>
+            <li><strong>Cisco Secure Workload</strong> &mdash; behavioural micro-segmentation for east-west traffic with policy as code.</li>
+            <li><strong>Pod security and admission control</strong> &mdash; Kubernetes Pod Security Standards, OPA Gatekeeper / Kyverno policies enforced at admission.</li>
+            <li><strong>Network policy</strong> &mdash; Calico / Cilium / Istio authorisation policies, tied to the segmentation model.</li>
+          </ul>
+
+          <h3 class="tab-h3">DAST programmes</h3>
+          <p>
+            Continuous web-application security testing against the deployed application &mdash;
+            authenticated scans, scheduled re-runs, findings landed in the engineering team's
+            bug queue with proof-of-fix retest:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Acunetix</strong> or <strong>Invicti</strong> as the primary DAST platform &mdash; chosen for your stack and integration model.</li>
+            <li><strong>OWASP ZAP</strong> for self-service scans, with baseline and full-scan profiles wired into CI.</li>
+            <li><strong>API-aware scanning</strong> for REST, GraphQL, and SOAP APIs &mdash; OpenAPI-driven, schema-aware.</li>
+            <li><strong>Authentication recipes</strong> &mdash; OIDC, SAML, custom token flows. Your apps don't get to opt out of authenticated scans by being awkward to log in to.</li>
+          </ul>
+
+          <h3 class="tab-h3">AppSec assessments and threat modelling</h3>
+          <ul class="tab-list">
+            <li><strong>Architectural threat modelling</strong> for new applications and significant changes &mdash; STRIDE-style, focused on findings engineers can act on.</li>
+            <li><strong>Secure-design reviews</strong> at the right point in the SDLC &mdash; not too early to be speculative, not too late to be expensive.</li>
+            <li><strong>Secure-coding training</strong> tailored to your stack, with measurable improvement in PR-level findings post-training.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a DevSecOps engagement</h4>
+            <ul>
+              <li>An integrated pipeline-security path: SAST, SCA, SBOM, signing, policy, all wired into your existing CI</li>
+              <li>RHACS deployed and tuned to your environment, with admission policies and runtime baselines</li>
+              <li>A DAST programme running against production-like environments with proof-of-fix tracking</li>
+              <li>A threat-modelling practice with the first round completed for top-risk applications</li>
+              <li>Policy-as-code repositories owned by your platform team and reviewed quarterly</li>
+              <li>A residual-risk register reflecting the controls you accepted and why</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== 07 Compliance ===== -->
+        <div
+          class="tab-panel"
+          id="panel-compliance"
+          role="tabpanel"
+          aria-labelledby="tab-compliance"
+          tabindex="0"
+          hidden
+        >
+          <div class="tab-section-h">
+            <span class="tab-section-eyebrow">07 — Compliance &amp; Audit Posture</span>
+          </div>
+          <h2 class="tab-section-title">Evidence at the source. Audit as a side effect.</h2>
+          <p class="tab-section-lede">
+            Most compliance programmes reconstruct evidence at audit time &mdash; an expensive,
+            error-prone exercise that produces output that nobody trusts. We design the
+            platform so that evidence is captured at the moment of action, in tamper-evident
+            stores, available on demand. Audit becomes the side effect, not the project.
+          </p>
+
+          <h3 class="tab-h3">Control-framework mapping</h3>
+          <p>
+            We work with the frameworks your organisation reports against, mapping each control
+            to the platform mechanism that actually implements it:
+          </p>
+          <table class="tab-table">
+            <thead>
+              <tr>
+                <th>Framework</th>
+                <th>Where we typically engage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>PCI DSS</strong></td>
+                <td>Card-data environments, segmentation evidence, encryption evidence, vulnerability management cadence</td>
+              </tr>
+              <tr>
+                <td><strong>ISO 27001 / 27002</strong></td>
+                <td>ISMS support, Annex A control mapping, evidence capture</td>
+              </tr>
+              <tr>
+                <td><strong>NIST CSF / 800-53</strong></td>
+                <td>Reference profile for regulated and federal-adjacent organisations</td>
+              </tr>
+              <tr>
+                <td><strong>SOC 2</strong></td>
+                <td>Trust-service criteria mapping, continuous-evidence capture, readiness assessment</td>
+              </tr>
+              <tr>
+                <td><strong>GDPR / regional privacy regimes</strong></td>
+                <td>Data-flow mapping, consent posture, breach-notification procedures, retention policies</td>
+              </tr>
+              <tr>
+                <td><strong>Central-bank IT guidance</strong></td>
+                <td>BFSI-specific regulators &mdash; control mapping to local frameworks, on-shore-data residency, dual-control discipline</td>
+              </tr>
+              <tr>
+                <td><strong>Insurance regulators</strong></td>
+                <td>Solvency-adjacent IT controls, claims-processing audit, agent integrity</td>
+              </tr>
+              <tr>
+                <td><strong>Telecom regulators</strong></td>
+                <td>Lawful intercept, data retention, customer-data protection</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="tab-h3">Evidence at the source</h3>
+          <p>
+            The shift from project-style compliance to continuous compliance:
+          </p>
+          <ul class="tab-list">
+            <li><strong>Git commits as change evidence.</strong> Signed commits with author and review trail are the evidence that a change happened, who approved it, and what reviewer comments resolved.</li>
+            <li><strong>GitOps reconciliation as configuration evidence.</strong> The desired state in Git, the reconciliation log in the cluster, and the running configuration on the device should all match &mdash; and the diff is the evidence either way.</li>
+            <li><strong>Pipeline outputs as security evidence.</strong> SAST, SCA, SBOM, signed images, policy decisions &mdash; captured at build time, attached to the image, queryable forever.</li>
+            <li><strong>Runtime audit logs.</strong> Vault audit log, RHACS event log, identity audit log, all forwarded to immutable storage with retention aligned to regulatory hold requirements.</li>
+            <li><strong>Operational evidence.</strong> Postmortems, change records, on-call logs, incident timelines &mdash; captured in your ticketing/wiki/SIEM with consistent metadata.</li>
+          </ul>
+
+          <h3 class="tab-h3">Audit-cycle support</h3>
+          <ul class="tab-list">
+            <li><strong>Readiness assessments</strong> ahead of formal audit, with gap remediation tracked to closure.</li>
+            <li><strong>Evidence-request facilitation</strong> &mdash; matching auditor information requests to the right source-of-truth, training your team to do this without re-engagement.</li>
+            <li><strong>Findings remediation</strong> &mdash; engineering-grade fixes for audit findings, not paperwork loops.</li>
+            <li><strong>Risk-acceptance register</strong> &mdash; documented exceptions with time-boxed re-review, accepted at the right authority level.</li>
+          </ul>
+
+          <h3 class="tab-h3">Reporting that matters</h3>
+          <p>
+            We build reporting your board, regulator, and engineering leadership all read:
+          </p>
+          <ul class="tab-list">
+            <li>SLA compliance for vulnerability remediation, with the gap analysis between aspiration and reality.</li>
+            <li>Mean-time-to-remediate by severity, by business unit, by application.</li>
+            <li>Control-coverage heat-map against your chosen framework.</li>
+            <li>Open audit findings, with owner, ETA, and the risk while open.</li>
+            <li>Top recurring root causes &mdash; the metric that drives engineering investment.</li>
+          </ul>
+
+          <div class="tab-deliverables">
+            <h4>What you get at the end of a compliance engagement</h4>
+            <ul>
+              <li>A control-framework map specific to your regulatory profile</li>
+              <li>Evidence-capture wired into your platform &mdash; commits, builds, pipelines, runtime, audit logs</li>
+              <li>Audit-cycle-ready posture with a runbook for upcoming external audits</li>
+              <li>A risk-acceptance register that your audit function accepts</li>
+              <li>Reporting dashboards that your engineering, security, and leadership teams all use</li>
+              <li>A residual-risk view for the next 12 months, with the controls that matter most</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
+    <div class="container" style="text-align: center;">
+      <span class="section-eyebrow" style="color: var(--color-accent);">Start a security engagement</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have a security programme that needs engineering depth?</h2>
+      <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
+        Send us a short note describing the problem and the regulatory context. We'll write
+        back with a concrete first-two-weeks scope and a definition of done for the
+        engagement.
+      </p>
+      <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+        <a href="/contact/" class="btn btn-primary">Contact us</a>
+        <a href="/services/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">All services</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector("[data-tabs]");
+    if (!root) return;
+    const buttons = Array.from(root.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(root.querySelectorAll(".tab-panel"));
+
+    function activate(id, opts = {}) {
+      buttons.forEach((b) => {
+        const active = b.dataset.tabTarget === id;
+        b.setAttribute("aria-selected", active ? "true" : "false");
+        b.setAttribute("tabindex", active ? "0" : "-1");
+      });
+      panels.forEach((p) => {
+        const active = p.id === `panel-${id}`;
+        p.classList.toggle("is-active", active);
+        if (active) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
+      });
+      if (opts.updateHash) {
+        history.replaceState(null, "", `#${id}`);
+      }
+      if (opts.focus) {
+        const btn = buttons.find((b) => b.dataset.tabTarget === id);
+        btn && btn.focus();
+      }
+    }
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => activate(btn.dataset.tabTarget, { updateHash: true }));
+    });
+
+    root.addEventListener("keydown", (e) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      const current = document.activeElement;
+      const idx = buttons.indexOf(current);
+      if (idx === -1) return;
+      e.preventDefault();
+      let nextIdx = idx;
+      if (e.key === "ArrowLeft")  nextIdx = (idx - 1 + buttons.length) % buttons.length;
+      if (e.key === "ArrowRight") nextIdx = (idx + 1) % buttons.length;
+      if (e.key === "Home")       nextIdx = 0;
+      if (e.key === "End")        nextIdx = buttons.length - 1;
+      activate(buttons[nextIdx].dataset.tabTarget, { updateHash: true, focus: true });
+    });
+
+    const initial = (location.hash || "").replace(/^#/, "");
+    if (initial && buttons.some((b) => b.dataset.tabTarget === initial)) {
+      activate(initial);
+    }
+  })();
+</script>
