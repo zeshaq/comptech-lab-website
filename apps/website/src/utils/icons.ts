@@ -14,9 +14,13 @@ export const SERVICE_ICONS: Record<string, string> = {
 export const INDUSTRY_ICONS: Record<string, string> = {
   "banking-financial-services": "bank",
   "insurance": "umbrella",
+  "healthcare": "compliance",
   "telecom": "telecom",
-  "defense": "defense",
+  "manufacturing": "operations",
+  "energy": "chip",
   "public-sector": "government",
+  "development-sector": "globe",
+  "defense": "defense",
 };
 
 export const PRACTICE_ICONS: Record<string, string> = {

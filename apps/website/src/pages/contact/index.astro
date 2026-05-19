@@ -20,8 +20,40 @@ import HeroBackground from "../../components/HeroBackground.astro";
   </section>
 
   <section class="section">
-    <div class="container" style="max-width: 720px;">
-      <form id="contact-form" class="contact-form" method="POST" action="/api/contact">
+    <div class="container" style="display: grid; gap: 3rem; grid-template-columns: 1fr;">
+
+      <div style="display: grid; gap: 2rem; grid-template-columns: 1fr;" class="contact-offices">
+        <div>
+          <p class="section-eyebrow">Corporate office</p>
+          <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0.4rem 0 0.85rem;">Gulshan, Dhaka</h3>
+          <address style="font-style: normal; line-height: 1.65; font-size: 0.95rem; color: var(--color-muted);">
+            Richmond Concord, Level 7<br/>
+            68 Gulshan Avenue<br/>
+            Dhaka 1212, Bangladesh<br/>
+            <br/>
+            <a href="tel:+8801916277170" style="color: var(--color-accent);">+88 01916-277170</a><br/>
+            <a href="tel:+8801958501206" style="color: var(--color-accent);">+88 01958-501206</a><br/>
+            <a href="mailto:info@comptech.com.bd" style="color: var(--color-accent);">info@comptech.com.bd</a>
+          </address>
+        </div>
+        <div>
+          <p class="section-eyebrow">Head office</p>
+          <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0.4rem 0 0.85rem;">Uttara, Dhaka — Pinaki Group</h3>
+          <address style="font-style: normal; line-height: 1.65; font-size: 0.95rem; color: var(--color-muted);">
+            Pinaki Group<br/>
+            29 Gareb-Newaz Avenue, Sector 11<br/>
+            Uttara, Dhaka 1230, Bangladesh<br/>
+            <br/>
+            <a href="tel:+88028931996" style="color: var(--color-accent);">+88-02-8931996</a><br/>
+            <a href="mailto:info@pinakigroup.com" style="color: var(--color-accent);">info@pinakigroup.com</a>
+          </address>
+        </div>
+      </div>
+
+      <div style="max-width: 720px; width: 100%;">
+        <p class="section-eyebrow" style="margin-bottom: 0.5rem;">Send us a note</p>
+        <h2 style="font-size: 1.5rem; font-weight: 400; margin: 0 0 1.5rem; letter-spacing: -0.01em;">For new engagements, partnership enquiries, or anything else</h2>
+        <form id="contact-form" class="contact-form" method="POST" action="/api/contact">
         <div class="form-row">
           <label for="name">Name</label>
           <input id="name" name="name" type="text" required autocomplete="name" />
@@ -41,10 +73,12 @@ import HeroBackground from "../../components/HeroBackground.astro";
           <label for="service">What you need help with</label>
           <select id="service" name="service">
             <option value="">— select —</option>
-            <option value="openshift-platform">OpenShift platform engineering</option>
-            <option value="ai-ml-enablement">AI/ML enablement</option>
-            <option value="devsecops-identity">DevSecOps & identity</option>
-            <option value="integration-data">Integration & data</option>
+            <option value="cloud-platforms">Cloud platforms (OpenShift, AWS, Azure, GCP)</option>
+            <option value="security">Security practice</option>
+            <option value="ai">AI practice</option>
+            <option value="data">Data &amp; analytics practice</option>
+            <option value="app-modernization">Application modernization</option>
+            <option value="operations">Operations &amp; managed services</option>
             <option value="other">Something else / not sure</option>
           </select>
         </div>
@@ -62,9 +96,10 @@ import HeroBackground from "../../components/HeroBackground.astro";
         </div>
 
         <p class="form-fineprint">
-          Or email <a href="mailto:hello@comptech-lab.com" style="color: var(--color-accent);">hello@comptech-lab.com</a> directly.
+          Or email <a href="mailto:info@comptech.com.bd" style="color: var(--color-accent);">info@comptech.com.bd</a> directly.
         </p>
       </form>
+      </div>
     </div>
   </section>
 </Layout>
@@ -153,11 +188,11 @@ import HeroBackground from "../../components/HeroBackground.astro";
           form.reset();
         } else {
           const body = await res.json().catch(() => ({}));
-          status.textContent = body.error || "Could not send. Please email hello@comptech-lab.com.";
+          status.textContent = body.error || "Could not send. Please email info@comptech.com.bd.";
           status.setAttribute("data-state", "err");
         }
       } catch (err) {
-        status.textContent = "Could not send. Please email hello@comptech-lab.com.";
+        status.textContent = "Could not send. Please email info@comptech.com.bd.";
         status.setAttribute("data-state", "err");
       }
     });

@@ -11,12 +11,14 @@ interface Partner {
   description: string;
   capabilities: string[];
   status?: string;
+  logo?: string;
 }
 
 const partners: Partner[] = [
   {
     name: "Red Hat",
     category: "Platform",
+    logo: "/images/partners/redhat.jpeg",
     description: "OpenShift Container Platform, Advanced Cluster Management, OpenShift GitOps, RHACS, OpenShift AI, OADP, OpenShift Service Mesh — the anchor stack for most of our regulated-platform engagements.",
     capabilities: ["OpenShift", "ACM / MCE", "OpenShift GitOps", "RHACS", "OpenShift AI", "OADP", "OpenShift Pipelines"],
     status: "Operating partner",
@@ -24,9 +26,32 @@ const partners: Partner[] = [
   {
     name: "NVIDIA",
     category: "AI / GPU",
+    logo: "/images/partners/nvidia.png",
     description: "NVIDIA AI Enterprise, NIM inference catalog, GPU Operator, Triton Inference Server, AI Workbench — the foundation of our LLM inference and GPU operations practice.",
     capabilities: ["AI Enterprise", "NIM", "Triton", "GPU Operator", "TensorRT-LLM", "AI Workbench"],
     status: "Operating partner",
+  },
+  {
+    name: "Hewlett Packard Enterprise (HPE)",
+    category: "Platform",
+    logo: "/images/partners/hpe.svg",
+    description: "HPE servers, storage, GreenLake — long-standing infrastructure partner for on-premise and hybrid platform deployments.",
+    capabilities: ["ProLiant", "Alletra", "GreenLake", "Aruba Networking"],
+    status: "Operating partner",
+  },
+  {
+    name: "Dell Technologies",
+    category: "Platform",
+    logo: "/images/partners/delltech.jpeg",
+    description: "Dell servers, storage, and edge infrastructure — used across BFSI and government engagements.",
+    capabilities: ["PowerEdge", "PowerStore", "PowerScale", "Apex"],
+  },
+  {
+    name: "SUSE",
+    category: "Platform",
+    logo: "/images/partners/suse.png",
+    description: "SUSE Linux Enterprise, SUSE Rancher, Harvester — alternative open-source-anchored platform stack.",
+    capabilities: ["SLES", "Rancher", "Harvester", "NeuVector"],
   },
   {
     name: "Cisco",
@@ -34,6 +59,27 @@ const partners: Partner[] = [
     description: "Nexus 9000 data-centre fabrics, ACI, Catalyst SD-WAN, ISE, Secure Firewall, Cisco XDR, Secure Endpoint, Duo, Secure Access (SSE), Splunk — the network and security backbone of most BFSI and telecom engagements.",
     capabilities: ["Nexus 9000 / NX-OS", "ACI / APIC", "Catalyst SD-WAN", "ISE", "Secure Firewall (FTDv/FMC)", "Cisco XDR", "Duo", "Splunk"],
     status: "Operating partner",
+  },
+  {
+    name: "Palo Alto Networks",
+    category: "Networking / Security",
+    logo: "/images/partners/pa.png",
+    description: "Next-gen firewalls, Prisma Cloud, Prisma Access (SASE), Cortex XDR — used where BFSI and government engagements require Palo-Alto-grade controls.",
+    capabilities: ["NGFW", "Prisma Cloud", "Prisma Access", "Cortex XDR"],
+  },
+  {
+    name: "Check Point",
+    category: "Networking / Security",
+    logo: "/images/partners/checkpoint.png",
+    description: "Quantum firewalls, Harmony endpoint, CloudGuard — security stack for enterprise perimeters and cloud workloads.",
+    capabilities: ["Quantum", "Harmony", "CloudGuard", "Infinity"],
+  },
+  {
+    name: "F5",
+    category: "Networking / Security",
+    logo: "/images/partners/f5.jpeg",
+    description: "BIG-IP, NGINX, Distributed Cloud — application delivery and security across regulated workloads.",
+    capabilities: ["BIG-IP", "NGINX", "Distributed Cloud", "WAAP"],
   },
   {
     name: "HashiCorp",
@@ -45,6 +91,7 @@ const partners: Partner[] = [
   {
     name: "WSO2",
     category: "Identity / Integration",
+    logo: "/images/partners/wso2.png",
     description: "Identity Server (IS), API Manager (APIM), Micro Integrator (MI) — our default open-source-anchored stack for federated identity and enterprise integration in regulated environments.",
     capabilities: ["Identity Server", "API Manager", "Micro Integrator", "Choreo"],
     status: "Operating partner",
@@ -58,20 +105,72 @@ const partners: Partner[] = [
   {
     name: "Microsoft",
     category: "Cloud",
+    logo: "/images/partners/microsoft.jpeg",
     description: "Azure infrastructure and platform services, Entra ID for identity, Microsoft 365 integration, Azure OpenAI for managed AI workloads where data-sovereignty allows.",
     capabilities: ["Azure", "Entra ID", "Azure OpenAI", "Azure AI Foundry", "Sentinel"],
   },
   {
     name: "Amazon Web Services",
     category: "Cloud",
+    logo: "/images/partners/aws.png",
     description: "AWS landing zones, EKS, Bedrock, SageMaker, Route 53, IAM Identity Center — where hyperscaler-anchored deployments are appropriate.",
     capabilities: ["EKS", "Bedrock", "SageMaker", "Landing Zone", "Identity Center"],
   },
   {
     name: "Google Cloud",
     category: "Cloud",
+    logo: "/images/partners/gcp.png",
     description: "GCP landing zones, GKE, Vertex AI, BigQuery, Cloud Identity — selected for AI workloads and data-analytics estates where Google's stack fits.",
     capabilities: ["GKE", "Vertex AI", "BigQuery", "Anthos", "Cloud Identity"],
+  },
+  {
+    name: "Oracle",
+    category: "Cloud",
+    logo: "/images/partners/oracle.jpeg",
+    description: "Oracle Cloud Infrastructure (OCI), database, and enterprise applications — for organisations with significant existing Oracle investment.",
+    capabilities: ["OCI", "Oracle Database", "Exadata", "Fusion Applications"],
+  },
+  {
+    name: "NetApp",
+    category: "Storage",
+    logo: "/images/partners/netapp.svg",
+    description: "ONTAP, StorageGRID — enterprise storage for both traditional and object workloads.",
+    capabilities: ["ONTAP", "StorageGRID", "Astra"],
+  },
+  {
+    name: "Pure Storage",
+    category: "Storage",
+    logo: "/images/partners/purestorage.png",
+    description: "FlashArray, FlashBlade — all-flash storage for performance-sensitive enterprise workloads.",
+    capabilities: ["FlashArray", "FlashBlade", "Portworx"],
+  },
+  {
+    name: "Hitachi",
+    category: "Storage",
+    logo: "/images/partners/hitachi.svg",
+    description: "Hitachi Vantara — enterprise storage and infrastructure for large-scale deployments.",
+    capabilities: ["VSP", "HCP", "Pentaho"],
+  },
+  {
+    name: "GitLab",
+    category: "DevOps",
+    logo: "/images/partners/gitlab.png",
+    description: "Enterprise source control, CI/CD, and DevSecOps platform — anchor of the federated GitOps delivery model.",
+    capabilities: ["Enterprise Edition", "Dedicated", "Duo (AI)"],
+  },
+  {
+    name: "Confluent",
+    category: "Data",
+    logo: "/images/partners/confluent.png",
+    description: "Confluent Platform and Confluent Cloud — managed Apache Kafka for streaming spines in regulated environments.",
+    capabilities: ["Platform", "Cloud", "Connect", "ksqlDB"],
+  },
+  {
+    name: "Redis",
+    category: "Data",
+    logo: "/images/partners/redis.png",
+    description: "Redis Enterprise — in-memory data store for state, session, caching, and vector workloads.",
+    capabilities: ["Enterprise", "Cloud", "Vector Search"],
   },
   {
     name: "Datadog",
@@ -135,10 +234,15 @@ const grouped = partners.reduce<Record<string, Partner[]>>((acc, p) => {
           <div class="card-grid card-grid-2">
             {items.map((p) => (
               <div class="card" style="cursor: default;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
-                  <h3 class="card-title" style="margin: 0;">{p.name}</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; min-height: 40px;">
+                  {p.logo ? (
+                    <img src={p.logo} alt={p.name} loading="lazy" style="max-height: 32px; max-width: 50%; object-fit: contain;" />
+                  ) : (
+                    <h3 class="card-title" style="margin: 0;">{p.name}</h3>
+                  )}
                   {p.status && <span class="pill pill-accent" style="font-size: 0.7rem;">{p.status}</span>}
                 </div>
+                {p.logo && <h3 class="card-title" style="margin: 0.75rem 0 0; font-size: 1rem;">{p.name}</h3>}
                 <p class="card-desc" style="margin-top: 0.65rem;">{p.description}</p>
                 <div class="pill-row" style="margin-top: 1rem;">
                   {p.capabilities.map((c) => <span class="pill">{c}</span>)}
