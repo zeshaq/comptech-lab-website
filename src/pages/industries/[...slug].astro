@@ -1,0 +1,122 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCollection, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const industries = await getCollection("industries", ({ data }) => !data.draft);
+  return industries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+
+const services = (await getCollection("services", ({ data }) => !data.draft))
+  .filter((s) => entry.data.key_services.includes(s.id))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const cases = (await getCollection("case-studies", ({ data }) => !data.draft))
+  .filter((c) => entry.data.related_case_studies.includes(c.id))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const otherIndustries = (await getCollection("industries", ({ data }) => !data.draft))
+  .filter((i) => i.id !== entry.id)
+  .sort((a, b) => a.data.order - b.data.order);
+---
+
+<Layout
+  title={`${entry.data.title} — CompTech Lab`}
+  description={entry.data.description}
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero-eyebrow">{entry.data.eyebrow ?? "Sector"}</span>
+      <h1 class="hero-title">{entry.data.title}</h1>
+      <p class="hero-lede">{entry.data.tagline}</p>
+      <div class="hero-actions">
+        <a href="/contact/" class="btn btn-primary">Discuss an engagement</a>
+        <a href="/services/" class="btn btn-secondary">All services</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="display: grid; gap: 3rem;">
+      <article class="prose">
+        <Content />
+      </article>
+
+      {entry.data.typical_workloads.length > 0 && (
+        <aside>
+          <h2 class="section-title" style="font-size: 1.4rem;">Typical workloads</h2>
+          <div class="pill-row">
+            {entry.data.typical_workloads.map((w) => (
+              <span class="pill">{w}</span>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {entry.data.regulatory_profile.length > 0 && (
+        <aside>
+          <h2 class="section-title" style="font-size: 1.4rem;">Regulatory profile</h2>
+          <div class="pill-row">
+            {entry.data.regulatory_profile.map((r) => (
+              <span class="pill pill-accent">{r}</span>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {services.length > 0 && (
+        <aside>
+          <h2 class="section-title" style="font-size: 1.4rem;">Key services in this sector</h2>
+          <div class="card-grid card-grid-3">
+            {services.map((s) => (
+              <a href={`/services/${s.id}/`} class="card">
+                <p class="card-eyebrow">{s.data.eyebrow ?? "Service"}</p>
+                <h3 class="card-title">{s.data.title}</h3>
+                <p class="card-desc">{s.data.tagline}</p>
+              </a>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {cases.length > 0 && (
+        <aside>
+          <h2 class="section-title" style="font-size: 1.4rem;">Related engagement profiles</h2>
+          <div class="card-grid card-grid-3">
+            {cases.map((c) => (
+              <a href={`/case-studies/${c.id}/`} class="card">
+                <p class="card-eyebrow">{c.data.sector ?? c.data.customer}</p>
+                <h3 class="card-title">{c.data.title}</h3>
+                <p class="card-desc">{c.data.summary}</p>
+              </a>
+            ))}
+          </div>
+        </aside>
+      )}
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--color-surface); border-top: 1px solid var(--color-border);">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-eyebrow">Other industries</span>
+        <h2 class="section-title">Where else we work</h2>
+      </div>
+      <div class="card-grid card-grid-3">
+        {otherIndustries.map((i) => (
+          <a href={`/industries/${i.id}/`} class="card">
+            <p class="card-eyebrow">{i.data.eyebrow ?? "Sector"}</p>
+            <h3 class="card-title">{i.data.title}</h3>
+            <p class="card-desc">{i.data.tagline}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Layout>

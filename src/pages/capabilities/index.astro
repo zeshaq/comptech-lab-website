@@ -65,39 +65,44 @@ function cluster(label: string, baseX: number, baseY: number, tools: string[]) {
   return { nodes, edges };
 }
 
-const platform = cluster("Platform", 200, 100, [
+const cloud = cluster("Cloud Platforms", 200, 100, [
   "OpenShift",
   "ACM",
   "OpenShift GitOps",
-  "Vault",
+  "Terraform",
+  "AWS",
+  "Azure",
+  "GCP",
   "ESO",
-  "RHACS",
-  "OADP",
   "cert-manager",
   "LVMS",
   "oc-mirror",
   "Quay",
-  "MinIO",
 ]);
 
-const aiml = cluster("AI / ML", 900, 100, [
+const modernization = cluster("Application Modernization", 900, 100, [
   "OpenShift AI",
+  "NVIDIA NIM",
   "vLLM",
   "Triton",
-  "NVIDIA NIM",
-  "TGI",
-  "Ollama",
-  "Kubeflow",
-  "PyTorch",
-  "LangChain",
   "MCP",
+  "LangChain",
+  "Kubeflow",
+  "WSO2 APIM",
+  "WSO2 MI",
+  "MuleSoft",
+  "Camunda",
+  "Temporal",
+  "Apache Kafka",
+  "Apache Spark",
+  "JBoss EAP",
 ]);
 
-const devsec = cluster("DevSecOps & Identity", 200, 800, [
+const security = cluster("End-to-End Security", 200, 900, [
+  "RHACS",
   "WSO2 IS",
   "Ping Identity",
   "Keycloak",
-  "RHACS",
   "Vault",
   "Acunetix",
   "Invicti",
@@ -106,63 +111,61 @@ const devsec = cluster("DevSecOps & Identity", 200, 800, [
   "OPA",
 ]);
 
-const integ = cluster("Integration & Data", 900, 800, [
-  "WSO2 APIM",
-  "WSO2 MI",
-  "MuleSoft",
-  "Camunda",
-  "Temporal",
-  "Apache Kafka",
-  "Apache Spark",
-  "Iceberg",
+const ops = cluster("Operations", 900, 900, [
   "Datadog",
-  "Kiali",
+  "Grafana",
+  "Prometheus",
   "OpenTelemetry",
-  "n8n",
+  "Kiali",
+  "Istio",
+  "GitLab",
+  "Nexus",
+  "OADP",
+  "Velero",
 ]);
 
 const hubNode = {
   id: "comptech_lab",
-  position: { x: 550, y: 470 },
-  data: { label: "CompTech Lab Platform" },
+  position: { x: 550, y: 500 },
+  data: { label: "CompTech Lab Practice" },
   style: hub,
 };
 
 const hubEdges = [
-  { id: "h-p", source: "comptech_lab", target: "platform", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
-  { id: "h-a", source: "comptech_lab", target: "ai___ml", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
-  { id: "h-d", source: "comptech_lab", target: "devsecops___identity", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
-  { id: "h-i", source: "comptech_lab", target: "integration___data", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-c", source: "comptech_lab", target: "cloud_platforms", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-m", source: "comptech_lab", target: "application_modernization", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-s", source: "comptech_lab", target: "end_to_end_security", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
+  { id: "h-o", source: "comptech_lab", target: "operations", animated: true, style: { stroke: "#15803d", strokeWidth: 2 }, markerEnd: { type: "arrowclosed", color: "#15803d" } },
 ];
 
 const nodes = [
   hubNode,
-  ...platform.nodes,
-  ...aiml.nodes,
-  ...devsec.nodes,
-  ...integ.nodes,
+  ...cloud.nodes,
+  ...modernization.nodes,
+  ...security.nodes,
+  ...ops.nodes,
 ];
 
 const edges = [
   ...hubEdges,
-  ...platform.edges,
-  ...aiml.edges,
-  ...devsec.edges,
-  ...integ.edges,
+  ...cloud.edges,
+  ...modernization.edges,
+  ...security.edges,
+  ...ops.edges,
 ];
 ---
 
 <Layout
-  title="Capabilities map — CompTech Lab"
-  description="An interactive pan-and-zoom map of every technology we operate — across OpenShift platform, AI/ML, DevSecOps, integration."
+  title="Capabilities — CompTech Lab"
+  description="An interactive map of the technologies CompTech Lab operates across cloud platforms, application modernization, security, and operations."
 >
   <section class="hero">
     <div class="container">
-      <span class="hero-eyebrow">Capabilities map</span>
-      <h1 class="hero-title">Every component we operate, on one canvas.</h1>
+      <span class="hero-eyebrow">Capabilities</span>
+      <h1 class="hero-title">The technology stack we deliver.</h1>
       <p class="hero-lede">
-        Drag to rearrange. Click a node to invert. Use the fullscreen button (⛶) to expand
-        the canvas. Each cluster maps to a service pillar.
+        An interactive map of the components we design, deploy, and operate &mdash; grouped by
+        practice area. Drag to rearrange, click to highlight, expand to fullscreen.
       </p>
     </div>
   </section>
@@ -172,25 +175,25 @@ const edges = [
       <InteractiveDiagram client:load nodes={nodes} edges={edges} height={720} />
 
       <div class="card-grid card-grid-4" style="margin-top: 2.5rem;">
-        <a href="/services/openshift-platform/" class="card">
-          <p class="card-eyebrow">Platform</p>
-          <h3 class="card-title">OpenShift fleet</h3>
-          <p class="card-desc">12 components — install, fleet ops, supply chain.</p>
+        <a href="/services/cloud-platforms/" class="card">
+          <p class="card-eyebrow">Platforms</p>
+          <h3 class="card-title">Cloud platforms</h3>
+          <p class="card-desc">OpenShift, AWS, Azure, GCP, hybrid topologies, GitOps fleet.</p>
         </a>
-        <a href="/services/ai-ml-enablement/" class="card">
-          <p class="card-eyebrow">AI / ML</p>
-          <h3 class="card-title">Inference & agentic</h3>
-          <p class="card-desc">10 components — OpenShift AI, inference, MCP.</p>
+        <a href="/services/application-modernization/" class="card">
+          <p class="card-eyebrow">Modernization</p>
+          <h3 class="card-title">Application modernization</h3>
+          <p class="card-desc">Containerise, refactor, integrate, rebuild with AI where it earns its keep.</p>
         </a>
-        <a href="/services/devsecops-identity/" class="card">
-          <p class="card-eyebrow">DevSecOps</p>
-          <h3 class="card-title">Security & identity</h3>
-          <p class="card-desc">10 components — WSO2 IS, Ping, Vault, RHACS.</p>
+        <a href="/services/end-to-end-security/" class="card">
+          <p class="card-eyebrow">Security</p>
+          <h3 class="card-title">End-to-end security</h3>
+          <p class="card-desc">Shift-left, shift-right, identity boundary, supply chain.</p>
         </a>
-        <a href="/services/integration-data/" class="card">
-          <p class="card-eyebrow">Integration</p>
-          <h3 class="card-title">APIs, workflows, data</h3>
-          <p class="card-desc">12 components — WSO2, Camunda, Spark, observability.</p>
+        <a href="/services/operations/" class="card">
+          <p class="card-eyebrow">Operations</p>
+          <h3 class="card-title">Operations &amp; managed services</h3>
+          <p class="card-desc">Day-2, observability, SRE practice, bounded managed services.</p>
         </a>
       </div>
     </div>

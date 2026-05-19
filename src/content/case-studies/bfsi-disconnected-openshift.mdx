@@ -1,0 +1,78 @@
+---
+title: "Tier-1 retail bank — disconnected OpenShift platform"
+customer: "Anonymised — large retail and commercial bank, South Asia"
+sector: "Banking & financial services"
+summary: "Greenfield disconnected OpenShift fleet — hub-and-spoke, GitOps, identity, runtime security — delivered to a regulator-facing production posture."
+year: "Recent engagement"
+featured: true
+order: 1
+technologies:
+  - Red Hat OpenShift v4
+  - Advanced Cluster Management
+  - OpenShift GitOps
+  - HashiCorp Vault
+  - External Secrets Operator
+  - RHACS
+  - OADP
+  - cert-manager
+  - GitLab Enterprise
+  - Quay
+  - Nexus
+  - oc-mirror
+services:
+  - cloud-platforms
+  - end-to-end-security
+  - operations
+outcome: "Hub + multiple spokes in production, dual-CI delivery path live, full handover completed."
+---
+
+## Background
+
+A large retail and commercial bank operating a multi-million customer base required a
+**regulator-grade container platform** to host its next generation of customer-facing
+applications. Existing virtualised infrastructure could not meet the deployment cadence the
+digital programme demanded, and air-gapped operation was a non-negotiable starting condition.
+
+## Challenge
+
+- Fully **disconnected operation** — no inbound or outbound internet from cluster nodes.
+- **Multi-cluster** from day one — separate clusters for production, non-production, and
+  disaster-recovery.
+- **Production-grade supply chain** — image mirroring, internal CAs, signed manifests, internal
+  GitLab, internal artifact repositories.
+- **Identity-fronted everything** — no service reachable without going through the bank's
+  identity layer.
+- **Regulator-facing posture** — controls traceable to central-bank IT guidance and
+  international standards.
+
+## Approach
+
+A hub-and-spoke topology was selected to centralise multi-cluster policy and lifecycle, with
+**Advanced Cluster Management on the hub** driving fleet state into the spokes via
+**OpenShift GitOps in pull-mode**. Every cluster pulls its desired state from internal
+GitLab; no external dependencies are introduced at the cluster boundary.
+
+Credential custody was anchored on **HashiCorp Vault** (VM-hosted for blast-radius isolation
+from in-cluster workloads), with **External Secrets Operator** bridging Vault paths to
+Kubernetes Secrets. **RHACS** was deployed early for admission policy, runtime detection, and
+image-risk gates — tuned to the BFSI risk profile rather than the out-of-the-box defaults.
+
+Application delivery used a **federated GitLab** model: each application team operates their
+own GitLab group, with the platform team owning two CI build paths — one for application
+images, one for platform manifests — so build pipelines never carry ambient platform
+credentials.
+
+## Outcome
+
+- Hub and multiple spoke clusters live in production posture
+- Image supply chain end-to-end via `oc-mirror` → internal Quay → cluster
+- Identity, secret-custody, runtime-security, and backup all GitOps-managed
+- Dual-CI delivery path running with application teams onboarded
+- Full handover documentation: architecture decisions, runbook set, replay log, install
+  manual
+
+## Engagement shape
+
+Approximately **20 weeks** of CompTech Lab engineering involvement, sequenced across
+discovery, platform build, application onboarding, and structured handover. Operations
+transitioned to the bank's platform team at the end of the engagement.

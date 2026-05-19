@@ -6,6 +6,10 @@ const services = (await getCollection("services", ({ data }) => !data.draft)).so
   (a, b) => a.data.order - b.data.order
 );
 
+const industries = (await getCollection("industries", ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+
 const featured = (await getCollection("case-studies", ({ data }) => !data.draft && data.featured)).sort(
   (a, b) => a.data.order - b.data.order
 );
@@ -14,17 +18,17 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
 <Layout>
   <section class="hero">
     <div class="container">
-      <span class="hero-eyebrow">CompTech Lab</span>
-      <h1 class="hero-title">The running lab behind regulated-platform engineering.</h1>
+      <span class="hero-eyebrow">Systems integration for regulated industries</span>
+      <h1 class="hero-title">Cloud platforms, security, modernization, and operations &mdash; engineered to ship.</h1>
       <p class="hero-lede">
-        We design and operate the platforms that ship — disconnected OpenShift fleets, AI/ML
-        enablement, identity and DevSecOps, integration and data. Proof by working artifact,
-        not by deck.
+        CompTech Lab designs, deploys, and hands over the cloud and container platforms that
+        anchor regulated workloads in banking, insurance, telecom, and public sector. We
+        deliver against documented outcomes, not against open-ended retainers.
       </p>
       <div class="hero-actions">
-        <a href="/services/" class="btn btn-primary">See services</a>
-        <a href="/case-studies/" class="btn btn-secondary">Case studies</a>
-        <a href="/contact/" class="btn btn-dark">Start a project</a>
+        <a href="/services/" class="btn btn-primary">Our services</a>
+        <a href="/case-studies/" class="btn btn-secondary">Engagement profiles</a>
+        <a href="/contact/" class="btn btn-dark">Start a conversation</a>
       </div>
     </div>
   </section>
@@ -32,12 +36,11 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
   <section class="section">
     <div class="container">
       <div class="section-header">
-        <span class="section-eyebrow">What we do</span>
-        <h2 class="section-title">Four pillars. One lab.</h2>
+        <span class="section-eyebrow">Services</span>
+        <h2 class="section-title">Four practice areas. One delivery discipline.</h2>
         <p class="section-lede">
-          Every engagement ships against a running reference — hub+spoke OpenShift, federated
-          GitLab, Vault, RHACS, OpenShift AI, WSO2 identity, the lot — already wired together
-          in our lab. We start from working systems, not blank PowerPoints.
+          Every engagement is scoped against a documented outcome, sequenced with a structured
+          handover, and built around the platforms your operations team will own afterwards.
         </p>
       </div>
 
@@ -56,11 +59,35 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
   <section class="section" style="background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border);">
     <div class="container">
       <div class="section-header">
-        <span class="section-eyebrow">Selected work</span>
-        <h2 class="section-title">Real engagements. Documented end-to-end.</h2>
+        <span class="section-eyebrow">Industries</span>
+        <h2 class="section-title">Regulated sectors where platform discipline matters.</h2>
         <p class="section-lede">
-          Each case study links to the underlying architecture, install manual, or running demo.
-          No abstracted-away outcomes — the artifacts are on the page.
+          We engage where the combination of regulatory pressure, operational expectation,
+          and audit-grade engineering rules out generic answers — and rewards specialists who
+          have done the work before.
+        </p>
+      </div>
+
+      <div class="card-grid card-grid-4">
+        {industries.map((i) => (
+          <a href={`/industries/${i.id}/`} class="card">
+            <p class="card-eyebrow">{i.data.eyebrow ?? "Sector"}</p>
+            <h3 class="card-title">{i.data.title}</h3>
+            <p class="card-desc">{i.data.tagline}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-eyebrow">Engagement profiles</span>
+        <h2 class="section-title">Representative engagements from our practice.</h2>
+        <p class="section-lede">
+          Anonymised for client confidentiality. Each profile describes the shape of the
+          engagement, the technologies involved, and the outcome delivered.
         </p>
       </div>
 
@@ -76,38 +103,87 @@ const featured = (await getCollection("case-studies", ({ data }) => !data.draft 
       </div>
 
       <p style="margin-top: 2rem;">
-        <a href="/case-studies/" class="btn btn-secondary">All case studies →</a>
+        <a href="/case-studies/" class="btn btn-secondary">All engagement profiles →</a>
       </p>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" style="background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border);">
     <div class="container">
       <div class="section-header">
-        <span class="section-eyebrow">Capabilities map</span>
-        <h2 class="section-title">Every component, in one diagram.</h2>
+        <span class="section-eyebrow">How we deliver</span>
+        <h2 class="section-title">Assess. Design. Deploy. Operate. Hand over.</h2>
         <p class="section-lede">
-          An interactive map of the technologies we operate — foundation models and inference,
-          GitOps and ACM, Vault and ESO, WSO2 and Ping, Spark and lakehouses. Pan, zoom, click.
+          Every engagement runs through the same five-phase discipline — sized to scope, but
+          never skipped. The endpoint is a platform your team owns, documented well enough to
+          outlast staff turnover.
         </p>
       </div>
-      <p>
-        <a href="/capabilities/" class="btn btn-primary">Open the map</a>
-      </p>
+
+      <div class="card-grid card-grid-3">
+        <div class="card" style="cursor: default;">
+          <p class="card-eyebrow">Phase 1</p>
+          <h3 class="card-title">Assess</h3>
+          <p class="card-desc">
+            Current-state discovery, gap analysis, regulatory mapping, technical-debt profile.
+            A short, sharp engagement that produces the case for the work.
+          </p>
+        </div>
+        <div class="card" style="cursor: default;">
+          <p class="card-eyebrow">Phase 2</p>
+          <h3 class="card-title">Design</h3>
+          <p class="card-desc">
+            Reference architecture, operating model, runbook structure, control mapping.
+            Designed for handover from day one.
+          </p>
+        </div>
+        <div class="card" style="cursor: default;">
+          <p class="card-eyebrow">Phase 3</p>
+          <h3 class="card-title">Deploy</h3>
+          <p class="card-desc">
+            Platform build, application onboarding, security posture, observability — sequenced
+            so each layer is fully ready before the next depends on it.
+          </p>
+        </div>
+        <div class="card" style="cursor: default;">
+          <p class="card-eyebrow">Phase 4</p>
+          <h3 class="card-title">Operate</h3>
+          <p class="card-desc">
+            Day-2 bring-up: SRE practice, alert hygiene, incident response, capacity and cost.
+            Run as a joint practice with your team, not in parallel.
+          </p>
+        </div>
+        <div class="card" style="cursor: default;">
+          <p class="card-eyebrow">Phase 5</p>
+          <h3 class="card-title">Hand over</h3>
+          <p class="card-desc">
+            Structured knowledge transfer, runbook walkthroughs, ADR review, residual-risk
+            register. Your team signs that they own it.
+          </p>
+        </div>
+        <div class="card" style="cursor: default; background: var(--color-dark); color: var(--color-dark-text); border-color: var(--color-dark);">
+          <p class="card-eyebrow" style="color: var(--color-accent);">Optional</p>
+          <h3 class="card-title" style="color: var(--color-dark-text-strong);">Bridge managed services</h3>
+          <p class="card-desc" style="color: var(--color-dark-text);">
+            When your team is not yet ready to take operations long-term, we operate a defined
+            scope as a time-boxed bridge — not as a permanent dependency.
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 
   <section class="section" style="background: var(--color-dark); color: var(--color-dark-text);">
     <div class="container" style="text-align: center;">
-      <span class="section-eyebrow" style="color: var(--color-accent);">Engagements</span>
-      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Have a regulated platform to ship?</h2>
+      <span class="section-eyebrow" style="color: var(--color-accent);">Start a conversation</span>
+      <h2 class="section-title" style="color: var(--color-dark-text-strong);">Tell us what you&rsquo;re building.</h2>
       <p class="section-lede" style="color: var(--color-dark-text); margin-left: auto; margin-right: auto;">
-        Tell us what you're building. We'll write back with a concrete scope —
-        what we'd do in the first two weeks and what success looks like at the end of the engagement.
+        Send us a short note. We&rsquo;ll write back with a concrete first-two-weeks scope and a
+        definition of done for the engagement.
       </p>
       <div style="margin-top: 1.75rem; display: inline-flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
-        <a href="/contact/" class="btn btn-primary">Start a project</a>
-        <a href="/about/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">About us</a>
+        <a href="/contact/" class="btn btn-primary">Contact us</a>
+        <a href="/about/" class="btn" style="background: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">About CompTech Lab</a>
       </div>
     </div>
   </section>

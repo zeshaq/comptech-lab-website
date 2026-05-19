@@ -2,14 +2,18 @@
 import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout title="About — CompTech Lab" description="Who we are, how we work, what we don't do.">
+<Layout
+  title="About — CompTech Lab"
+  description="A specialist systems integrator for regulated industries — cloud platforms, security, modernization, and operations."
+>
   <section class="hero">
     <div class="container">
       <span class="hero-eyebrow">About</span>
-      <h1 class="hero-title">A small lab that ships regulated platforms.</h1>
+      <h1 class="hero-title">A specialist systems integrator for regulated industries.</h1>
       <p class="hero-lede">
-        CompTech Lab is a specialist engineering practice for regulated platforms — OpenShift,
-        AI/ML, DevSecOps, integration. We operate the systems we recommend.
+        CompTech Lab designs, deploys, and hands over the cloud and container platforms that
+        anchor regulated workloads. We engage where engineering depth, audit-grade discipline,
+        and a documented handover matter more than scale.
       </p>
     </div>
   </section>
@@ -19,65 +23,106 @@ import Layout from "../layouts/Layout.astro";
       <article class="prose">
         <h2>What we do</h2>
         <p>
-          We design, deploy, and operate the platforms that ship critical workloads under
-          regulatory constraint — banking, insurance, telco, public sector. The work spans the
-          stack from bare-metal OpenShift up through identity, integration, and AI/ML enablement.
+          CompTech Lab is a focused systems integrator. We deliver four practice areas
+          end-to-end &mdash; <strong>cloud platforms</strong>, <strong>application
+          modernization</strong>, <strong>end-to-end security</strong>, and <strong>operations
+          &amp; managed services</strong> &mdash; into four industries where regulation, audit,
+          and platform discipline define the shape of the engagement: <strong>banking and
+          financial services</strong>, <strong>insurance</strong>, <strong>telecom</strong>,
+          and <strong>public sector</strong>.
         </p>
 
-        <h2>How we work</h2>
+        <h2>How we deliver</h2>
+        <p>
+          Every engagement runs through the same five-phase discipline &mdash;
+          <em>assess, design, deploy, operate, hand over</em> &mdash; sized to scope. We do
+          not run open-ended retainers. The endpoint is a platform your operations team
+          owns, with documentation deep enough to outlast staff turnover and a residual-risk
+          register your audit function can sign for.
+        </p>
+
+        <h2>What you keep after we leave</h2>
+        <ul>
+          <li><strong>A reference architecture</strong> specific to your environment, with
+            architecture decisions (ADRs) for every non-obvious choice and the trade-offs
+            considered for each.</li>
+          <li><strong>A runbook set</strong> indexed by failure mode &mdash; not a generic
+            wiki, but procedures verified against the system as it actually runs.</li>
+          <li><strong>An operating model</strong> your platform team can sign for &mdash; on-call
+            structure, escalation paths, alert hygiene, postmortem culture.</li>
+          <li><strong>A residual-risk register</strong> &mdash; what we hardened, what we left in
+            place by design, and what your operations team should watch for in the next 12
+            months.</li>
+        </ul>
+
+        <h2>What we believe</h2>
         <ul>
           <li>
-            <strong>Reference-first.</strong> Every engagement starts from a running lab.
-            We don't draft architecture in PowerPoint; we hand you a working system and a
-            documented path from your environment to it.
+            <strong>Engineering depth beats scale.</strong> A small senior team that has done
+            the work before will out-deliver a large team that hasn&rsquo;t. We engage where
+            this is true.
           </li>
           <li>
-            <strong>Disconnected by default.</strong> Our reference fleet runs disconnected
-            (image mirroring, internal CAs, internal registries, internal GitLab). Connected
-            environments are an easier subset.
+            <strong>GitOps-shaped from day one.</strong> Desired state in Git, reconciliation
+            in the cluster, drift treated as a defect &mdash; never an out-of-band patch.
           </li>
           <li>
-            <strong>GitOps-shaped.</strong> ACM hub+spoke, OpenShift GitOps in pull-mode,
-            Vault as the credential root, ESO to bridge Kubernetes secrets, OADP for backups.
-            Application teams ship through GitLab + dual-CI.
+            <strong>Identity is platform.</strong> Identity is not an application your team
+            integrates with &mdash; it is the boundary your platform is shaped around.
           </li>
           <li>
-            <strong>Writeup is the deliverable.</strong> Architecture decisions, runbooks,
-            install manuals, replay logs. The diff between us and what you operate after we
-            leave is documented.
+            <strong>Security is engineering work.</strong> Shift-left in the pipeline,
+            shift-right at runtime, evidence at the source. Not a quarterly slide.
+          </li>
+          <li>
+            <strong>Documentation is a primary deliverable.</strong> The handover document is
+            the engineering work, not a closeout task.
           </li>
         </ul>
 
-        <h2>What we don't do</h2>
+        <h2>What we don&rsquo;t do</h2>
         <ul>
-          <li>Net-new application development end-to-end. We integrate, harden, and platform-host applications, but the product engineering is yours.</li>
-          <li>"Managed services" with permanent oncall. We hand over with runbooks; long-term operations are your team's.</li>
-          <li>Generic cloud migrations. If the workload doesn't have a regulatory, identity, or platform-engineering edge, we're probably not the right firm.</li>
+          <li>
+            We don&rsquo;t replace your engineering team. Our default is a structured
+            handover; we run optional bridge managed services where your team is not yet
+            ready to operate, but we do not aim to stay forever.
+          </li>
+          <li>
+            We don&rsquo;t pitch transformation programmes with five-year horizons. We engage
+            against bounded outcomes and let the next engagement be the next decision.
+          </li>
+          <li>
+            We don&rsquo;t engage where the platform-discipline edge is missing. If the
+            workload doesn&rsquo;t have a regulatory, identity, or platform-engineering
+            dimension, we&rsquo;re probably not the right firm.
+          </li>
         </ul>
 
-        <h2>The stack we operate</h2>
+        <h2>The technologies we operate</h2>
         <p>
-          <strong>Platform:</strong> Red Hat OpenShift (v4.16+), ACM, OpenShift GitOps, RHACS,
-          OADP, OpenShift AI, cert-manager, External Secrets Operator (ESO), LVMS.<br/>
-          <strong>Identity:</strong> WSO2 Identity Server, Ping Identity, Vault, Keycloak.<br/>
-          <strong>Integration:</strong> WSO2 APIM/MI, MuleSoft, Camunda, Temporal, n8n.<br/>
-          <strong>Data &amp; AI:</strong> Apache Spark, MinIO, lakehouse patterns, vLLM, Triton, NVIDIA NIM, Ollama, Kubeflow, NVIDIA AI Enterprise.<br/>
-          <strong>Observability &amp; security:</strong> Datadog, Kiali, distributed tracing, RHACS, Acunetix, Invicti, SBOMs, supply-chain signing.<br/>
-          <strong>Operations:</strong> GitLab Enterprise, Quay, Nexus, MinIO, PDNS, HAProxy, NetBox, oc-mirror, Ansible.
+          <strong>Cloud platforms:</strong> Red Hat OpenShift, AWS, Microsoft Azure, Google
+          Cloud Platform, Advanced Cluster Management, OpenShift GitOps, Argo CD, Terraform,
+          Ansible.<br/>
+          <strong>Identity &amp; security:</strong> WSO2 Identity Server, Ping Identity,
+          Keycloak, HashiCorp Vault, External Secrets Operator, RHACS, Acunetix, Invicti,
+          cosign / sigstore, OPA, cert-manager.<br/>
+          <strong>Integration &amp; data:</strong> WSO2 API Manager, WSO2 Micro Integrator,
+          MuleSoft, Camunda, Temporal, Apache Kafka, Apache Spark, S3-compatible object
+          storage, Iceberg / Delta lakehouse formats.<br/>
+          <strong>AI &amp; modernization:</strong> OpenShift AI, NVIDIA NIM, vLLM, Triton,
+          Ollama, MCP, LangChain, JBoss EAP, Spring Boot, Quarkus, Node.js.<br/>
+          <strong>Operations &amp; observability:</strong> Datadog, Grafana / Prometheus /
+          Loki / Tempo, OpenTelemetry, Kiali, Istio, OADP, Velero, GitLab Enterprise, Quay,
+          Nexus.
         </p>
 
-        <h2>Where to find more</h2>
+        <h2>Get in touch</h2>
         <p>
-          Engineering notes and reference architectures live at
-          <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener">zeshaq.pages.dev</a>.
-          Selected case studies are in <a href="/case-studies/">case studies</a>. A pan-and-zoom
-          view of every technology we operate is on the <a href="/capabilities/">capabilities map</a>.
+          Engagements start with a short note describing what you&rsquo;re building. We
+          reply with a concrete first-two-weeks scope and a definition of done.
+          <a href="/contact/">Send us a note &rarr;</a>
         </p>
       </article>
-
-      <div style="margin-top: 3rem;">
-        <a href="/contact/" class="btn btn-primary">Start a conversation →</a>
-      </div>
     </div>
   </section>
 </Layout>

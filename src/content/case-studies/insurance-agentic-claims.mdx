@@ -1,0 +1,74 @@
+---
+title: "National insurance carrier — agentic claims-triage platform"
+customer: "Anonymised — national general-insurance carrier"
+sector: "Insurance"
+summary: "Identity-fronted agentic AI for first-line claims triage, deployed on OpenShift AI behind WSO2 IS, with full audit and rollback."
+year: "Recent engagement"
+featured: true
+order: 2
+technologies:
+  - OpenShift
+  - OpenShift AI
+  - NVIDIA NIM
+  - vLLM
+  - MCP (Model Context Protocol)
+  - WSO2 Identity Server
+  - OpenSearch
+  - Redis
+  - HashiCorp Vault
+  - RHACS
+services:
+  - application-modernization
+  - end-to-end-security
+outcome: "Production agentic claims-triage assistant; measurable reduction in first-touch handling time, full audit trail."
+---
+
+## Background
+
+A national general-insurance carrier was facing a familiar pressure point: **first-line
+claims triage** consumed a disproportionate share of agent time, most of it spent on
+deterministic-but-tedious clarifications, document checks, and policy lookups. The carrier
+wanted to know whether an agentic AI assistant could compress the triage step **without
+opening compliance holes** that the regulator and the internal audit function would not
+accept.
+
+## Challenge
+
+- **Compliance posture must be preserved.** Every model output and every tool call had to be
+  traceable to an authenticated identity and persisted in an audit trail.
+- **No bypass paths.** The agent had to authenticate against the same identity provider as
+  human agents, with the same SCIM lifecycle.
+- **Inspectable behaviour.** Reviewers needed to see exactly what the agent saw, what it
+  recommended, and what changed in the case record.
+- **Rollback at every step.** If the assistant produced an unacceptable recommendation, the
+  case had to revert to a fully-human flow without data loss.
+
+## Approach
+
+The agentic assistant was built on **OpenShift AI**, with NVIDIA NIM and vLLM serving the
+inference layer behind the same OpenShift fleet that hosts the carrier's other production
+workloads. Tool integration was done via **MCP (Model Context Protocol)** servers — each
+tool (policy lookup, claims-history retrieval, document classifier, mail send) is a
+separately-deployed MCP server with its own audit log.
+
+The identity boundary is **WSO2 Identity Server**: the agent runs under a service identity
+provisioned via SCIM from the same directory of record as human agents, with OAuth2 token
+exchange for downstream tool calls. The agent cannot reach any backend system except
+through the IS-mediated boundary.
+
+Search across policies and prior claims uses **OpenSearch**, with results filtered by the
+agent's session identity. State for in-flight conversations is held in Redis with a short
+TTL and full audit-event emission.
+
+## Outcome
+
+- Production agentic assistant integrated into the carrier's claims front-end
+- Measurable reduction in first-touch handling time on the cases routed through the assistant
+- Full audit trail accepted by the carrier's internal audit and compliance functions
+- Documented rollback path tested in production and in DR drills
+
+## Engagement shape
+
+Approximately **14 weeks**, sequenced across identity integration, MCP tool wiring, inference
+platform tuning, audit and compliance review, and production rollout under change-management
+discipline.

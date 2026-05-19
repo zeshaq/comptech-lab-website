@@ -43,16 +43,16 @@ const fmt = (d: Date | null) =>
 
 <Layout
   title="Insights — CompTech Lab"
-  description="Engineering notes on OpenShift, AI/ML, DevSecOps, identity, and integration — published on the engineering notes site."
+  description="Technical writing by our principals on OpenShift, AI/ML, DevSecOps, identity, and integration."
 >
   <section class="hero">
     <div class="container">
       <span class="hero-eyebrow">Insights</span>
-      <h1 class="hero-title">Engineering notes from the lab.</h1>
+      <h1 class="hero-title">Technical writing from our practice.</h1>
       <p class="hero-lede">
-        We write the long-form posts on a separate site —
-        <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener" style="color: var(--color-accent);">zeshaq.pages.dev</a>.
-        The latest are pulled below. Click through to read.
+        Long-form notes on the platforms we work with &mdash; OpenShift, AI/ML, identity,
+        integration, security. Posts are published on the principals&rsquo; engineering blog;
+        the latest are surfaced below.
       </p>
     </div>
   </section>
@@ -61,8 +61,8 @@ const fmt = (d: Date | null) =>
     <div class="container">
       {posts.length === 0 ? (
         <p style="color: var(--color-muted);">
-          Posts couldn't be fetched at build time. Visit
-          <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener">zeshaq.pages.dev</a>
+          Posts could not be fetched at build time. Visit
+          <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener" style="color: var(--color-accent);">the engineering blog</a>
           directly.
         </p>
       ) : (
@@ -91,7 +91,7 @@ const fmt = (d: Date | null) =>
 
       <p style="margin-top: 3rem;">
         <a href="https://zeshaq.pages.dev" target="_blank" rel="noopener" class="btn btn-secondary">
-          All posts on zeshaq.pages.dev ↗
+          All posts on the engineering blog ↗
         </a>
       </p>
     </div>

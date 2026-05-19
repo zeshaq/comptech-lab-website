@@ -1,0 +1,71 @@
+---
+title: "Regional telecom operator — multi-site edge platform"
+customer: "Anonymised — regional telecom operator"
+sector: "Telecom"
+summary: "OpenShift on bare-metal at the edge, GitOps-driven across multiple sites, RHACS-monitored, unified observability — bring-up and ongoing upgrade posture."
+year: "Recent engagement"
+featured: true
+order: 4
+technologies:
+  - Red Hat OpenShift on bare metal
+  - Advanced Cluster Management
+  - OpenShift GitOps
+  - Cilium / Multus
+  - SR-IOV
+  - RHACS
+  - Datadog
+  - OpenTelemetry
+  - OADP
+services:
+  - cloud-platforms
+  - operations
+outcome: "Edge platform live across multiple sites; centralised lifecycle, drift detection, and SLO-driven operations."
+---
+
+## Background
+
+A regional telecom operator was building out **multi-site edge infrastructure** for
+latency-sensitive network functions and adjacent application workloads. The platform team
+needed an OpenShift posture that worked **on bare metal at the edge**, was managed from a
+central hub, and could be upgraded across a fleet of small clusters without on-site staff at
+each one.
+
+## Challenge
+
+- **Bare-metal OpenShift** with SR-IOV and Multus for the network-function workloads.
+- **Multi-site lifecycle** — every site gets its software state from a central control plane,
+  with drift detection and self-healing.
+- **Low-touch operations** — sites are remote and minimally-staffed; the operating model has
+  to assume nobody is in the room.
+- **Unified observability** — operations needed a single pane for fleet health, with
+  per-site detail one click away.
+
+## Approach
+
+A hub cluster, hosted centrally, runs **Advanced Cluster Management** and the fleet-level
+GitOps control plane. Each edge site is a small OpenShift cluster registered to ACM,
+pulling its desired state from internal GitLab via **OpenShift GitOps in pull-mode**.
+**RHACS** posture is uniform across sites and centrally tuned.
+
+Network-function workloads use **SR-IOV** for line-rate networking, with **Multus** providing
+the secondary-interface attachment patterns the workloads expect. Cluster topology is
+optimised for hardware refresh cycles — control-plane separation, hardware-independent
+machine configs, and a documented re-image flow.
+
+Observability stitches the fleet together: **Datadog** as the upper-layer pane, with
+**OpenTelemetry** instrumenting both platform and application workloads. ACM observability
+provides cluster-level metrics into the same surface. **OADP** runs scheduled backups to a
+central S3-compatible store.
+
+## Outcome
+
+- Edge platform live across multiple sites under a single ACM-managed fleet
+- GitOps drift detection and auto-remediation operational
+- SLO-driven operations practice in place, with a documented upgrade orchestration runbook
+- Per-site mean-time-to-recover materially below the prior bare-metal baseline
+
+## Engagement shape
+
+Initial bring-up: approximately **22 weeks**, sequenced across hub stand-up, first-site
+template, multi-site rollout, observability, and operations-practice handover. Ongoing
+quarterly upgrade orchestration available as a bounded managed service.

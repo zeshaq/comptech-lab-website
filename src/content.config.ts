@@ -33,4 +33,24 @@ const caseStudies = defineCollection({
   }),
 });
 
-export const collections = { services, "case-studies": caseStudies };
+const industries = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/industries" }),
+  schema: z.object({
+    title: z.string(),
+    tagline: z.string(),
+    description: z.string(),
+    eyebrow: z.string().optional(),
+    order: z.number().default(99),
+    typical_workloads: z.array(z.string()).default([]),
+    regulatory_profile: z.array(z.string()).default([]),
+    key_services: z.array(z.string()).default([]),
+    related_case_studies: z.array(z.string()).default([]),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = {
+  services,
+  "case-studies": caseStudies,
+  industries,
+};

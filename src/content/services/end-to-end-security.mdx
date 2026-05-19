@@ -1,0 +1,69 @@
+---
+title: "End-to-End Security"
+tagline: "Shift-left in the pipeline, shift-right at runtime, identity-fronted everywhere — done as engineering work."
+description: "Pipeline security (SAST/SCA/SBOMs/signing), runtime security (RHACS, DAST), identity (WSO2 IS, Ping, Keycloak), credential custody (Vault), compliance posture, supply chain."
+eyebrow: "Security"
+order: 3
+technologies:
+  - RHACS (StackRox)
+  - HashiCorp Vault
+  - External Secrets Operator
+  - WSO2 Identity Server
+  - Ping Identity
+  - Keycloak
+  - Acunetix
+  - Invicti
+  - cosign / sigstore
+  - Syft / Trivy
+  - Open Policy Agent
+  - cert-manager
+capabilities:
+  - Shift-left pipeline security
+  - Shift-right runtime security with RHACS
+  - DAST programmes (Acunetix, Invicti)
+  - Identity federation and SSO
+  - SCIM provisioning, OIDC, OAuth2, SAML
+  - Credential custody with Vault
+  - Supply-chain signing and SBOMs
+  - Compliance posture (PCI, ISO 27001, GDPR, sector-specific)
+related_case_studies:
+  - bfsi-disconnected-openshift
+  - insurance-agentic-claims
+---
+
+Security on a regulated platform is two halves of the same engineering practice: **shift-left**
+in the delivery pipeline and **shift-right** at runtime, both anchored by an identity boundary
+that auditors will sign for. We do all three as platform work — not as a quarterly audit slide.
+
+## What we deliver
+
+- **Shift-left.** Pipeline-integrated SAST and SCA, SBOM generation (Syft), image vulnerability
+  scanning (Trivy), image signing (cosign / sigstore), policy gates (OPA / conftest), signed
+  manifests in GitOps repositories.
+- **Shift-right.** RHACS deploy and tune — admission policies, network baselines, runtime
+  detection, image-risk gates, network-flow observability — integrated into your existing
+  incident-response workflow. SIEM forwarding to Splunk / Sentinel / Elastic / Datadog.
+- **DAST programmes.** Acunetix or Invicti deployed against your applications, with
+  authenticated scans, scheduled re-runs, and findings landed directly in the engineering
+  team's bug queue — not a wall-of-PDFs audit deliverable.
+- **Identity.** WSO2 Identity Server, Ping Identity, or Keycloak — federation across business
+  units, SCIM provisioning from your directory of record, OIDC / OAuth2 / SAML flows, MFA
+  posture, fine-grained authorisation. Identity-as-a-platform, not identity-as-an-application.
+- **Credential custody.** HashiCorp Vault as the root of credential trust, External Secrets
+  Operator bridging Kubernetes Secrets, short-lived dynamic credentials, transit encryption,
+  audit log shipped to your SIEM, blast-radius isolation from application workloads.
+- **Compliance posture.** Working maps from your control frameworks (PCI DSS, ISO 27001, NIST
+  CSF, GDPR, sector regulators) to the platform controls that actually implement them.
+  Evidence captured at the source, not reconstructed at audit time.
+
+## How we work
+
+Security engagements typically ride alongside platform or modernization work, but we also
+do **focused identity bring-ups**, **standalone RHACS tune-ups**, and **DAST programme
+stand-ups** for organisations already on OpenShift.
+
+## Engagement shape
+
+Focused identity engagements: **4–8 weeks**. Full DevSecOps integration on an existing
+platform: **8–14 weeks**. Compliance-evidence alignment for a regulated programme: **6–10
+weeks**, run as a parallel workstream to platform delivery.

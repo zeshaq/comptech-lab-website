@@ -8,22 +8,30 @@ const cases = (await getCollection("case-studies", ({ data }) => !data.draft)).s
 ---
 
 <Layout
-  title="Case studies — CompTech Lab"
-  description="Selected engagements: the CompTech OpenShift fleet, BRAC banking POC, greenfield disconnected install manual, insurance agentic demo."
+  title="Engagement profiles — CompTech Lab"
+  description="Representative engagement profiles from our practice — banking, insurance, telecom, public sector. Anonymised for client confidentiality."
 >
   <section class="hero">
     <div class="container">
-      <span class="hero-eyebrow">Case studies</span>
-      <h1 class="hero-title">Real engagements. Documented end-to-end.</h1>
+      <span class="hero-eyebrow">Engagement profiles</span>
+      <h1 class="hero-title">Representative engagements from our practice.</h1>
       <p class="hero-lede">
-        Each case study links to the underlying architecture, install path, or running demo.
-        We don't ship abstractions of outcomes — the artifacts are on the page.
+        Anonymised for client confidentiality. Each profile describes the shape of the
+        engagement, the technologies involved, the approach, and the outcome delivered.
+        Names and identifying details have been removed.
       </p>
     </div>
   </section>
 
   <section class="section">
     <div class="container">
+      <p style="background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: 0.4rem; padding: 1rem 1.25rem; font-size: 0.92rem; color: var(--color-muted); margin: 0 0 2.5rem;">
+        <strong style="color: var(--color-ink);">A note on confidentiality:</strong>
+        client names, sites, and identifying details are not published. Profiles below are
+        representative of the engagement type, with figures and identifiers omitted or
+        generalised. References available under NDA.
+      </p>
+
       <div class="card-grid">
         {cases.map((c) => (
           <a href={`/case-studies/${c.id}/`} class="card">

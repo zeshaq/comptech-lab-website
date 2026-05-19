@@ -1,0 +1,70 @@
+---
+title: "Retail bank — customer-service modernization"
+customer: "Anonymised — retail bank, South Asia"
+sector: "Banking & financial services"
+summary: "SPA front-end, JBoss EAP-backed customer-service chat, and integrated bank-payment flow — replatformed onto OpenShift with a documented production hardening path."
+year: "Recent engagement"
+featured: true
+order: 3
+technologies:
+  - Red Hat OpenShift
+  - JBoss EAP
+  - OpenShift Pipelines
+  - HashiCorp Vault
+  - RHACS
+  - GitLab Enterprise
+  - WSO2 Identity Server
+services:
+  - application-modernization
+  - cloud-platforms
+  - end-to-end-security
+outcome: "Modernised customer-service platform live, integrated with the bank's existing payment rails, hardened for production rollout."
+---
+
+## Background
+
+A retail bank had operated its customer-service experience across a fragmented set of
+legacy applications — a desktop-era SPA, an unmanaged chat service, and a payment integration
+that lived on aging middleware. The bank wanted these capabilities **modernised together**,
+on container infrastructure that the platform team could operate confidently, without
+introducing exotic runtimes their team would have to learn from zero.
+
+## Challenge
+
+- **Modernise the SPA** without a multi-year front-end rewrite.
+- **Replatform the chat service** in a way the existing operations team could maintain — they
+  had deep Java EE skills but were new to non-JVM runtimes.
+- **Integrate with the bank's payment rails** with strict idempotency, auth, and retry
+  semantics — no shortcuts and no stubs.
+- **Production-shaped from day one** — RHACS posture, Vault credential custody, GitOps
+  delivery, RBAC discipline.
+
+## Approach
+
+The SPA was containerised and served from OpenShift Routes behind the bank's edge, with a
+clean decomposition path toward micro-frontends marked but not forced. **JBoss EAP** was
+chosen for the chat backend not because it was novel but because it **matched the bank's
+existing skill base** — a faster path to production than introducing a new runtime, and a
+clean fit with their staffing model.
+
+The **payment integration** exercises the bank's existing payment infrastructure end-to-end
+— authentication via WSO2 Identity Server, idempotency keys per transaction, exponential
+backoff with circuit breakers, and a full reconciliation flow. Build and delivery run
+through **OpenShift Pipelines** with internal Quay as the image registry; the GitOps repo
+holds all manifests under change control.
+
+Security posture from day one: **RHACS** for runtime, **Vault** + ESO for credential
+custody, **cosign**-signed images, SBOMs at build, and signed manifests in Git.
+
+## Outcome
+
+- Modernised SPA + chat + payment customer-service platform live on OpenShift
+- Integrated with the bank's production payment rails under change-management discipline
+- Documented production hardening path: RHACS tune-up for BFSI risk profile, OADP backup
+  posture, DR drill rehearsal
+- Architecture decisions, runbook set, and handover completed
+
+## Engagement shape
+
+Approximately **16 weeks**, sequenced across discovery, SPA replatform, chat backend rebuild,
+payment integration, and production hardening with change-control rollout.
