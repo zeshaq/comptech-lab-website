@@ -414,6 +414,61 @@ html, body {
   color: #a6c8ff;
 }
 
+/* ===== Dark CTA section ===== */
+
+.section-cta {
+  background: var(--color-dark);
+  color: var(--color-dark-text);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.section-cta > .container {
+  position: relative;
+  z-index: 1;
+}
+
+.section-cta .section-eyebrow {
+  color: #78a9ff;
+}
+
+.section-cta .section-title {
+  color: #ffffff;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 22ch;
+}
+
+.section-cta .section-lede {
+  color: rgba(255, 255, 255, 0.72);
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 56ch;
+}
+
+.section-cta-actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.section-cta .btn-secondary,
+.section-cta .btn-dark {
+  background: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.section-cta .btn-secondary:hover,
+.section-cta .btn-dark:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
 .card-icon {
   display: inline-flex;
   align-items: center;
