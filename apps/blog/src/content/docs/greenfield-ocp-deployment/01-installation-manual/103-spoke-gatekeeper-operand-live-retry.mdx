@@ -1,0 +1,261 @@
+---
+title: "Installation Manual - 103 Spoke Gatekeeper operand live retry"
+sidebar_label: "103 Spoke Gatekeeper operand live retry"
+description: "Successful spoke Gatekeeper no-constraints operand retry after image readiness validation."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-12`, the `spoke-dc-v7` Gatekeeper
+no-constraints operand live retry.
+
+The retry succeeded. The `Gatekeeper/gatekeeper` operand reconciled with the
+expected fail-open spec, `gatekeeper-audit` reached `1/1`, and
+`gatekeeper-controller-manager` reached `3/3`. No policies or mutation
+resources were created.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-12` / `#424` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-11` / `#423` |
+
+## Access Path
+
+Live checks and GitOps reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Baseline
+
+The retry started from a clean guardrail state:
+
+```text
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+hub_side_app=Synced Progressing 436fafcc211b008ab2884face53d6b054605ead8
+spoke_side_app=Synced Healthy 436fafcc211b008ab2884face53d6b054605ead8
+gatekeeper_subscription=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+gatekeeper_csv=Succeeded reason=InstallSucceeded
+gatekeeper_operator_deploy=1/1
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+operand_deployments=none
+operand_pods=none
+constrainttemplate_instances=0
+constraint_api_resources=none
+```
+
+Image readiness was rechecked immediately before apply:
+
+```text
+spoke-dc-v7-worker-0 pull_rc=0 duration=8s
+spoke-dc-v7-worker-1 pull_rc=0 duration=7s
+spoke-dc-v7-worker-2 pull_rc=0 duration=7s
+```
+
+## GitOps Changes
+
+Platform GitOps commits:
+
+```text
+c6261f2 Retry spoke Gatekeeper operand canary
+0e64c08 Document spoke Gatekeeper operand retry
+```
+
+The retry reintroduced only:
+
+```text
+clusters/spoke-dc-v7/security/gatekeeper/gatekeeper.yaml
+clusters/spoke-dc-v7/security/gatekeeper/kustomization.yaml
+```
+
+and the `gatekeeper` include in:
+
+```text
+clusters/spoke-dc-v7/security/kustomization.yaml
+```
+
+Render validation before push:
+
+```text
+oc kustomize clusters/spoke-dc-v7 rendered 2414 lines
+rendered Gatekeeper count=1
+rendered constraint/mutation references=none
+git diff --check passed
+```
+
+The bootstrap clone was fast-forwarded to:
+
+```text
+0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+```
+
+Both the hub-side and spoke-side Argo applications were hard-refreshed.
+
+## Operand Spec
+
+The live operand has the expected no-constraints fail-open posture:
+
+```text
+Gatekeeper/gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore webhookLog=INFO auditLog=INFO
+```
+
+Manifest shape:
+
+```yaml
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    failurePolicy: Ignore
+    logLevel: INFO
+  audit:
+    logLevel: INFO
+```
+
+## Readiness
+
+Gatekeeper deployment readiness:
+
+```text
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+```
+
+Pods:
+
+```text
+gatekeeper-audit-898885b67-qr6hr                 Running spoke-dc-v7-worker-0
+gatekeeper-controller-manager-59c5f66764-fzhs6   Running spoke-dc-v7-worker-1
+gatekeeper-controller-manager-59c5f66764-jqlxr   Running spoke-dc-v7-worker-2
+gatekeeper-controller-manager-59c5f66764-n6xt4   Running spoke-dc-v7-worker-0
+gatekeeper-operator-controller-c7d5c4476-hwvxb   Running spoke-dc-v7-worker-0
+```
+
+## Admission Surface
+
+The validating webhook exists and is fail-open:
+
+```text
+gatekeeper-validating-webhook-configuration validation.gatekeeper.sh Ignore
+gatekeeper-validating-webhook-configuration check-ignore-label.gatekeeper.sh Ignore
+```
+
+The mutating webhook remains absent:
+
+```text
+mutating_webhook_count=0
+```
+
+Admission smoke dry-run passed:
+
+```text
+admission_smoke_final=configmap/gatekeeper-spoke-retry-final-smoke
+```
+
+## Policy Guardrails
+
+No policy objects were created:
+
+```text
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_instances=none
+```
+
+## Short Soak
+
+Six polls over roughly one minute stayed steady:
+
+```text
+hub_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+spoke_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+```
+
+## Final Validation
+
+```text
+bootstrap_git_rev=0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+hub_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+spoke_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+gatekeeper_cr=gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore webhookLog=INFO auditLog=INFO
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+all_gatekeeper_namespace_pods=Running
+validating_webhook_count=1
+validating_webhook_failurePolicy=Ignore for both webhooks
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_instances=none
+admission_smoke_final=configmap/gatekeeper-spoke-retry-final-smoke
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+```
+
+## Rollback Path
+
+If rollback is needed later, remove only the spoke operand include/path:
+
+```text
+clusters/spoke-dc-v7/security/gatekeeper
+```
+
+Keep the narrow Argo RBAC grant for:
+
+```text
+operator.gatekeeper.sh/gatekeepers
+```
+
+Post-rollback checks:
+
+- no spoke `Gatekeeper` CR;
+- no Gatekeeper validating or mutating webhook;
+- no `gatekeeper-audit` or `gatekeeper-controller-manager` deployment, pod,
+  or ReplicaSet;
+- no constraint templates, constraints, or mutation resources;
+- admission smoke dry-run passes.
+
+## Residual Risks
+
+The spoke now has Gatekeeper admission infrastructure. It is fail-open and has
+no policies, but it is still admission-path infrastructure.
+
+Gatekeeper also still lacks explicit disconnected mirror coverage. Current
+workers have the image cached and pull probes passed, but worker rebuilds or
+cache loss can reintroduce pull risk.
+
+Do not add constraint templates or constraints until a separate issue-backed
+gate introduces and validates specific policy objects.
