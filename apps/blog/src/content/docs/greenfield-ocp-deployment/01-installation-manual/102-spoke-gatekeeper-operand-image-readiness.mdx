@@ -1,0 +1,203 @@
+---
+title: "Installation Manual - 102 Spoke Gatekeeper operand image readiness"
+sidebar_label: "102 Spoke Gatekeeper operand image readiness"
+description: "Readiness proof for the spoke Gatekeeper operand image before retrying the no-constraints canary."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-11`, the `spoke-dc-v7` Gatekeeper
+operand image readiness gate before retrying the no-constraints live canary.
+
+The previous spoke canary reached `Gatekeeper/gatekeeper` and created the
+fail-open validating webhook, but failed readiness because the operand pods
+stayed in `ContainerCreating` while pulling the Gatekeeper image. This gate
+proved the current workers can use the exact image digest without creating a
+live Gatekeeper operand.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-11` / `#423` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-10` / `#422` |
+| Follow-up | `OP-GF-OPERATORS-12` / `#424` |
+
+## Access Path
+
+Live checks used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Target Image
+
+```text
+registry.redhat.io/gatekeeper/gatekeeper-rhel9@sha256:da64ddea8260faad7e3bdd33f5ad37dc872ef69a1a530730e55386762838bf87
+```
+
+## Baseline
+
+```text
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+gatekeeper_subscription=AtLatestKnown installedCSV=gatekeeper-operator-product.v3.21.0 currentCSV=gatekeeper-operator-product.v3.21.0
+gatekeeper_csv=Succeeded reason=InstallSucceeded
+gatekeeper_operator_deploy=1/1
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+operand_deployments=none
+operand_pods=none
+constrainttemplate_instances=0
+constraint_api_resources=none
+```
+
+## Mirror Policy
+
+The spoke had one `ImageDigestMirrorSet`, but it only covered OpenShift
+release-image sources:
+
+```text
+image-digest-mirror source=quay.io/openshift-release-dev/ocp-v4.0-art-dev mirrors=quay.v7.comptech-lab.com/openshift-release/openshift/release
+image-digest-mirror source=quay.io/openshift-release-dev/ocp-release mirrors=quay.v7.comptech-lab.com/openshift-release/openshift/release-images
+```
+
+No `ImageDigestMirrorSet`, `ImageTagMirrorSet`, or
+`ImageContentSourcePolicy` entry matched `registry.redhat.io`, the Gatekeeper
+repository, or the operand digest.
+
+That means this gate proves current worker/runtime readiness. It does not add
+durable disconnected mirror coverage for future worker rebuilds or image cache
+loss.
+
+## Worker Image Evidence
+
+All three spoke workers had the Gatekeeper operand repository cached:
+
+```text
+spoke-dc-v7-worker-0 cached registry.redhat.io/gatekeeper/gatekeeper-rhel9
+spoke-dc-v7-worker-1 cached registry.redhat.io/gatekeeper/gatekeeper-rhel9
+spoke-dc-v7-worker-2 cached registry.redhat.io/gatekeeper/gatekeeper-rhel9
+```
+
+Exact digest inspection on all three workers returned:
+
+```text
+registry.redhat.io/gatekeeper/gatekeeper-rhel9@sha256:da64ddea8260faad7e3bdd33f5ad37dc872ef69a1a530730e55386762838bf87
+```
+
+Bounded pull probes completed successfully:
+
+```text
+spoke-dc-v7-worker-0 pull_probe_rc=0 duration_seconds=8
+spoke-dc-v7-worker-1 pull_probe_rc=0 duration_seconds=8
+spoke-dc-v7-worker-2 pull_probe_rc=0 duration_seconds=8
+```
+
+The runtime reported the image as up to date. It also reported the
+manifest-list digest:
+
+```text
+registry.redhat.io/gatekeeper/gatekeeper-rhel9@sha256:012f906330cd998b34aa012be9491fcf905c8460239253118f5ebcbccf96a1b9
+```
+
+## Final Guardrails
+
+No Gatekeeper operand was introduced during this readiness gate:
+
+```text
+gatekeeper_cr_count=0
+validating_webhook_count=0
+mutating_webhook_count=0
+operand_deployments=none
+operand_pods=none
+debug_probe_pods=none
+```
+
+Cluster health remained clean:
+
+```text
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+hub_side_app=Synced Progressing 436fafcc211b008ab2884face53d6b054605ead8
+spoke_side_app=Synced Healthy 436fafcc211b008ab2884face53d6b054605ead8
+```
+
+The hub-side pull-model application was synced at the expected revision but
+reported `Progressing` with only the standard `AdditionalStatusReport`
+condition. The spoke-local application was `Synced/Healthy` at the same
+revision.
+
+## Retry Checklist
+
+Use issue `#424` / `OP-GF-OPERATORS-12` for the next live retry.
+
+Before applying the operand again:
+
+- recheck spoke health, nodes, ClusterOperators, pending CSRs, and
+  non-running pods;
+- recheck hub-side and spoke-side Argo status and revision;
+- recheck Gatekeeper guardrails: no CR, no webhooks, no operand deployments,
+  no operand pods, no constraint templates, no constraints, and no mutation
+  resources;
+- recheck all three workers still have the exact operand digest cached or can
+  complete a bounded pull probe.
+
+Apply only the spoke Gatekeeper no-constraints operand path:
+
+```text
+clusters/spoke-dc-v7/security/gatekeeper
+```
+
+The manifest should keep:
+
+```yaml
+validatingWebhook: Enabled
+mutatingWebhook: Disabled
+webhook:
+  failurePolicy: Ignore
+  logLevel: INFO
+audit:
+  logLevel: INFO
+```
+
+Retry acceptance:
+
+- `Gatekeeper/gatekeeper` exists with the expected spec;
+- `gatekeeper-audit` is ready;
+- `gatekeeper-controller-manager` is `3/3` ready;
+- no `ConstraintTemplate`, constraint, or mutation resources exist;
+- the validating webhook exists and is fail-open;
+- no mutating webhook exists;
+- admission smoke dry-run passes.
+
+Rollback if readiness fails:
+
+- remove only the spoke operand path/include from GitOps;
+- sync/prune `spoke-dc-v7-cluster-config`;
+- confirm the `Gatekeeper` CR, webhooks, operand deployments, ReplicaSets,
+  and pods are absent;
+- keep the existing narrow Argo RBAC grant for
+  `operator.gatekeeper.sh/gatekeepers`.
+
+## Residual Risk
+
+The image is ready on the current workers, but Gatekeeper still lacks explicit
+disconnected mirror coverage. If workers are rebuilt or the cache is lost,
+run a separate mirror/readiness gate before depending on this cached evidence.
