@@ -1,0 +1,167 @@
+---
+title: "Installation Manual - 105 Gatekeeper policy dry-run candidate"
+sidebar_label: "105 Gatekeeper dry-run candidate"
+description: "First Gatekeeper policy candidate design and dry-run-only validation for privileged-container detection."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-14`, the first Gatekeeper policy design
+gate after both hub and spoke Gatekeeper operands were proven with rollback
+drills.
+
+No policy object was persisted. No GitOps desired state was changed. The gate
+only designed a candidate and validated what the Kubernetes API server could
+evaluate with server-side dry-run.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-14` / `#427` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-13` / `#425` |
+
+## Candidate
+
+The selected candidate is:
+
+```text
+K8sDisallowPrivilegedContainers
+```
+
+The policy flags Pods whose regular, init, or ephemeral containers set:
+
+```yaml
+securityContext:
+  privileged: true
+```
+
+The future constraint is intentionally scoped to namespaces labeled:
+
+```text
+gatekeeper.comptech-lab.com/dryrun-candidate=true
+```
+
+That selector keeps a later persisted dry-run canary from generating
+cluster-wide audit noise.
+
+## Baseline
+
+Both clusters were healthy before the dry-run checks:
+
+```text
+hub_cv=4.20.18 True False False
+hub_nodes_ready=3/3
+hub_nonsteady_clusteroperators=none
+hub_nonrunning_pods=0
+hub_pending_csrs=0
+spoke_cv=4.20.18 True False False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+hub_side_app_hub-dc-v7-bootstrap=Synced Healthy 4f8c431221a324f06827a40eab505e9d228fbaf0
+hub_side_app_spoke-dc-v7-cluster-config=Synced Healthy 4f8c431221a324f06827a40eab505e9d228fbaf0
+spoke_side_app_spoke-dc-v7-cluster-config=Synced Healthy 4f8c431221a324f06827a40eab505e9d228fbaf0
+```
+
+Gatekeeper was still in the no-policy fail-open posture:
+
+```text
+hub_gatekeeper_cr=gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore
+hub_gatekeeper_audit=1/1
+hub_gatekeeper_controller=3/3
+hub_validating_webhook_count=1
+hub_mutating_webhook_count=0
+hub_constrainttemplate_instances=0
+hub_constraint_api_resources=none
+hub_mutation_api_resources=none
+spoke_gatekeeper_cr=gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore
+spoke_gatekeeper_audit=1/1
+spoke_gatekeeper_controller=3/3
+spoke_validating_webhook_count=1
+spoke_mutating_webhook_count=0
+spoke_constrainttemplate_instances=0
+spoke_constraint_api_resources=none
+spoke_mutation_api_resources=none
+```
+
+Admission smoke dry-runs passed on both clusters.
+
+## Dry-run Results
+
+Server-side dry-run accepted the `ConstraintTemplate` on both clusters:
+
+```text
+hub_constrainttemplate_rc=0
+hub_constrainttemplate_output=constrainttemplate.templates.gatekeeper.sh/k8sdisallowprivilegedcontainers
+spoke_constrainttemplate_rc=0
+spoke_constrainttemplate_output=constrainttemplate.templates.gatekeeper.sh/k8sdisallowprivilegedcontainers
+```
+
+The matching constraint instance could not be server-side dry-runed:
+
+```text
+no matches for kind "K8sDisallowPrivilegedContainers" in version "constraints.gatekeeper.sh/v1beta1"
+ensure CRDs are installed first
+```
+
+That is expected. Gatekeeper only creates the generated
+`k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh` CRD after the
+`ConstraintTemplate` is persisted. This gate did not persist the template
+just to make the constraint dry-run succeed.
+
+A negative sample Pod also passed API-server dry-run on both clusters because
+no policy was persisted:
+
+```text
+hub_sample_privileged_pod_rc=0
+spoke_sample_privileged_pod_rc=0
+```
+
+That result proves the baseline admission path stayed healthy. It does not
+prove Gatekeeper denial behavior.
+
+## Final No-residue Check
+
+Final validation confirmed the dry-run checks left no policy residue:
+
+```text
+hub_constrainttemplate_instances=0
+hub_candidate_constrainttemplate=absent
+hub_candidate_crd=absent
+hub_candidate_constraint=absent
+hub_sample_pod=absent
+hub_gatekeeper_audit=1/1
+hub_gatekeeper_controller=3/3
+hub_gatekeeper_nonrunning_pods=0
+hub_admission_smoke_final=configmap/gatekeeper-policy-dryrun-final-hub
+spoke_constrainttemplate_instances=0
+spoke_candidate_constrainttemplate=absent
+spoke_candidate_crd=absent
+spoke_candidate_constraint=absent
+spoke_sample_pod=absent
+spoke_gatekeeper_audit=1/1
+spoke_gatekeeper_controller=3/3
+spoke_gatekeeper_nonrunning_pods=0
+spoke_admission_smoke_final=configmap/gatekeeper-policy-dryrun-final-spoke
+```
+
+## Residual Risks
+
+No Gatekeeper policy enforcement is active yet.
+
+The constraint instance has not been evaluated by Gatekeeper because its
+generated CRD requires a persisted template.
+
+Gatekeeper still lacks durable disconnected image mirror coverage.
+
+## Next Gate
+
+The recommended next gate is:
+
+```text
+OP-GF-OPERATORS-15: Gatekeeper scoped dry-run policy canary
+```
