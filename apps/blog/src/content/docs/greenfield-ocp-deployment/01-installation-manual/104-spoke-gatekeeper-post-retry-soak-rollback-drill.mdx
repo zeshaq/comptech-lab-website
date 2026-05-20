@@ -1,0 +1,235 @@
+---
+title: "Installation Manual - 104 Spoke Gatekeeper post-retry rollback drill"
+sidebar_label: "104 Spoke Gatekeeper rollback drill"
+description: "Spoke Gatekeeper post-retry soak, GitOps rollback, prune validation, restore, and post-restore soak."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-13`, the `spoke-dc-v7` Gatekeeper
+post-retry soak and rollback drill.
+
+The drill succeeded. The spoke Gatekeeper operand stayed healthy during the
+pre-rollback soak, was pruned cleanly through GitOps rollback, and returned to
+the same no-constraints fail-open state after restore.
+
+No Gatekeeper policies, constraint templates, constraints, or mutation
+resources were created.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-13` / `#425` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-12` / `#424` |
+
+## Access Path
+
+Live checks and GitOps reconciliation used:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Spoke kubeconfig on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+```
+
+## Baseline
+
+The drill started from the successful `OP-GF-OPERATORS-12` restored state:
+
+```text
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+hub_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+spoke_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+gatekeeper_cr=gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore webhookLog=INFO auditLog=INFO
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+validating_webhook_count=1
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_api_resources=none
+mutation_instances=none
+admission_smoke=configmap/gatekeeper-spoke-post-retry-preflight-smoke
+```
+
+## Pre-rollback Soak
+
+Six polls over roughly two and a half minutes stayed steady:
+
+```text
+hub_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+spoke_side_app=Synced Healthy 0e64c0886a26dfb7fd5f6cce1bb7173878fd1cd6
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+nonrunning_gatekeeper_pods=0
+validating_webhook_count=1
+constrainttemplate_instances=0
+```
+
+## Rollback
+
+Rollback platform GitOps commit:
+
+```text
+b12d362 Drill spoke Gatekeeper operand rollback
+```
+
+The rollback removed only the spoke Gatekeeper include from:
+
+```text
+clusters/spoke-dc-v7/security/kustomization.yaml
+```
+
+Diff:
+
+```diff
+-  - gatekeeper
+```
+
+The operand manifest path remained in the repository, and the narrow Argo RBAC
+grant for `operator.gatekeeper.sh/gatekeepers` remained in desired state.
+
+Render validation:
+
+```text
+oc kustomize clusters/spoke-dc-v7 rendered 2398 lines
+rendered Gatekeeper count=0
+rendered constraint/mutation references=none
+git diff --check passed
+```
+
+## Prune Validation
+
+Argo pruned the operand resources:
+
+```text
+hub_side_app=Synced Healthy b12d362f9a655e59515a89c70d61eb852248c190
+spoke_side_app=Synced Healthy b12d362f9a655e59515a89c70d61eb852248c190
+gatekeeper_cr_count=0
+gatekeeper_webhook_count=0
+operand_deployments=0
+operand_replicasets=0
+operand_pods=0
+gatekeeper_operator_controller=1/1
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_api_resources=none
+mutation_instances=none
+admission_smoke_after_prune=configmap/gatekeeper-spoke-rollback-prune-smoke
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+```
+
+The live Argo RBAC grant stayed present:
+
+```text
+clusterrole.rbac.authorization.k8s.io/argocd-spoke-foundation-extensions
+apiGroups=["operator.gatekeeper.sh"] resources=["gatekeepers"] verbs=["get","list","watch","create","update","patch","delete"]
+```
+
+## Restore
+
+Restore platform GitOps commit:
+
+```text
+9723404 Restore spoke Gatekeeper operand after rollback drill
+```
+
+Render validation:
+
+```text
+oc kustomize clusters/spoke-dc-v7 rendered 2414 lines
+rendered Gatekeeper count=1
+rendered constraint/mutation references=none
+git diff --check passed
+```
+
+The platform GitOps changelog commit is:
+
+```text
+4f8c431 Document spoke Gatekeeper rollback drill
+```
+
+The app path remained at restore commit `9723404` because the changelog commit
+did not alter the rendered application path.
+
+## Restore Validation
+
+The operand returned to the expected no-constraints fail-open posture:
+
+```text
+hub_side_app=Synced Healthy 9723404952158def9a8b5b57bc5039cf573f37c8
+spoke_side_app=Synced Healthy 9723404952158def9a8b5b57bc5039cf573f37c8
+gatekeeper_cr=gatekeeper validating=Enabled mutating=Disabled failurePolicy=Ignore webhookLog=INFO auditLog=INFO
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+gatekeeper-operator-controller=1/1
+validating_webhook_count=1
+validation.gatekeeper.sh=Ignore
+check-ignore-label.gatekeeper.sh=Ignore
+mutating_webhook_count=0
+constrainttemplate_instances=0
+constraint_api_resources=none
+constraint_instances=none
+mutation_api_resources=none
+mutation_instances=none
+admission_smoke_restored=configmap/gatekeeper-spoke-restore-final-smoke
+spoke_cv=4.20.18 available=True progressing=False failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=none
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+```
+
+Restored pods:
+
+```text
+gatekeeper-audit-898885b67-ljjzq                 Running spoke-dc-v7-worker-0
+gatekeeper-controller-manager-59c5f66764-86xs4   Running spoke-dc-v7-worker-1
+gatekeeper-controller-manager-59c5f66764-cdp4c   Running spoke-dc-v7-worker-2
+gatekeeper-controller-manager-59c5f66764-r4th8   Running spoke-dc-v7-worker-0
+gatekeeper-operator-controller-c7d5c4476-hwvxb   Running spoke-dc-v7-worker-0
+```
+
+## Post-restore Soak
+
+Six polls over roughly two and a half minutes stayed steady:
+
+```text
+hub_side_app=Synced Healthy 9723404952158def9a8b5b57bc5039cf573f37c8
+spoke_side_app=Synced Healthy 9723404952158def9a8b5b57bc5039cf573f37c8
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+nonrunning_gatekeeper_pods=0
+validating_webhook_count=1
+constrainttemplate_instances=0
+```
+
+## Residual Risks
+
+`spoke-dc-v7` now has a rollback-proven fail-open Gatekeeper admission
+surface, but it still has no policies. No enforcement is active.
+
+Gatekeeper still lacks durable disconnected image mirror coverage. Current
+workers have already proven image readiness, but worker rebuilds or cache loss
+can reintroduce pull risk.
+
+Do not add constraint templates or constraints until a separate issue-backed
+gate introduces and validates specific policy objects.
