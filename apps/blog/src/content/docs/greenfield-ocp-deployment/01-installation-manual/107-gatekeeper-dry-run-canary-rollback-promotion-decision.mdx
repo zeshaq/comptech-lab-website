@@ -1,0 +1,207 @@
+---
+title: "Installation Manual - 107 Gatekeeper dry-run canary rollback and promotion decision"
+sidebar_label: "107 Gatekeeper rollback decision"
+description: "Rollback and restore drill for the scoped Gatekeeper dry-run canary, with the decision to keep it in dry-run."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-16`, the rollback and promotion
+decision gate for the scoped Gatekeeper dry-run canary introduced in chapter
+106.
+
+The result is deliberately conservative: rollback and restore are proven, and
+the policy remains scoped dry-run only. It is not promoted to deny.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-16` / `#429` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-15` / `#428` |
+
+## Preflight
+
+The bootstrap clone started at the OP-GF-OPERATORS-15 documentation head:
+
+```text
+bootstrap_head=3a8017c
+```
+
+Both Argo CD application views were healthy:
+
+```text
+hub_app=Synced Healthy 3a8017c506ae07ded86d6250b18417f8af2e1321
+spoke_app=Synced Healthy 3a8017c506ae07ded86d6250b18417f8af2e1321
+```
+
+Both clusters were healthy:
+
+```text
+hub clusterversion=4.20.18 Available=True Progressing=False Failing=False nodes=3/3 nonsteady_co=0 nonrunning_pods=0 pending_csrs=0
+spoke clusterversion=4.20.18 Available=True Progressing=False Failing=False nodes=6/6 nonsteady_co=0 nonrunning_pods=0 pending_csrs=0
+```
+
+The spoke canary was present:
+
+```text
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate=k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint=dryrun-disallow-privileged-containers action=dryrun selector=true totalViolations=0
+spoke_constraint_api_resources=k8sdisallowprivilegedcontainers
+spoke_mutation_api_resources=
+```
+
+Admission smoke dry-runs passed on both clusters.
+
+## Rollback Drill
+
+The rollback was split into two commits so the generated constraint API was
+removed cleanly.
+
+First, the constraint instance was removed:
+
+```text
+f717818 Rollback spoke Gatekeeper dry-run constraint
+```
+
+Validation confirmed the constraint was pruned while the namespace,
+`ConstraintTemplate`, and generated CRD remained:
+
+```text
+hub_app=Synced Healthy f717818e50062e395e71b6c96e652136615faed6
+spoke_app=Synced Healthy f717818e50062e395e71b6c96e652136615faed6
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate.templates.gatekeeper.sh/k8sdisallowprivilegedcontainers
+customresourcedefinition.apiextensions.k8s.io/k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh
+constraint=absent
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+nonrunning_gatekeeper_pods=0
+```
+
+Then, the namespace and `ConstraintTemplate` were removed:
+
+```text
+e877451 Rollback spoke Gatekeeper dry-run template canary
+```
+
+Validation confirmed the canary was fully pruned:
+
+```text
+hub_app=Synced Healthy e877451462205572721cffa2af85a54d11a1991b
+spoke_app=Synced Healthy e877451462205572721cffa2af85a54d11a1991b
+namespace=absent
+constrainttemplate=absent
+crd=absent
+constraint=absent
+spoke_constraint_api_resources=
+spoke_mutation_api_resources=
+hub gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+spoke gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+```
+
+Admission smoke dry-runs still passed on both clusters.
+
+## Restore Drill
+
+Restore also used two commits.
+
+First, the namespace and `ConstraintTemplate` were restored:
+
+```text
+654e242 Restore spoke Gatekeeper dry-run template canary
+```
+
+Validation confirmed the generated CRD returned before the constraint:
+
+```text
+hub_app=Synced Healthy 654e2421ed0a026e072305b36f2cfd07888b8851
+spoke_app=Synced Healthy 654e2421ed0a026e072305b36f2cfd07888b8851
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate.templates.gatekeeper.sh/k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint=absent
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+```
+
+Then, the dry-run constraint was restored:
+
+```text
+1a519ff Restore spoke Gatekeeper dry-run constraint canary
+```
+
+Final validation confirmed the same safe posture as chapter 106:
+
+```text
+hub_app=Synced Healthy 1a519ffa60c5d03161e796d4a4423ba4600c823b
+spoke_app=Synced Healthy 1a519ffa60c5d03161e796d4a4423ba4600c823b
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate=k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint=dryrun-disallow-privileged-containers action=dryrun selector=true
+spoke_constraint_api_resources=k8sdisallowprivilegedcontainers
+spoke_mutation_api_resources=
+```
+
+Gatekeeper stayed ready:
+
+```text
+hub gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+hub nonrunning_gatekeeper_pods=0
+spoke gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+spoke nonrunning_gatekeeper_pods=0
+```
+
+The Gatekeeper audit status refreshed after restore:
+
+```text
+totalViolations=0
+auditTimestamp=2026-05-20T01:43:30Z
+```
+
+Privileged Pod server-side dry-run samples were still admitted in both the
+canary namespace and `default`:
+
+```text
+pod/gatekeeper-dryrun-restore-canary
+pod/gatekeeper-dryrun-restore-default
+```
+
+That proves the restored policy remains non-enforcing.
+
+## Promotion Decision
+
+Do not promote `K8sDisallowPrivilegedContainers` to deny yet.
+
+The reason is operational, not a policy failure:
+
+- rollback and restore are proven;
+- dry-run status reports zero violations;
+- the canary namespace has no meaningful workload population yet;
+- the hub remains intentionally no-policy;
+- Gatekeeper still lacks durable disconnected image mirror coverage.
+
+The current state is a good safe pause point: one scoped dry-run policy is
+live, rollback is proven, and no deny enforcement is active.
+
+## Residual Risks
+
+Gatekeeper deny enforcement is still not active.
+
+The dry-run canary has not produced real workload signal.
+
+Gatekeeper image supply still depends on current pull/cache readiness rather
+than durable mirror coverage.
+
+## Next Gate
+
+If continuing immediately, the recommended next gate is:
+
+```text
+OP-GF-OPERATORS-17: Gatekeeper durable image mirror coverage
+```
