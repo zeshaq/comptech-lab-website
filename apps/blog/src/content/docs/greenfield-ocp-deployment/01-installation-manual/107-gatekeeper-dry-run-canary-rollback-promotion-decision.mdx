@@ -1,32 +1,72 @@
 ---
-title: "Installation Manual - 107 Gatekeeper policy gates batch closeout"
-sidebar_label: "107 Gatekeeper policy closeout"
-description: "Rollback, restore, image mirror hardening, and final dry-run decision for the scoped Gatekeeper policy canary."
+title: "Installation Manual - 94 Gatekeeper rollout and policy closeout"
+sidebar_label: "94 Gatekeeper rollout and policy closeout"
+description: "Consolidated Gatekeeper operator, operand, rollback, image mirror, dry-run policy, and final non-enforcement decision for the v7 greenfield clusters."
 last_reviewed: 2026-05-20
 draft: false
 ---
 
-This chapter records the final Gatekeeper policy-gates batch for the scoped
-dry-run canary introduced in chapter 106.
+This chapter is the single public installation-manual entry for the completed
+Gatekeeper rollout and policy gates.
 
-It covers two linked gates in one manual entry:
+The original detailed Gatekeeper chapters `94` through `106` are archived as
+draft source pages and their old public routes redirect here. The operational
+evidence remains in the gate reports, GitHub issues, and session records. The
+manual now keeps the durable state and replay guidance in one place instead of
+spreading the sequence across many sidebar entries.
 
-- `OP-GF-OPERATORS-16`: rollback, restore, and promotion decision;
-- `OP-GF-OPERATORS-17`: durable Gatekeeper image mirror coverage and batch
-  closeout.
-
-The result is deliberately conservative: rollback and restore are proven,
-durable spoke-side image mirror coverage is in place, and the policy remains
-scoped dry-run only. It is not promoted to deny.
+The result is deliberately conservative: both hub and spoke Gatekeeper operands
+were installed and rollback-tested, durable spoke-side Gatekeeper image mirror
+coverage is in place, and the only policy remains scoped dry-run on the spoke.
+No deny enforcement is active.
 
 ## Governance
 
 | Field | Value |
 | --- | --- |
-| Issue | `OP-GF-OPERATORS-16` / `#429`; `OP-GF-OPERATORS-17` / `#430` |
+| Issue range | `#415` through `#430` |
+| Consolidation issue | `OP-GF-DOCS-25` / `#431` |
 | Milestone | `Workspace Governance` |
 | Governing ADR | `ADR 0016` |
-| Predecessor | `OP-GF-OPERATORS-15` / `#428` |
+| Gate range | `OP-GF-OPERATORS-03` through `OP-GF-OPERATORS-17` |
+| Public scope | One consolidated installation-manual chapter |
+
+## Consolidated Gate Sequence
+
+| Gate | Issue | Durable outcome |
+| --- | --- | --- |
+| `OP-GF-OPERATORS-03` | `#415` | Validated the Gatekeeper package, install shape, and dry-run design without changing GitOps or live clusters. |
+| `OP-GF-OPERATORS-04` | `#416` | Installed the Red Hat Gatekeeper Operator on `hub-dc-v7`, stopping before any operand or policy. |
+| `OP-GF-OPERATORS-05` | `#417` | Installed the Red Hat Gatekeeper Operator on `spoke-dc-v7`, stopping before any operand or policy. |
+| `OP-GF-OPERATORS-06` | `#418` | Designed the hub no-constraints operand rollout and rollback path before creating the live operand. |
+| `OP-GF-OPERATORS-07` | `#419` | Created the hub `Gatekeeper/gatekeeper` operand with no constraints or mutation configs. |
+| `OP-GF-OPERATORS-08` | `#420` | Proved hub operand rollback and restore through GitOps. |
+| `OP-GF-OPERATORS-09` | `#421` | Designed the spoke no-constraints operand rollout and rollback path. |
+| `OP-GF-OPERATORS-10` | `#422` | Attempted the spoke operand canary, found image readiness failure, and rolled back cleanly. |
+| `OP-GF-OPERATORS-11` | `#423` | Confirmed spoke Gatekeeper operand image readiness before retrying. |
+| `OP-GF-OPERATORS-12` | `#424` | Re-ran the spoke operand canary successfully with no constraints or mutation configs. |
+| `OP-GF-OPERATORS-13` | `#425` | Proved spoke operand soak, rollback, prune, restore, and post-restore health. |
+| `OP-GF-OPERATORS-14` | `#427` | Designed the first privileged-container policy candidate without persisting policy objects. |
+| `OP-GF-OPERATORS-15` | `#428` | Persisted one spoke-scoped dry-run policy canary in a labeled namespace. |
+| `OP-GF-OPERATORS-16` | `#429` | Proved dry-run canary rollback and restore, then kept the policy non-enforcing. |
+| `OP-GF-OPERATORS-17` | `#430` | Added durable spoke Gatekeeper image mirror coverage and closed the policy-gates batch. |
+
+## Final Public Manual State
+
+The installation manual now exposes one Gatekeeper entry:
+
+```text
+94 Gatekeeper rollout and policy closeout
+```
+
+The archived detailed chapters remain in source for audit and future
+reconstruction, but they are `draft: true` and are no longer generated as
+public manual pages. Old public chapter URLs redirect to this consolidated
+chapter.
+
+The sections below keep the final rollback, restore, image mirror, and
+promotion-decision evidence from the closing batch because that is the state
+future work must start from.
 
 ## Preflight
 
