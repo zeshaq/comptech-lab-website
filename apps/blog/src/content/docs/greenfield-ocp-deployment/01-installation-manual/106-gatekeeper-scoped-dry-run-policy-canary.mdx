@@ -1,0 +1,178 @@
+---
+title: "Installation Manual - 106 Gatekeeper scoped dry-run policy canary"
+sidebar_label: "106 Gatekeeper scoped dry-run canary"
+description: "First persisted Gatekeeper dry-run policy canary on the spoke cluster, scoped to a labeled namespace."
+last_reviewed: 2026-05-20
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-15`, the first persisted Gatekeeper
+policy canary after the dry-run-only candidate design.
+
+The canary deliberately stays non-enforcing. It persists one
+`ConstraintTemplate`, one generated constraint kind, and one dry-run
+constraint scoped only to a labeled namespace on `spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-OPERATORS-15` / `#428` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Predecessor | `OP-GF-OPERATORS-14` / `#427` |
+
+## Scope
+
+The canary uses the candidate from chapter 105:
+
+```text
+K8sDisallowPrivilegedContainers
+```
+
+The policy flags Pods whose regular, init, or ephemeral containers set:
+
+```yaml
+securityContext:
+  privileged: true
+```
+
+The constraint is dry-run only:
+
+```yaml
+spec:
+  enforcementAction: dryrun
+```
+
+It only matches namespaces labeled:
+
+```text
+gatekeeper.comptech-lab.com/dryrun-candidate=true
+```
+
+The first labeled namespace is:
+
+```text
+gatekeeper-policy-canary
+```
+
+No hub policy object, deny enforcement, mutation config, broad namespace
+selector, OADP object, node drain, or storage object was added.
+
+## GitOps Rollout
+
+The rollout was split into two functional commits so Gatekeeper could create
+the generated constraint CRD before Argo CD applied the constraint instance.
+
+Step 1 added the canary namespace, the `ConstraintTemplate`, and narrow Argo
+CD RBAC:
+
+```text
+196fad3 Add spoke Gatekeeper dry-run template canary
+```
+
+After Step 1 reconciled, `spoke-dc-v7` had:
+
+```text
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate=k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint_count=0
+gatekeeper-audit=1/1
+gatekeeper-controller-manager=3/3
+nonrunning_gatekeeper_pods=0
+```
+
+Step 2 added the dry-run constraint:
+
+```text
+4403e53 Add spoke Gatekeeper dry-run constraint canary
+```
+
+The platform changelog was updated separately:
+
+```text
+3a8017c Document spoke Gatekeeper dry-run canary
+```
+
+## Final Validation
+
+Both Argo CD application views reconciled the functional change:
+
+```text
+hub_app=Synced Healthy 4403e53022b7ae790be2ea0a67e4cedfe9b1a0d0
+spoke_app=Synced Healthy 4403e53022b7ae790be2ea0a67e4cedfe9b1a0d0
+```
+
+Both clusters stayed healthy:
+
+```text
+hub_clusterversion=4.20.18 Available=True Progressing=False Failing=False
+hub_nodes_ready=3/3
+hub_nonsteady_clusteroperators=0
+hub_nonrunning_pods=0
+hub_pending_csrs=0
+spoke_clusterversion=4.20.18 Available=True Progressing=False Failing=False
+spoke_nodes_ready=6/6
+spoke_nonsteady_clusteroperators=0
+spoke_nonrunning_pods=0
+spoke_pending_csrs=0
+```
+
+The spoke canary objects are present and scoped:
+
+```text
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate=k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint=dryrun-disallow-privileged-containers action=dryrun selector=true
+constraint_status_total_violations=0
+spoke_constraint_api_resources=k8sdisallowprivilegedcontainers
+spoke_mutation_api_resources=
+```
+
+Gatekeeper remained ready on both clusters:
+
+```text
+hub gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+hub nonrunning_gatekeeper_pods=0
+spoke gatekeeper-audit=1/1 gatekeeper-controller-manager=3/3
+spoke nonrunning_gatekeeper_pods=0
+```
+
+Harmless admission smoke dry-runs passed:
+
+```text
+configmap/gatekeeper-scoped-canary-final-hub
+configmap/gatekeeper-scoped-canary-final-spoke
+```
+
+Privileged Pod samples were admitted with server-side dry-run in both the
+canary namespace and `default`, proving the canary did not become an
+enforcing deny policy:
+
+```text
+pod/gatekeeper-dryrun-privileged-canary
+pod/gatekeeper-dryrun-privileged-default
+```
+
+The API server also returned the expected OpenShift Pod Security warning for
+the privileged sample. The warning did not block admission dry-run.
+
+## Residual Risks
+
+Gatekeeper policy enforcement is still not active. This gate creates audit
+surface only.
+
+The policy has only been introduced on `spoke-dc-v7`. The hub remains in the
+no-policy Gatekeeper posture.
+
+Gatekeeper still lacks durable disconnected image mirror coverage.
+
+## Next Gate
+
+The recommended next gate is:
+
+```text
+OP-GF-OPERATORS-16: Gatekeeper dry-run canary rollback and promotion decision
+```
