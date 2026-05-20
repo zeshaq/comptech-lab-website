@@ -1,23 +1,29 @@
 ---
-title: "Installation Manual - 107 Gatekeeper dry-run canary rollback and promotion decision"
-sidebar_label: "107 Gatekeeper rollback decision"
-description: "Rollback and restore drill for the scoped Gatekeeper dry-run canary, with the decision to keep it in dry-run."
+title: "Installation Manual - 107 Gatekeeper policy gates batch closeout"
+sidebar_label: "107 Gatekeeper policy closeout"
+description: "Rollback, restore, image mirror hardening, and final dry-run decision for the scoped Gatekeeper policy canary."
 last_reviewed: 2026-05-20
 draft: false
 ---
 
-This chapter records `OP-GF-OPERATORS-16`, the rollback and promotion
-decision gate for the scoped Gatekeeper dry-run canary introduced in chapter
-106.
+This chapter records the final Gatekeeper policy-gates batch for the scoped
+dry-run canary introduced in chapter 106.
 
-The result is deliberately conservative: rollback and restore are proven, and
-the policy remains scoped dry-run only. It is not promoted to deny.
+It covers two linked gates in one manual entry:
+
+- `OP-GF-OPERATORS-16`: rollback, restore, and promotion decision;
+- `OP-GF-OPERATORS-17`: durable Gatekeeper image mirror coverage and batch
+  closeout.
+
+The result is deliberately conservative: rollback and restore are proven,
+durable spoke-side image mirror coverage is in place, and the policy remains
+scoped dry-run only. It is not promoted to deny.
 
 ## Governance
 
 | Field | Value |
 | --- | --- |
-| Issue | `OP-GF-OPERATORS-16` / `#429` |
+| Issue | `OP-GF-OPERATORS-16` / `#429`; `OP-GF-OPERATORS-17` / `#430` |
 | Milestone | `Workspace Governance` |
 | Governing ADR | `ADR 0016` |
 | Predecessor | `OP-GF-OPERATORS-15` / `#428` |
@@ -174,20 +180,110 @@ pod/gatekeeper-dryrun-restore-default
 
 That proves the restored policy remains non-enforcing.
 
+## Image Mirror Batch
+
+The remaining policy-gate prerequisite was durable Gatekeeper image mirror
+coverage on the spoke. The hub already had exact coverage for the Gatekeeper
+source repository:
+
+```text
+hub gatekeeper_idms_source=registry.redhat.io/gatekeeper mirrors=["quay.v7.comptech-lab.com/openshift-operators/gatekeeper"]
+```
+
+The spoke only had install-time OpenShift release image mirrors, so it lacked
+explicit coverage for `registry.redhat.io/gatekeeper`.
+
+The batch added one narrow spoke-side mirror set:
+
+```text
+c449e3f Add spoke Gatekeeper image mirror coverage
+```
+
+The desired object is:
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: idms-gatekeeper
+spec:
+  imageDigestMirrors:
+    - mirrors:
+        - quay.v7.comptech-lab.com/openshift-operators/gatekeeper
+      source: registry.redhat.io/gatekeeper
+```
+
+It is intentionally scoped to the Gatekeeper image repository. It does not add
+broad spoke mirror coverage, deny enforcement, mutation configs, hub
+constraints, backup objects, node drains, or storage objects.
+
+The functional GitOps revision converged:
+
+```text
+hub_app_spoke_cluster_config=Synced Healthy c449e3f91f3829bc943f65f2d61714aaeb7b4d9d
+spoke_app_spoke_cluster_config=Synced Healthy c449e3f91f3829bc943f65f2d61714aaeb7b4d9d
+```
+
+The platform GitOps changelog was then updated:
+
+```text
+86d9dae Document Gatekeeper policy batch closeout
+bootstrap_clone_head=86d9dae
+```
+
+Final cluster validation stayed clean:
+
+```text
+hub clusterversion=4.20.18 Available=True Progressing=False Failing=False nodes=3/3 nonsteady_co=0 nonrunning_pods=0 pending_csrs=0
+spoke clusterversion=4.20.18 Available=True Progressing=False Failing=False nodes=6/6 nonsteady_co=0 nonrunning_pods=0 pending_csrs=0
+spoke master_mcp=Updated=True Updating=False Degraded=False
+spoke worker_mcp=Updated=True Updating=False Degraded=False
+```
+
+The spoke now has exact Gatekeeper mirror coverage:
+
+```text
+idms_names=idms-gatekeeper image-digest-mirror
+gatekeeper_idms_source=registry.redhat.io/gatekeeper mirrors=["quay.v7.comptech-lab.com/openshift-operators/gatekeeper"]
+```
+
+The policy canary remained dry-run only:
+
+```text
+namespace=gatekeeper-policy-canary label=true
+constrainttemplate.templates.gatekeeper.sh/k8sdisallowprivilegedcontainers
+crd=k8sdisallowprivilegedcontainers.constraints.gatekeeper.sh established=True
+constraint_action=dryrun selector=true violations=0 audit=2026-05-20T02:04:30Z
+```
+
+Admission dry-runs still passed:
+
+```text
+hub_smoke=configmap/gatekeeper-policy-batch-hub
+spoke_smoke=configmap/gatekeeper-policy-batch-spoke
+canary_privileged=pod/gatekeeper-policy-batch-canary
+default_privileged=pod/gatekeeper-policy-batch-default
+```
+
+OpenShift returned the expected Pod Security warning for the privileged
+canary sample, but Gatekeeper did not block it because the constraint remains
+dry-run.
+
 ## Promotion Decision
 
-Do not promote `K8sDisallowPrivilegedContainers` to deny yet.
+Do not promote `K8sDisallowPrivilegedContainers` to deny in this batch.
 
 The reason is operational, not a policy failure:
 
 - rollback and restore are proven;
+- durable spoke-side Gatekeeper image mirror coverage now exists;
 - dry-run status reports zero violations;
 - the canary namespace has no meaningful workload population yet;
-- the hub remains intentionally no-policy;
-- Gatekeeper still lacks durable disconnected image mirror coverage.
+- the hub remains intentionally no-policy.
 
-The current state is a good safe pause point: one scoped dry-run policy is
-live, rollback is proven, and no deny enforcement is active.
+The current state is the intended closeout point for the policy gates: one
+scoped dry-run policy is live, rollback is proven, image mirror coverage is in
+place, and no deny enforcement is active.
 
 ## Residual Risks
 
@@ -195,13 +291,13 @@ Gatekeeper deny enforcement is still not active.
 
 The dry-run canary has not produced real workload signal.
 
-Gatekeeper image supply still depends on current pull/cache readiness rather
-than durable mirror coverage.
+Future enforcement still needs explicit blast-radius review and a rollback
+window.
 
-## Next Gate
+## Batch Result
 
-If continuing immediately, the recommended next gate is:
+No additional Gatekeeper policy prerequisite gates remain for the current
+scoped dry-run posture.
 
-```text
-OP-GF-OPERATORS-17: Gatekeeper durable image mirror coverage
-```
+Any future move from dry-run to deny is a separate enforcement gate, not a
+continuation of this batch.
