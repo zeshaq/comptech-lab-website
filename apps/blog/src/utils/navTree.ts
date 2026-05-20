@@ -15,6 +15,22 @@ type LearnItem = CollectionEntry<"learn">;
 const prettify = (s: string) =>
   s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toLowerCase());
 
+const sortCollator = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+const compareSortText = (a: string, b: string) => sortCollator.compare(a, b);
+
+const compareNavNodes = (a: NavNode, b: NavNode) =>
+  compareSortText(a.sortKey ?? a.label, b.sortKey ?? b.label);
+
+const sortRecursive = (nodes: NavNode[] | undefined) => {
+  if (!nodes) return;
+  nodes.sort(compareNavNodes);
+  for (const n of nodes) sortRecursive(n.children);
+};
+
 /** Strip a leading "NN-" or "NN_" numeric prefix, used for sort-only segments. */
 const stripPrefix = (s: string) => s.replace(/^\d+[-_]/, "");
 
@@ -28,7 +44,7 @@ export function stripIdPrefixes(id: string): string {
 
 export function buildTree(items: BlogItem[], base: string): NavNode[] {
   const root: NavNode = { label: "", children: [] };
-  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...items].sort((a, b) => compareSortText(a.id, b.id));
 
   for (const item of sorted) {
     const parts = item.id.split("/");
@@ -52,12 +68,6 @@ export function buildTree(items: BlogItem[], base: string): NavNode[] {
     });
   }
 
-  // Sort children at every level by sortKey (so 01-foo comes before 02-bar).
-  const sortRecursive = (nodes: NavNode[] | undefined) => {
-    if (!nodes) return;
-    nodes.sort((a, b) => (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label));
-    for (const n of nodes) sortRecursive(n.children);
-  };
   sortRecursive(root.children);
 
   return root.children ?? [];
@@ -66,7 +76,7 @@ export function buildTree(items: BlogItem[], base: string): NavNode[] {
 /** Like buildTree but for the `docs` collection — accepts a per-item `sidebar_label` override. */
 export function buildDocsTree(items: DocItem[], base: string): NavNode[] {
   const root: NavNode = { label: "", children: [] };
-  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...items].sort((a, b) => compareSortText(a.id, b.id));
 
   for (const item of sorted) {
     const parts = item.id.split("/");
@@ -91,11 +101,6 @@ export function buildDocsTree(items: DocItem[], base: string): NavNode[] {
     });
   }
 
-  const sortRecursive = (nodes: NavNode[] | undefined) => {
-    if (!nodes) return;
-    nodes.sort((a, b) => (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label));
-    for (const n of nodes) sortRecursive(n.children);
-  };
   sortRecursive(root.children);
 
   return root.children ?? [];
@@ -119,7 +124,7 @@ export function buildModuleTree(
   const scoped = items.filter((it) => it.id.startsWith(prefix));
 
   const root: NavNode = { label: "", children: [] };
-  const sorted = [...scoped].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...scoped].sort((a, b) => compareSortText(a.id, b.id));
 
   for (const item of sorted) {
     // Walk only the segments *inside* the module folder.
@@ -146,11 +151,6 @@ export function buildModuleTree(
     });
   }
 
-  const sortRecursive = (nodes: NavNode[] | undefined) => {
-    if (!nodes) return;
-    nodes.sort((a, b) => (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label));
-    for (const n of nodes) sortRecursive(n.children);
-  };
   sortRecursive(root.children);
 
   return root.children ?? [];
@@ -170,7 +170,7 @@ export function buildLearnTrackTree(
   const scoped = items.filter((it) => it.id.startsWith(prefix));
 
   const root: NavNode = { label: "", children: [] };
-  const sorted = [...scoped].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...scoped].sort((a, b) => compareSortText(a.id, b.id));
 
   for (const item of sorted) {
     const inner = item.id.slice(prefix.length);
@@ -196,11 +196,6 @@ export function buildLearnTrackTree(
     });
   }
 
-  const sortRecursive = (nodes: NavNode[] | undefined) => {
-    if (!nodes) return;
-    nodes.sort((a, b) => (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label));
-    for (const n of nodes) sortRecursive(n.children);
-  };
   sortRecursive(root.children);
 
   return root.children ?? [];
@@ -214,7 +209,7 @@ export function buildLearnTrackTree(
  */
 export function buildLearnTree(items: LearnItem[], base: string): NavNode[] {
   const root: NavNode = { label: "", children: [] };
-  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...items].sort((a, b) => compareSortText(a.id, b.id));
 
   for (const item of sorted) {
     const parts = item.id.split("/");
@@ -248,11 +243,6 @@ export function buildLearnTree(items: LearnItem[], base: string): NavNode[] {
     });
   }
 
-  const sortRecursive = (nodes: NavNode[] | undefined) => {
-    if (!nodes) return;
-    nodes.sort((a, b) => (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label));
-    for (const n of nodes) sortRecursive(n.children);
-  };
   sortRecursive(root.children);
 
   return root.children ?? [];
