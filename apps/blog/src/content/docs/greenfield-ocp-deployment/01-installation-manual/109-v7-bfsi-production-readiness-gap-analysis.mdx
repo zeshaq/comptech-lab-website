@@ -1,0 +1,200 @@
+---
+title: "Installation Manual - 109 v7 BFSI production-readiness gap analysis"
+sidebar_label: "109 v7 BFSI readiness gap analysis"
+description: "Current v7 OpenShift gap analysis against a real-life BFSI production-grade deployment, with scanner-compliance boundary, domain scorecard, and roadmap."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-ASSESSMENT-22` and `OP-GF-DOCS-27`, the v7
+BFSI production-grade gap analysis and its publication into the Greenfield OCP
+Deployment installation manual.
+
+## Decision Answer
+
+| Question | Answer |
+| --- | --- |
+| Is OpenShift v7 successfully deployed? | Yes. |
+| Are the active v7 clusters scanner-clean for the targeted CIS and PCI DSS 4 OpenShift Compliance Operator profiles? | Yes. |
+| Is the platform real-life BFSI production-grade today? | No. |
+
+The current platform is a strong lab / pre-production foundation. It is
+suitable for platform engineering, internal demos, non-regulated workload
+trials, compliance-evidence practice, and controlled non-production
+application onboarding.
+
+It is not yet suitable for customer-facing banking production, cardholder data
+environment workloads, payment rails, core banking workloads, or systems that
+require formal PCI DSS ROC/AOC, regulator examination evidence, or bank-grade
+operational resilience.
+
+## Assessment Basis
+
+Internal evidence:
+
+- `OP-GF-COMPLIANCE-21`: v7 CIS and PCI DSS 4 scanner closure.
+- `OP-GF-ASSESSMENT-22`: BFSI production-grade gap analysis.
+- Active clusters: `hub-dc-v7` and `spoke-dc-v7`.
+- Historical v6 clusters are retired/gone and are not part of this
+  assessment.
+
+External reference baseline:
+
+- [PCI DSS overview, PCI Security Standards Council](https://www.pcisecuritystandards.org/standards/pci-dss/)
+- [PCI DSS v4.0.1 publication note, PCI Security Standards Council](https://blog.pcisecuritystandards.org/just-published-pci-dss-v4-0-1)
+- [PCI DSS v4.0.1 ROC template release, PCI Security Standards Council](https://blog.pcisecuritystandards.org/pci-ssc-releases-roc-template-for-pci-dss-v4-0-1)
+- [NIST Cybersecurity Framework 2.0](https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf)
+- [FFIEC Architecture, Infrastructure, and Operations](https://ithandbook.ffiec.gov/it-booklets/architecture-infrastructure-and-operations/)
+- [FFIEC Business Continuity Management](https://ithandbook.ffiec.gov/it-booklets/business-continuity-management)
+
+## Current v7 Strengths
+
+- `hub-dc-v7` and `spoke-dc-v7` are the active clusters.
+- GitOps source of truth is GitHub-backed and live through Argo CD.
+- Final compliance closure evidence at `2026-05-21T13:14:54Z` showed:
+  - hub and spoke Argo CD Applications `Synced / Healthy`;
+  - hub and spoke ClusterOperators steady;
+  - hub and spoke MachineConfigPools updated and not degraded;
+  - all targeted hub and spoke CIS scans `DONE / COMPLIANT`;
+  - all targeted hub and spoke PCI DSS 4 scans `DONE / COMPLIANT`;
+  - zero relevant `FAIL` check results;
+  - File Integrity node statuses `Succeeded` on all active nodes.
+- Security and platform foundations exist or have started:
+  - RHACS as the selected security control plane;
+  - Gatekeeper operator and canary policy history;
+  - Compliance Operator with CIS and PCI DSS 4 profiles;
+  - File Integrity Operator;
+  - OADP backup and restore validation history;
+  - Vault R1 for secrets custody;
+  - external Quay and Nexus services;
+  - Logging/Loki, observability, network observability, tracing, and mesh
+    operators at operator-only foundation level where documented.
+
+## Evidence Boundary
+
+The current evidence closes OpenShift scanner findings. It does not establish
+formal BFSI production readiness.
+
+Important limitations:
+
+- No formal PCI DSS ROC/AOC/QSA attestation exists.
+- No cardholder data environment scope has been formally defined or tested.
+- Compliance Operator `MANUAL` controls remain evidence-attestation items:
+  - hub CIS: `21`
+  - hub PCI DSS 4 platform: `22`
+  - spoke CIS: `21`
+  - spoke PCI DSS 4 platform: `22`
+- Existing VM disk encryption is recorded as a lab exception and is not a
+  production BFSI posture.
+- HTPasswd remains a temporary lab break-glass identity source.
+- Many operators are installed as foundations only; their production operands,
+  tenancy, retention, policy, alerting, and escalation workflows are not fully
+  built.
+
+## Real BFSI Target Profile
+
+| Area | BFSI expectation |
+| --- | --- |
+| Scope | Production, non-production, CDE/non-CDE, regulated data flows, business owners, data classification, and third-party boundaries. |
+| Identity | Enterprise IdP, phishing-resistant MFA for privileged access, PAM, joiner/mover/leaver process, break-glass process, and regular access review. |
+| Segmentation | CDE zoning, DMZ design, firewall rules, route controls, egress control, NetworkPolicy, segmentation testing, and exception register. |
+| Perimeter | WAF, IPS/IDS, DDoS protection, hardened ingress, certificate lifecycle, and edge logging. |
+| Cryptography | HSM-backed key custody for regulated keys, documented key ceremonies, rotation, separation of duties, FIPS-mode decisions, and full disk encryption for production nodes where required. |
+| Resilience | Second site or equivalent recovery capability, defined RTO/RPO, offsite immutable backups, restore drills, failover exercises, and business continuity reporting. |
+| Monitoring | Central SIEM, 24x7 SOC or equivalent monitoring, alert triage runbooks, ticketing, retention, and tamper-evident audit evidence. |
+| Supply chain | Signed images, SBOMs, provenance, vulnerability SLAs, registry quarantine/promotion, admission enforcement, and third-party software risk review. |
+| Operations | ITSM, CAB/change approval, segregation of duties, SLOs, capacity management, patch windows, incident/problem management, and independent audit review. |
+| Applications | Workload golden paths, namespace tenancy, database patterns, DR patterns, secrets patterns, logging standards, and application resilience tests. |
+
+## Gap Scorecard
+
+Legend:
+
+- `Ready`: mostly in place and evidenced for the current scope.
+- `Partial`: component exists, but production operating model or evidence is
+  incomplete.
+- `Gap`: missing or explicitly outside current scope.
+
+| Domain | Current v7 state | BFSI target | Rating |
+| --- | --- | --- | --- |
+| OpenShift core platform | Hub and spoke are healthy, GitOps-managed, and scanner-clean. | Stable, supported, monitored platform with documented lifecycle and production SLOs. | Partial |
+| Compliance scanner posture | CIS and PCI DSS 4 OpenShift profiles are `COMPLIANT` with zero relevant failures. | Scanner evidence plus formal manual evidence, external scope validation, and assessor-reviewed control evidence. | Partial |
+| PCI DSS formal readiness | PCI DSS 4 profile closure exists. | ROC/AOC or applicable SAQ path, QSA/ISA review, CDE scope, policies, roles, evidence, and business-process controls. | Gap |
+| Governance and risk | GitHub issues, milestones, ADRs, session reports, and GitOps history are strong for a solo lab. | Board/senior-management risk governance, CAB, independent review, policy lifecycle, and regulator-ready evidence. | Gap |
+| Identity and MFA | HTPasswd remains temporary break-glass. | Enterprise IdP, MFA, PAM, least privilege, session recording for privileged operations, JML workflow, and periodic access review. | Gap |
+| Privileged access | Admin activity is tracked through issues and session reports, but not through enterprise PAM. | Named accounts, MFA, PAM checkout, approval, session logging, emergency access review, and segregation of duties. | Gap |
+| Network segmentation | Some Kubernetes policy and tailoring exists, but no formal CDE segmentation evidence. | Zone model, CDE boundaries, DMZ, egress controls, firewall rules, segmentation testing, and documented exceptions. | Gap |
+| Edge and perimeter | Lab ingress/DNS is functional; no documented BFSI perimeter stack exists. | HA edge, WAF, IPS/IDS, DDoS, certificate lifecycle, secure route governance, and edge security monitoring. | Gap |
+| Data protection | Vault R1 exists, but disk encryption has a lab exception and PAN/tokenization scope is undefined. | Data classification, encryption at rest/in transit, HSM/key ceremony, tokenization or PAN avoidance, and retention/destruction controls. | Gap |
+| Key management | Vault is present for platform secrets. | HSM-backed regulated key custody where required, split knowledge, dual control, rotation, escrow/recovery, and audit evidence. | Partial |
+| Backup and restore | OADP backup/restore validation exists in session history. | Immutable offsite backups, recurring restore drills, RTO/RPO proof, backup monitoring, and business continuity reporting. | Partial |
+| Disaster recovery | Active hub/spoke exists, but no current second-site production DR platform is in scope. | Tested multi-site recovery or equivalent, declared RTO/RPO, failover/failback runbooks, and annual or more frequent exercises. | Gap |
+| Logging and audit | Logging/Loki foundations exist; audit forwarding work exists. | Central SIEM, tamper-evident retention, monitored audit sources, alert correlation, and retention aligned to legal/regulator policy. | Partial |
+| SOC and incident response | Tooling foundations exist, but no 24x7 SOC operating model is recorded. | Monitored alert queue, incident runbooks, severity model, tabletop exercises, evidence capture, and regulator/customer communications. | Gap |
+| Vulnerability management | RHACS exists and scanner closure is strong. | SLA-based vulnerability remediation, external ASV if PCI scope applies, penetration testing, risk acceptance, and executive reporting. | Partial |
+| Runtime policy | Gatekeeper was brought through canary policy gates; RHACS is selected. | Enforced policy library, exception workflow, admission control, Security Profiles Operator/seccomp hardening, and regular drift review. | Partial |
+| Supply chain | External Quay/Nexus and Pipelines foundations exist. | Signed images, SBOM/provenance, dependency controls, promotion gates, admission signature enforcement, and vendor risk linkage. | Partial |
+| Observability | Operators for observability, network observability, tracing, and mesh are installed in places. | Production operands, retention, alerting, dashboards, SLOs, capacity management, and operational ownership. | Partial |
+| Change management | GitOps, issues, ADRs, and session records are good engineering evidence. | Formal CAB workflow, SoD, emergency change process, independent approval, release calendar, and audit sampling. | Partial |
+| Physical and environmental controls | Not assessed in this workspace. | Data center access controls, power, cooling, fire/smoke/water controls, hardware lifecycle, and independent facility evidence. | Gap |
+| Third-party risk | External dependencies exist, but vendor risk is not formalized here. | Vendor inventory, contracts, SLAs, SOC reports, right-to-audit, concentration risk, and annual reviews. | Gap |
+| Application onboarding | App-platform operator batch was explicitly deferred. | Workload golden path, tenant model, app DR, CI/CD controls, database patterns, secrets standards, and application evidence packs. | Gap |
+
+## Highest-Risk Gaps
+
+1. **Formal production scope is undefined.** Without a CDE/non-CDE boundary and
+   data-flow model, PCI DSS status cannot be accurately asserted.
+2. **Identity is not bank-grade.** Temporary HTPasswd is acceptable for lab
+   break-glass only, not as the primary enterprise access model.
+3. **DR and business continuity are not production-grade.** Current evidence
+   does not prove bank RTO/RPO, second-site recovery, or sustained critical
+   service availability.
+4. **Audit and SOC operations are incomplete.** Tooling foundations are not the
+   same as monitored, retained, and response-ready security operations.
+5. **Cryptographic custody is not bank-grade for regulated payment use cases.**
+   Vault is useful, but HSM-backed regulated key management and disk encryption
+   posture remain open.
+6. **Perimeter and segmentation are not auditor-ready.** BFSI deployment needs
+   tested network zoning, WAF/IPS/DDoS controls, ingress governance, and
+   segmentation evidence.
+7. **Formal governance is missing.** Issues, ADRs, and GitOps are strong
+   engineering controls, but they are not a substitute for bank change, access,
+   risk, and audit governance.
+
+## Recommended Closure Roadmap
+
+1. Define production/CDE scope, data flows, network diagrams, owner register,
+   target standard, CAB model, access-review process, and evidence ownership.
+2. Replace primary HTPasswd with enterprise OIDC/Keycloak or equivalent IdP,
+   enforce MFA, add PAM, and define named-account, break-glass, JML, periodic
+   review, and SoD controls.
+3. Define network zones and CDE boundaries, add ingress/egress standards,
+   namespace NetworkPolicy baselines, route approval, WAF, IPS/IDS, DDoS, and
+   segmentation testing.
+4. Define RTO/RPO by workload class, build second-site or equivalent recovery,
+   make backups immutable and offsite, and run regular restore/failover drills.
+5. Decide FIPS-mode and full-disk encryption posture for future rebuilds, add
+   HSM-backed key custody where regulated keys or payment data require it, and
+   document key ceremony and rotation evidence.
+6. Forward platform, audit, RHACS, Vault, ingress, registry, GitOps, backup,
+   and hypervisor logs to SIEM; define alert triage, severity, response SLAs,
+   escalation, retention, and evidence capture.
+7. Require signed images and SBOM/provenance for production namespaces, enforce
+   signature and vulnerability gates, promote images through Quay/Nexus, move
+   Gatekeeper policies gradually from dry-run into enforce mode, and evaluate
+   Security Profiles Operator.
+8. Define namespace, RBAC, network, secrets, CI/CD, logging, backup, and DR
+   golden paths for production workloads, then run load, failover,
+   backup/restore, chaos, and performance validation before production
+   approval.
+
+## Bottom Line
+
+This is a credible OpenShift platform foundation. The v7 deployment, GitOps
+model, Compliance Operator scanner closure, RHACS posture, OADP history, Vault
+R1, and operator foundations all matter.
+
+But a BFSI production deployment is not just a cluster. It is a regulated
+operating environment with formal scope, identity, segmentation, resilience,
+audit, cryptographic custody, operational staffing, and governance evidence.
+That surrounding program is the remaining work.

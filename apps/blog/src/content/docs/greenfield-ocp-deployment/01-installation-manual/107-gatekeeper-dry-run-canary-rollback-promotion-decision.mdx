@@ -1,19 +1,15 @@
 ---
-title: "Installation Manual - 94 Gatekeeper rollout and policy closeout"
-sidebar_label: "94 Gatekeeper rollout and policy closeout"
+title: "Installation Manual - 107 Gatekeeper rollout and policy closeout"
+sidebar_label: "107 Gatekeeper rollout and policy closeout"
 description: "Consolidated Gatekeeper operator, operand, rollback, image mirror, dry-run policy, and final non-enforcement decision for the v7 greenfield clusters."
 last_reviewed: 2026-05-20
 draft: false
 ---
 
-This chapter is the single public installation-manual entry for the completed
-Gatekeeper rollout and policy gates.
-
-The original detailed Gatekeeper chapters `94` through `106` are archived as
-draft source pages and their old public routes redirect here. The operational
-evidence remains in the gate reports, GitHub issues, and session records. The
-manual now keeps the durable state and replay guidance in one place instead of
-spreading the sequence across many sidebar entries.
+This chapter is the closeout entry for the completed Gatekeeper rollout and
+policy gates. The detailed Gatekeeper chapters `94` through `106` remain public
+installation-manual chapters, and this chapter keeps the final durable state,
+rollback, restore, image mirror, and promotion-decision evidence in one place.
 
 The result is deliberately conservative: both hub and spoke Gatekeeper operands
 were installed and rollback-tested, durable spoke-side Gatekeeper image mirror
@@ -53,20 +49,9 @@ No deny enforcement is active.
 
 ## Final Public Manual State
 
-The installation manual now exposes one Gatekeeper entry:
-
-```text
-94 Gatekeeper rollout and policy closeout
-```
-
-The archived detailed chapters remain in source for audit and future
-reconstruction, but they are `draft: true` and are no longer generated as
-public manual pages. Old public chapter URLs redirect to this consolidated
-chapter.
-
-The sections below keep the final rollback, restore, image mirror, and
-promotion-decision evidence from the closing batch because that is the state
-future work must start from.
+The installation manual exposes the full Gatekeeper sequence as chapters `94`
+through `107`. This chapter is the final state and promotion-decision record
+that future Gatekeeper work must start from.
 
 ## Preflight
 

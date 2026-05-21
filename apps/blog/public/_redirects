@@ -79,33 +79,3 @@
 /docs/openshift-platform/platform-services /docs/openshift-platform/openshift-platform/platform-services/ 301
 /docs/openshift-platform/platform-services/ /docs/openshift-platform/openshift-platform/platform-services/ 301
 /docs/openshift-platform/platform-services/* /docs/openshift-platform/openshift-platform/platform-services/:splat 301
-
-# Greenfield Gatekeeper installation-manual chapters 94-106 were consolidated
-# into one durable public closeout chapter. Keep old links working while the
-# detailed source chapters remain archived as drafts.
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-preflight-dry-run-design /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-preflight-dry-run-design/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operator-only-install /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operator-only-install/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operator-only-install /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operator-only-install/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operand-no-constraints-preflight /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operand-no-constraints-preflight/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operand-no-constraints-live-canary /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-operand-no-constraints-live-canary/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-no-constraints-soak-rollback-drill /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/hub-gatekeeper-no-constraints-soak-rollback-drill/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-no-constraints-preflight /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-no-constraints-preflight/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-live-canary-rollback /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-live-canary-rollback/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-image-readiness /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-image-readiness/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-live-retry /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-operand-live-retry/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-post-retry-soak-rollback-drill /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/spoke-gatekeeper-post-retry-soak-rollback-drill/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-policy-dry-run-candidate /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-policy-dry-run-candidate/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-scoped-dry-run-policy-canary /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
-/docs/greenfield-ocp-deployment/installation-manual/gatekeeper-scoped-dry-run-policy-canary/ /docs/greenfield-ocp-deployment/installation-manual/gatekeeper-dry-run-canary-rollback-promotion-decision/ 301
