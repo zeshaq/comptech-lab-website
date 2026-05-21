@@ -1,0 +1,198 @@
+---
+title: "Installation Manual - 119 hub-dr-v7 edge DNS and HAProxy foundation"
+sidebar_label: "119 hub-dr-v7 edge DNS and HAProxy foundation"
+description: "The authoritative PowerDNS records, resolver validation, HAProxy no-op decision, rollback checkpoints, and next gate for the hub-dr-v7 warm standby deployment."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records the live edge foundation for `hub-dr-v7` under
+`OP-GF-HUBDRV7-3`.
+
+The result is deliberately narrow: DNS is ready for the planned standby
+cluster, HAProxy is validated and left unchanged, and no OpenShift install or
+VM creation has started.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#449` / `OP-GF-HUBDRV7-3` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Parent | `#448` / `OP-GF-HUBDRV7-0` |
+| Predecessor | `#447` / `OP-GF-HUBDRV7-2` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-edge-dns-haproxy.md` |
+
+## Entry State
+
+`dl385-2` already had working SSH and passwordless sudo to the two edge hosts:
+
+```text
+gf-ocp-pdns-01
+gf-ocp-haproxy-01
+```
+
+The install inputs from the prior gate existed on `gf-ocp-bootstrap-01`, but
+there was still no `hub-dr-v7` agent ISO, no `hub-dr-v7` VM, and no OpenShift
+API behind the planned names.
+
+Existing v7 OpenShift DNS was direct-to-VIP:
+
+```text
+api.hub-dc-v7.v7.comptech-lab.com                         30.30.210.10
+*.apps.hub-dc-v7.v7.comptech-lab.com                      30.30.210.11
+api.spoke-dc-v7.v7.comptech-lab.com                       30.30.0.10
+*.apps.spoke-dc-v7.v7.comptech-lab.com                    30.30.0.11
+```
+
+The HAProxy VM was not serving OpenShift API, machine-config-server, or
+cluster ingress traffic. It was serving public VM-hosted services such as
+GitLab, NetBox, Quay, Nexus, and MinIO.
+
+## PowerDNS Records
+
+Authoritative zone:
+
+```text
+v7.comptech-lab.com
+```
+
+Rollback checkpoint:
+
+```text
+/home/ze/pdns-v7-zone.OP-GF-HUBDRV7-3.20260521T162520Z.txt
+```
+
+Records applied:
+
+| Name | Type | TTL | Value |
+| --- | --- | --- | --- |
+| `api.hub-dr-v7.v7.comptech-lab.com` | A | 300 | `30.30.220.10` |
+| `api-int.hub-dr-v7.v7.comptech-lab.com` | A | 300 | `30.30.220.10` |
+| `*.apps.hub-dr-v7.v7.comptech-lab.com` | A | 300 | `30.30.220.11` |
+| `hub-dr-v7-master-0.v7.comptech-lab.com` | A | 300 | `30.30.220.13` |
+| `hub-dr-v7-master-1.v7.comptech-lab.com` | A | 300 | `30.30.220.14` |
+| `hub-dr-v7-master-2.v7.comptech-lab.com` | A | 300 | `30.30.220.15` |
+
+## Resolver Note
+
+The private DNS address `30.30.200.53` is the PowerDNS Recursor. The
+authoritative server listens on loopback and `59.153.29.101`.
+
+After the records were applied, the authoritative listener had the correct
+answers immediately. The private recursor still held stale negative responses
+for names that had been queried before the apply. A recursor zone/cache refresh
+was required before the installer-facing resolver path returned the new
+answers.
+
+## HAProxy Decision
+
+Rollback checkpoint:
+
+```text
+/etc/haproxy/haproxy.cfg.OP-GF-HUBDRV7-3.20260521T162538Z.noop.bak
+```
+
+No `hub-dr-v7` HAProxy frontend or backend was added.
+
+Reason:
+
+- current v7 OpenShift API and ingress names route directly to VIPs;
+- HAProxy has no existing OpenShift `6443`, `22623`, `80`, or `443` cluster
+  listener pattern;
+- adding OpenShift through this HAProxy would create a new traffic path that
+  `hub-dc-v7` and `spoke-dc-v7` do not use;
+- public console or route exposure should be a separate governed decision.
+
+The #449 HAProxy outcome is therefore an explicit no-op exception:
+
+```text
+hub-dr-v7 frontends: none
+hub-dr-v7 backends:  none
+HAProxy reload:      not required
+```
+
+## IPAM Exception
+
+NetBox was not updated in this gate. There is no recorded authenticated
+NetBox mutation path in this workspace.
+
+The reservation evidence for this gate is:
+
+```text
+GitHub issue #449
+ADR 0029
+CLUSTERS.md
+RUNBOOK.md
+PowerDNS zone v7.comptech-lab.com
+```
+
+If NetBox becomes the authoritative IPAM source for OpenShift VIPs and nodes,
+sync these six `hub-dr-v7` entries in a separate governed NetBox gate before
+final reproducibility certification.
+
+## Validation
+
+PowerDNS services:
+
+```text
+pdns.service active
+pdns-recursor.service active
+```
+
+Zone check:
+
+```text
+Checked 44 records of 'v7.comptech-lab.com', 0 errors, 0 warnings.
+```
+
+Private resolver `30.30.200.53`:
+
+```text
+api.hub-dr-v7.v7.comptech-lab.com                         30.30.220.10
+api-int.hub-dr-v7.v7.comptech-lab.com                     30.30.220.10
+console-openshift-console.apps.hub-dr-v7.v7.comptech-lab.com 30.30.220.11
+hub-dr-v7-master-0.v7.comptech-lab.com                    30.30.220.13
+hub-dr-v7-master-1.v7.comptech-lab.com                    30.30.220.14
+hub-dr-v7-master-2.v7.comptech-lab.com                    30.30.220.15
+```
+
+Public authoritative listener `59.153.29.101` returned the same `hub-dr-v7`
+answers for the checked names.
+
+Existing hub DNS remained unchanged:
+
+```text
+api.hub-dc-v7.v7.comptech-lab.com                         30.30.210.10
+console-openshift-console.apps.hub-dc-v7.v7.comptech-lab.com 30.30.210.11
+```
+
+HAProxy:
+
+```text
+Configuration file is valid
+haproxy.service active
+```
+
+Guardrails:
+
+```text
+hub-dr-v7 libvirt domains: none
+agent ISO created:         false
+OpenShift API changed:     false
+platform GitOps changed:   false
+```
+
+## Outcome
+
+The edge foundation for `hub-dr-v7` is ready for the next deployment gate.
+The cluster names now resolve to the planned addresses, but those addresses
+will not serve traffic until the VM and OpenShift install gates create the
+cluster.
+
+Next gate:
+
+```text
+#450 / OP-GF-HUBDRV7-4: hub-dr-v7 VM env dry-run and libvirt readiness validation
+```
