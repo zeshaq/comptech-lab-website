@@ -1,0 +1,208 @@
+---
+title: "Installation Manual - 117 hub-dr-v7 install inputs and edge plan"
+sidebar_label: "117 hub-dr-v7 install inputs and edge plan"
+description: "The first rendered hub-dr-v7 OpenShift install inputs, validation result, VM planning files, and DNS/HAProxy edge plan before VM creation."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-HUBDRV7-2`, the first execution gate for
+`hub-dr-v7`.
+
+The gate rendered and validated OpenShift install inputs, created non-secret
+VM planning files, and prepared the DNS/HAProxy edge plan. It deliberately
+stopped before creating an agent ISO, creating VMs, or changing live edge
+services.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#447` / `OP-GF-HUBDRV7-2` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Predecessor | `#446` / `OP-GF-HUBDRV7-1` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-install-inputs-edge-plan.md` |
+
+## Execution Boundary
+
+Systems touched:
+
+- `dl385-2` for read-only libvirt, network, and capacity checks;
+- `gf-ocp-bootstrap-01` for render and validation work;
+- `hub-dc-v7` and `spoke-dc-v7` for read-only kubeconfig health checks.
+
+No OpenShift objects, libvirt VMs, DNS records, HAProxy configuration, GitOps
+desired state, or managed-cluster ownership changed in this gate.
+
+## Rendered Artifact Location
+
+The install inputs were rendered on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7
+```
+
+Rendered files:
+
+```text
+cluster.env
+install-config.yaml
+agent-config.yaml
+mirror-resources/*
+trust-bundle.pem
+pull-secret.json
+```
+
+The installer pull secret remained remote and was not printed or copied into
+the documentation workspace.
+
+## Rendered Install Summary
+
+| Field | Value |
+| --- | --- |
+| Cluster | `hub-dr-v7` |
+| Base domain | `v7.comptech-lab.com` |
+| OpenShift release | `4.20.18` |
+| FIPS | `true` |
+| Platform | `baremetal` |
+| API/API-int VIP | `30.30.220.10` |
+| Ingress VIP | `30.30.220.11` |
+| Control-plane replicas | `3` |
+| Worker replicas | `0` |
+| Rendezvous IP | `30.30.220.13` |
+| Cluster network | `10.128.0.0/14` |
+| Service network | `172.30.0.0/16` |
+| Machine network | `30.30.0.0/16` |
+
+Agent hosts:
+
+```text
+hub-dr-v7-master-0  master  52:54:00:23:00:00  30.30.220.13/16  /dev/vda
+hub-dr-v7-master-1  master  52:54:00:23:00:01  30.30.220.14/16  /dev/vda
+hub-dr-v7-master-2  master  52:54:00:23:00:02  30.30.220.15/16  /dev/vda
+```
+
+## Validation Result
+
+The rendered input validation passed:
+
+```text
+mirror_resources_validated=9
+rendered_yaml_valid=true
+agent_hosts=3
+agent_masters=3
+agent_workers=0
+pull_secret_has_quay_auth=true
+rendered_trust_bundle_certificates=149
+release_image_validated_with_rendered_trust_bundle=true
+agent_cluster_manifests_valid=true
+fips_installer_validated=true
+install_media_created=false
+```
+
+Validated disconnected sources:
+
+```text
+quay.v7.comptech-lab.com/openshift-release/openshift/release-images:4.20.18-x86_64
+quay.v7.comptech-lab.com/openshift-operators/redhat/redhat-operator-index:v4.20
+quay.v7.comptech-lab.com/openshift-operators/redhat/certified-operator-index:v4.20
+```
+
+`install_media_created=false` is intentional for this gate. Agent ISO creation
+belongs to a later VM creation gate.
+
+## Read-only Preflight
+
+The active hub baseline was still healthy:
+
+- `hub-dc-v7` kubeconfig worked from `gf-ocp-bootstrap-01`;
+- ClusterVersion was `4.20.18`, Available True, Progressing False;
+- all three compact hub masters were Ready.
+
+Candidate allocation checks from `dl385-2`:
+
+- candidate IPs `30.30.220.10`, `.11`, `.13`, `.14`, and `.15` did not
+  respond to ping;
+- no existing `hub-dr-v7` libvirt domains were found;
+- MACs `52:54:00:23:00:00-02` were not observed on existing libvirt
+  interfaces;
+- active `hub-dc-v7` DNS resolved through `30.30.200.53`;
+- candidate `hub-dr-v7` API, API-int, console, and master names did not
+  resolve yet.
+
+## VM Planning Files
+
+Non-secret VM environment planning files were created on the bootstrap host:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/vm-env/README.md
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/vm-env/gf-ocp-hub-dr-v7-master-0.env
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/vm-env/gf-ocp-hub-dr-v7-master-1.env
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/vm-env/gf-ocp-hub-dr-v7-master-2.env
+```
+
+Each planned VM mirrors the active hub shape:
+
+- 32 vCPU;
+- 64 GiB RAM;
+- bridge `br33`;
+- UEFI secure boot;
+- TPM enabled;
+- one 300 GiB boot disk;
+- three 500 GiB data disks;
+- agent ISO path
+  `/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/agent.x86_64.iso`.
+
+These files are planning artifacts only. They must not be used with the
+current service-VM helper until a reviewed RHCOS/agent-ISO VM path exists.
+
+## DNS Plan
+
+Proposed records:
+
+```text
+api.hub-dr-v7.v7.comptech-lab.com                         A 30.30.220.10
+api-int.hub-dr-v7.v7.comptech-lab.com                     A 30.30.220.10
+*.apps.hub-dr-v7.v7.comptech-lab.com                      A 30.30.220.11
+hub-dr-v7-master-0.v7.comptech-lab.com                    A 30.30.220.13
+hub-dr-v7-master-1.v7.comptech-lab.com                    A 30.30.220.14
+hub-dr-v7-master-2.v7.comptech-lab.com                    A 30.30.220.15
+```
+
+Rollback is to remove these records, reload or notify PowerDNS, then confirm
+the candidate names no longer resolve while active `hub-dc-v7` names still do.
+
+## HAProxy Plan
+
+The next gate must confirm the actual HAProxy implementation before live
+reload. Expected OpenShift endpoints are:
+
+```text
+API         30.30.220.10:6443   to 30.30.220.13-15:6443
+MCS         30.30.220.10:22623  to 30.30.220.13-15:22623
+Ingress 80  30.30.220.11:80     to hub-dr-v7 ingress targets
+Ingress 443 30.30.220.11:443    to hub-dr-v7 ingress targets
+```
+
+Rollback is to remove only the `hub-dr-v7` HAProxy entries, validate the
+configuration, reload HAProxy, and confirm active `hub-dc-v7` API and console
+remain reachable.
+
+## Residual Risks
+
+- SSH from `dl385-2` to PowerDNS `30.30.200.53` and HAProxy
+  `30.30.200.102` as `ze` failed with public-key authentication.
+- R1 Vault is healthy, but the old bootstrap helper pull-secret path is not
+  present. The render gate reused the existing generated installer registry
+  auth artifact from `hub-dc-v7`; secret custody must be restored before final
+  reproducibility certification.
+- The `dl385-2` deployment workspace has stale templates. Render work should
+  use the bootstrap host copy.
+- No agent ISO exists yet.
+- No `hub-dr-v7` VM exists yet.
+
+## Next Gate
+
+Continue with `#449` / `OP-GF-HUBDRV7-3`: reserve and apply the `hub-dr-v7`
+IPAM, DNS, and HAProxy changes after edge access and rollback are confirmed.
