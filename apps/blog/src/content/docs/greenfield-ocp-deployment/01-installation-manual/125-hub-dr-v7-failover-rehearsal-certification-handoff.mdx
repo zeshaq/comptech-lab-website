@@ -1,0 +1,319 @@
+---
+title: "Installation Manual - 125 hub-dr-v7 failover rehearsal certification and handoff"
+sidebar_label: "125 hub-dr-v7 failover rehearsal certification and handoff"
+description: "Batch 4 execution for hub-dr-v7: failover runbook dry-run, controlled takeover no-go decision, warm-standby certification evidence, and operator handoff."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records Batch 4 of the `hub-dr-v7` warm-standby management hub
+deployment. It combines issue `#458`, issue `#459`, issue `#460`, and issue
+`#461` into one operational evidence set.
+
+The important result is deliberately conservative: the failover runbook was
+written and server-side dry-run validation passed, but the actual takeover was
+not executed because `hub-dc-v7` was healthy and still authoritative for
+`spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Batch | `hub-dr-v7` Batch 4: failover rehearsal, certification, and handoff |
+| Issues | `#458` / `OP-GF-HUBDRV7-12`, `#459` / `OP-GF-HUBDRV7-13`, `#460` / `OP-GF-HUBDRV7-14`, `#461` / `OP-GF-HUBDRV7-15` |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local runbook | `plans/hub-dr-v7-failover-runbook.md` |
+| Local evidence | `reports/platform/hub-dr-v7/20260522/hub-dr-v7-failover-rehearsal-certification-handoff.md` |
+
+## Objective
+
+Close the safe portion of the final `hub-dr-v7` batch:
+
+- write a usable failover runbook from `hub-dc-v7` to `hub-dr-v7`;
+- dry-run the takeover object model without transferring authority;
+- validate that the current active and standby hub boundaries are clean;
+- decide whether controlled takeover is allowed under the issue entry
+  criteria;
+- record reproducibility and operator handoff evidence.
+
+## Non-Goals
+
+- Do not promote `hub-dr-v7` while `hub-dc-v7` is healthy.
+- Do not import or actively manage `spoke-dc-v7` from `hub-dr-v7` unless a
+  deliberate failure or isolation condition is declared.
+- Do not create a second ApplicationSet or GitOpsCluster for `spoke-dc-v7`
+  while the active hub still owns it.
+- Do not publish kubeconfigs, kubeadmin passwords, pull secrets, Vault tokens,
+  object-storage credentials, RHACS credentials, HTPasswd values, private
+  keys, PATs, or full Secret manifests.
+- Do not present this internal certification as external Red Hat, PCI DSS
+  ROC/AOC, QSA, ISO, or bank-auditor attestation.
+
+## Entry State
+
+Batch 3 left `hub-dr-v7` operationally ready:
+
+- OpenShift `4.20.18`;
+- three compact masters Ready;
+- GitOps root app healthy;
+- management operators installed;
+- Vault-backed identity in place;
+- `kubeadmin` retired after replacement login validation;
+- OADP backup and restore smoke test complete;
+- RHACS Central and SecuredCluster available;
+- Compliance Operator CIS and PCI DSS 4 scans clean;
+- File Integrity node status clean;
+- standby boundary intact.
+
+The final standby boundary before Batch 4 was:
+
+```text
+hub-dr-v7:
+  ManagedCluster/local-cluster only
+  no ApplicationSet
+  no GitOpsCluster
+  no ManagedCluster/spoke-dc-v7
+```
+
+## Stop Conditions
+
+The batch had to stop before takeover if any of these occurred:
+
+- `hub-dc-v7` remained healthy and authoritative;
+- `hub-dc-v7` failure or isolation was not deliberately declared;
+- `spoke-dc-v7` was still reconciled by the active hub;
+- server-side dry-run failed for the candidate takeover objects;
+- backup posture could not be checked at a useful summary level;
+- any command path would print secrets or full Secret manifests.
+
+The first two stop conditions were true, so actual takeover was correctly
+blocked.
+
+## Live Systems Touched
+
+Read-only and dry-run checks touched:
+
+- `hub-dc-v7`;
+- `spoke-dc-v7`;
+- `hub-dr-v7`;
+- `gf-ocp-bootstrap-01`;
+- `dl385-2`.
+
+No durable OpenShift object was created, changed, or deleted by the takeover
+dry-run.
+
+## Execution Sequence
+
+The batch started with the local workspace state, issue bodies, and the latest
+session records. The next work was already governed by milestone `#34`, parent
+issue `#448`, child issues `#458` through `#461`, and ADRs `0016`, `0017`,
+`0024`, `0025`, and `0029`.
+
+The live checks were run through the governed bootstrap path:
+
+```bash
+ssh ze@dl385-2 'ssh gf-ocp-bootstrap-01'
+```
+
+The kubeconfigs remained on the bootstrap host under:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/<cluster>/auth/kubeconfig
+```
+
+The validation sequence was:
+
+1. Check ClusterVersion, nodes, ClusterOperators, and non-running pods for
+   `hub-dc-v7`, `spoke-dc-v7`, and `hub-dr-v7`.
+2. Check active management authority on `hub-dc-v7`.
+3. Check standby authority absence on `hub-dr-v7`.
+4. Confirm required takeover CRDs and API resources exist on `hub-dr-v7`.
+5. Run server-side dry-run for takeover candidate resources.
+6. Decide go or no-go for actual takeover based on #459 entry criteria.
+7. Update local runbooks, evidence, state files, and this installation-manual
+   chapter.
+
+## Live Validation
+
+The final live validation at 2026-05-21T22:06:05Z showed all three clusters
+healthy.
+
+| Cluster | OpenShift | ClusterVersion | Nodes | Unhealthy ClusterOperators | Non-running pods |
+| --- | --- | --- | --- | --- | --- |
+| `hub-dc-v7` | `4.20.18` | Available=True, Progressing=False, Failing=False | 3 Ready compact masters | 0 | 0 |
+| `spoke-dc-v7` | `4.20.18` | Available=True, Progressing=False, Failing=False | 3 Ready masters, 3 Ready workers | 0 | 0 |
+| `hub-dr-v7` | `4.20.18` | Available=True, Progressing=False, Failing=False | 3 Ready compact masters | 0 | 0 |
+
+## Authority Boundary
+
+`hub-dc-v7` remained active management authority:
+
+```text
+ManagedCluster/local-cluster
+ManagedCluster/spoke-dc-v7
+ApplicationSet/openshift-gitops/spoke-cluster-config-pull
+GitOpsCluster/openshift-gitops/gitops-managed
+```
+
+`hub-dr-v7` remained standby-only:
+
+```text
+ManagedCluster/local-cluster
+no ApplicationSet
+no GitOpsCluster
+no ManagedCluster/spoke-dc-v7
+```
+
+This is the expected normal operating state. It prevents two hubs from
+reconciling the same workload cluster.
+
+## Dry-Run Candidate
+
+The dry-run candidate checked the minimum object model needed for a future
+controlled promotion:
+
+- namespace `spoke-dc-v7`;
+- `ManagedCluster/spoke-dc-v7`;
+- `Placement/openshift-gitops/gitops-managed`;
+- `GitOpsCluster/openshift-gitops/gitops-managed`.
+
+`hub-dr-v7` exposes the required API resources:
+
+```text
+ManagedCluster
+ManagedClusterSet
+ManagedClusterSetBinding
+Placement
+GitOpsCluster
+ApplicationSet
+```
+
+Server-side dry-run passed for the namespace, ManagedCluster, Placement, and
+GitOpsCluster candidates. The dry-run did not create the resources.
+
+## Controlled Takeover Decision
+
+Issue `#459` requires a deliberately declared `hub-dc-v7` failure or isolation
+condition before takeover.
+
+The observed condition was:
+
+- `hub-dc-v7` healthy;
+- `spoke-dc-v7` healthy;
+- `hub-dc-v7` still actively owns `spoke-dc-v7`;
+- no failure or isolation declared.
+
+Decision: no-go for actual takeover.
+
+This is not a failed drill. It is the correct safety outcome. Promoting
+`hub-dr-v7` while the active hub is healthy would create avoidable split-brain
+risk and violate the warm-standby design in ADR 0029.
+
+## Failover Runbook
+
+The failover runbook now records:
+
+- promotion entry criteria;
+- read-only prerequisite checks;
+- backup freshness checks;
+- isolation decision path;
+- activation candidate sequence;
+- service validation after promotion;
+- rollback order;
+- the 2026-05-21 dry-run result.
+
+The runbook is local to the operations workspace:
+
+```text
+plans/hub-dr-v7-failover-runbook.md
+```
+
+The central rule is:
+
+```text
+If hub-dc-v7 is healthy and reachable, the correct drill result is no-go.
+```
+
+## Reproducibility Matrix
+
+| Domain | Evidence |
+| --- | --- |
+| Governance | Issues `#446` through `#461`, milestone `#34`, ADRs `0016`, `0017`, `0024`, `0025`, `0029` |
+| Design | ADR 0029 and `plans/hub-dr-v7-warm-standby-deployment-program.md` |
+| Install inputs | Chapter 117, install inputs and edge plan |
+| Edge DNS | Chapter 119, edge DNS and HAProxy foundation |
+| VM readiness | Chapter 120, VM env and libvirt dry-run |
+| Execution model | Chapter 121, batched execution model |
+| Base install | Chapter 122, build and base install |
+| GitOps/operators | Chapter 123, standby platform foundation and operators |
+| Protection/readiness | Chapter 124, protection compliance and readiness |
+| Failover | This chapter and `plans/hub-dr-v7-failover-runbook.md` |
+
+## Certification Boundary
+
+`hub-dr-v7` is internally certified as a protected warm-standby management hub
+for the CompTech lab.
+
+The certification covers:
+
+- healthy OpenShift `4.20.18` compact cluster;
+- GitOps-managed desired state;
+- disconnected catalog and mirror policy posture;
+- LVMS storage foundation;
+- cert-manager, External Secrets, Vault integration, ACM/MCE, RHACS, OADP,
+  Gatekeeper, logging, Compliance Operator, and File Integrity Operator;
+- Vault-backed break-glass identity and `kubeadmin` removal;
+- OADP restore proof;
+- RHACS backup evidence;
+- selected CIS and PCI DSS 4 Compliance Operator scans clean;
+- failover runbook and server-side dry-run.
+
+The certification does not cover:
+
+- a completed live authority transfer to `hub-dr-v7`;
+- formal external compliance attestation;
+- active-active hub operation.
+
+## Operator Handoff
+
+Normal operation:
+
+1. Keep `hub-dc-v7` as the active management hub.
+2. Keep `hub-dr-v7` standby-only.
+3. Monitor health, GitOps sync, OADP schedules, RHACS, Compliance Operator,
+   File Integrity, and Vault/ESO readiness.
+4. Do not create `spoke-dc-v7` import resources on `hub-dr-v7` during normal
+   operations.
+
+Incident operation:
+
+1. Declare `hub-dc-v7` failed or isolated.
+2. Confirm split-brain prevention.
+3. Check backup freshness and `spoke-dc-v7` health.
+4. Follow `plans/hub-dr-v7-failover-runbook.md`.
+5. Validate authority, GitOps, RHACS, OADP, logging, compliance, and workload
+   reachability after promotion.
+6. Decide to roll back or retain `hub-dr-v7` authority from evidence.
+
+## Residual Risks
+
+- Actual `spoke-dc-v7` rehome/import remains unexecuted.
+- The next real takeover must start from a declared failure or isolation
+  condition.
+- External audit attestation remains out of scope for this lab certification.
+
+## Closeout
+
+Batch 4 reached its safe stop:
+
+- failover runbook written;
+- dry-run validation passed;
+- active and standby authority boundaries proven;
+- no takeover executed because the active hub was healthy;
+- split-brain risk avoided;
+- handoff evidence recorded.
+
+The cluster should remain in warm standby until a future governed failover
+window or real active-hub failure requires promotion.
