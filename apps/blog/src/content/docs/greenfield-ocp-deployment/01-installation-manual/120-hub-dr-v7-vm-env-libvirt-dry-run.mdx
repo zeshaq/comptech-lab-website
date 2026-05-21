@@ -1,0 +1,202 @@
+---
+title: "Installation Manual - 120 hub-dr-v7 VM env and libvirt dry run"
+sidebar_label: "120 hub-dr-v7 VM env and libvirt dry run"
+description: "The hub-dr-v7 VM environment review, libvirt conflict checks, dry-run output, rollback commands, and handoff to the VM creation gate."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-HUBDRV7-4`, the VM environment and libvirt
+dry-run gate for the planned `hub-dr-v7` warm standby management cluster.
+
+No VM was defined or started in this gate. The purpose was to prove that the
+planned VM names, MAC addresses, disk paths, bridge, capacity, and candidate
+domain XML are ready for the next gated execution step.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#450` / `OP-GF-HUBDRV7-4` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Parent | `#448` / `OP-GF-HUBDRV7-0` |
+| Predecessor | `#449` / `OP-GF-HUBDRV7-3` |
+| Next gate | `#451` / `OP-GF-HUBDRV7-5` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-vm-env-libvirt-dry-run.md` |
+
+## Entry State
+
+The install inputs already existed on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7
+```
+
+The DNS and edge gate had already prepared the cluster names:
+
+```text
+api.hub-dr-v7.v7.comptech-lab.com          30.30.220.10
+api-int.hub-dr-v7.v7.comptech-lab.com      30.30.220.10
+*.apps.hub-dr-v7.v7.comptech-lab.com       30.30.220.11
+hub-dr-v7-master-0.v7.comptech-lab.com     30.30.220.13
+hub-dr-v7-master-1.v7.comptech-lab.com     30.30.220.14
+hub-dr-v7-master-2.v7.comptech-lab.com     30.30.220.15
+```
+
+There was still no agent ISO on `dl385-2`, no `hub-dr-v7` libvirt domain, no
+OpenShift API, and no platform GitOps desired state for the standby hub.
+
+## VM Plan
+
+The non-secret VM env files under the bootstrap artifact directory define
+three compact masters matching `hub-dc-v7`:
+
+| VM | IP | MAC | CPU | Memory | Bridge | Disks |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gf-ocp-hub-dr-v7-master-0` | `30.30.220.13` | `52:54:00:23:00:00` | 32 vCPU | 64 GiB | `br33` | 300 GiB boot + 3 x 500 GiB data |
+| `gf-ocp-hub-dr-v7-master-1` | `30.30.220.14` | `52:54:00:23:00:01` | 32 vCPU | 64 GiB | `br33` | 300 GiB boot + 3 x 500 GiB data |
+| `gf-ocp-hub-dr-v7-master-2` | `30.30.220.15` | `52:54:00:23:00:02` | 32 vCPU | 64 GiB | `br33` | 300 GiB boot + 3 x 500 GiB data |
+
+The agent ISO source remains on the bootstrap host:
+
+```text
+gf-ocp-bootstrap-01:/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/agent.x86_64.iso
+```
+
+The next gate should copy it to this hypervisor path:
+
+```text
+/var/lib/libvirt/images/openshift/hub-dr-v7/hub-dr-v7-agent.iso
+```
+
+## Hypervisor Readiness
+
+Read-only checks on `dl385-2` showed:
+
+```text
+br33: UP
+/var/lib/libvirt/images: 12T available
+memory available: about 989 GiB
+CPU threads: 512
+libvirtd: active
+virsh: present
+qemu-img: present
+virt-install: present
+qemu-system-x86_64: present
+swtpm: present
+virt-xml-validate: present
+```
+
+The requested VM capacity is 96 vCPU, 192 GiB RAM, and 5.4 TiB nominal thin
+disk capacity across all three masters.
+
+The existing `hub-dc-v7` masters were used as the mirror reference. Each has
+32 vCPU, 64 GiB RAM, bridge `br33`, and one boot disk plus three data disks.
+
+## Conflict Checks
+
+The planned VM names are free:
+
+```text
+gf-ocp-hub-dr-v7-master-0
+gf-ocp-hub-dr-v7-master-1
+gf-ocp-hub-dr-v7-master-2
+```
+
+The planned MAC addresses are free:
+
+```text
+52:54:00:23:00:00
+52:54:00:23:00:01
+52:54:00:23:00:02
+```
+
+All planned boot and data disk paths are free under `/var/lib/libvirt/images`.
+The agent ISO destination is also free.
+
+The planned IPs are not responding to ping yet, which is expected before the
+VMs exist.
+
+## Dry-Run Result
+
+The dry-run renderer generated transient domain XML and validated it with
+`virt-xml-validate`. Temporary XML was removed before exit.
+
+Captured result:
+
+```text
+OP-GF-HUBDRV7-4 libvirt dry-run for hub-dr-v7
+timestamp_utc=2026-05-21T16:42:01Z
+mode=dry-run-only no-qemu-img no-virsh-define no-virsh-start
+
+planned topology:
+  api_vip=30.30.220.10 ingress_vip=30.30.220.11 bridge=br33 ram_mib=65536 vcpu=32 boot_gb=300 data_disks=3x500GiB
+  gf-ocp-hub-dr-v7-master-0 ip=30.30.220.13 mac=52:54:00:23:00:00
+  gf-ocp-hub-dr-v7-master-1 ip=30.30.220.14 mac=52:54:00:23:00:01
+  gf-ocp-hub-dr-v7-master-2 ip=30.30.220.15 mac=52:54:00:23:00:02
+
+preflight conflict checks:
+  OK bridge exists: br33
+  OK secure-boot loader present
+  OK secure-boot nvram template present
+  OK domain name free: gf-ocp-hub-dr-v7-master-0
+  OK mac free: 52:54:00:23:00:00
+  OK domain XML validates: gf-ocp-hub-dr-v7-master-0
+  OK domain name free: gf-ocp-hub-dr-v7-master-1
+  OK mac free: 52:54:00:23:00:01
+  OK domain XML validates: gf-ocp-hub-dr-v7-master-1
+  OK domain name free: gf-ocp-hub-dr-v7-master-2
+  OK mac free: 52:54:00:23:00:02
+  OK domain XML validates: gf-ocp-hub-dr-v7-master-2
+  OK iso destination free: /var/lib/libvirt/images/openshift/hub-dr-v7/hub-dr-v7-agent.iso
+
+result=DRY_RUN_PASS pending evidence review and next gate approval
+```
+
+The full local report records the repeated disk-path checks for all twelve
+planned boot and data disks.
+
+## Rollback Commands
+
+These commands must stay ready before any #451 execution:
+
+```bash
+for vm in \
+  gf-ocp-hub-dr-v7-master-0 \
+  gf-ocp-hub-dr-v7-master-1 \
+  gf-ocp-hub-dr-v7-master-2; do
+  sudo virsh -c qemu:///system destroy "$vm" 2>/dev/null || true
+  sudo virsh -c qemu:///system undefine "$vm" --nvram --remove-all-storage 2>/dev/null || true
+done
+
+sudo rm -f /var/lib/libvirt/images/openshift/hub-dr-v7/hub-dr-v7-agent.iso
+sudo rm -f /var/lib/libvirt/images/gf-ocp-hub-dr-v7-master-0-{boot,data0,data1,data2}.qcow2
+sudo rm -f /var/lib/libvirt/images/gf-ocp-hub-dr-v7-master-1-{boot,data0,data1,data2}.qcow2
+sudo rm -f /var/lib/libvirt/images/gf-ocp-hub-dr-v7-master-2-{boot,data0,data1,data2}.qcow2
+```
+
+## Guardrails
+
+This gate did not:
+
+- create disks;
+- copy the agent ISO;
+- define libvirt domains;
+- start VMs;
+- change OpenShift APIs;
+- change platform GitOps desired state;
+- print kubeconfigs, pull secrets, PATs, passwords, private keys, or full
+  Secret manifests.
+
+## Outcome
+
+`hub-dr-v7` is VM-plan-ready. The next gate may render the agent ISO and
+create the VMs, but it must repeat the conflict checks immediately before
+execution if any time has passed.
+
+Next gate:
+
+```text
+#451 / OP-GF-HUBDRV7-5: render hub-dr-v7 agent ISO and create VMs
+```
