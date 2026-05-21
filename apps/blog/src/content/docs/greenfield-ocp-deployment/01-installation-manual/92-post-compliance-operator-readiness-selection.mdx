@@ -1,7 +1,7 @@
 ---
 title: "Installation Manual - 92 Operator readiness and batch execution"
 sidebar_label: "92 Operator readiness and batch execution"
-description: "Read-only operator readiness, parity audit, install/defer decisions, the consolidated v7 operator batch plan, and the spoke Pipelines Batch 1 execution."
+description: "Read-only operator readiness, parity audit, install/defer decisions, the consolidated v7 operator batch plan, and the spoke Pipelines plus observability foundation executions."
 last_reviewed: 2026-05-21
 draft: false
 ---
@@ -10,8 +10,9 @@ This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
 gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
 v6-to-v7 operator parity addendum, the `OP-GF-OPERATORS-19` missing-operator
 decision, the `OP-GF-OPERATORS-20` batch model, and the
-`OP-GF-OPERATORS-21` Pipelines Batch 1 execution so the manual keeps one
-coherent operator path instead of one sidebar entry per preflight,
+`OP-GF-OPERATORS-21` Pipelines Batch 1 execution, and the
+`OP-GF-OPERATORS-22` observability foundation Batch 2 execution so the manual
+keeps one coherent operator path instead of one sidebar entry per preflight,
 installation, validation, or rollback step.
 
 The initial readiness gate did not change live cluster state. Later batch
@@ -329,8 +330,8 @@ Planned batches:
 | Batch | Phase | Target | Packages | Gate posture |
 | --- | --- | --- | --- | --- |
 | 1 | `OP-GF-OPERATORS-21` | `spoke-dc-v7` | `openshift-pipelines-operator-rh` | Completed. Operator-only app delivery foundation; no user workload runs, triggers, app namespaces, build workloads, or CI/CD credentials. |
-| 2 | `OP-GF-OPERATORS-22` | hub/spoke after preflight | Cluster Observability Operator and NetObserv | Next. Storage, retention, flow volume, and resource posture must be settled before install. |
-| 3 | `OP-GF-OPERATORS-23` | `spoke-dc-v7` | Tempo, OpenTelemetry, Service Mesh, and Kiali | Can end as defer/no-install if there is no sample app or mesh onboarding requirement. |
+| 2 | `OP-GF-OPERATORS-22` | `spoke-dc-v7` | Cluster Observability Operator and NetObserv | Completed. Operator-only observability foundation; no FlowCollector, MonitoringStack, UIPlugin, Perses, ACM observability, object storage, retention, or tenant workload operands. |
+| 3 | `OP-GF-OPERATORS-23` | `spoke-dc-v7` | Tempo, OpenTelemetry, Service Mesh, and Kiali | Next. Can end as defer/no-install if there is no sample app or mesh onboarding requirement. |
 | 4 | `OP-GF-OPERATORS-24` | `spoke-dc-v7` | Open Liberty and app-facing CloudNativePG | Requires tenant, backup/restore, image supply, and RHACS exception decisions. |
 | 5 | `OP-GF-OPERATORS-25` | hub/spoke after evidence | Kube Descheduler and Security Profiles Operator | Requires workload evidence, disruption budgets, profile ownership, and exception process. |
 
@@ -497,4 +498,171 @@ Next operator batch:
 
 ```text
 OP-GF-OPERATORS-22: Batch 2 observability foundation - Cluster Observability and NetObserv
+```
+
+## 2026-05-21 Batch 2: spoke observability foundation operators
+
+`OP-GF-OPERATORS-22` installed the Cluster Observability Operator and
+NetObserv Operator on `spoke-dc-v7` as the second consolidated operator batch.
+
+Governance:
+
+| Field | Value |
+| --- | --- |
+| Issue | `#438` / `OP-GF-OPERATORS-22` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#437` / `OP-GF-OPERATORS-21` |
+
+Scope:
+
+| Field | Cluster Observability Operator | NetObserv Operator |
+| --- | --- | --- |
+| Target | `spoke-dc-v7` only | `spoke-dc-v7` only |
+| Package | `cluster-observability-operator` | `netobserv-operator` |
+| Channel | `stable` | `stable` |
+| CSV | `cluster-observability-operator.v1.4.0` | `network-observability-operator.v1.11.1` |
+| Version | `1.4.0` | `1.11.1` |
+| Namespace | `openshift-cluster-observability-operator` | `openshift-netobserv-operator` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` | `cs-redhat-operator-index-v4-20` |
+| GitOps commit | `dd6d1da` / `Install spoke observability foundation operators` | `dd6d1da` / `Install spoke observability foundation operators` |
+
+The batch intentionally stopped at operator readiness. It did not create
+`FlowCollector`, `FlowMetric`, `MonitoringStack`, `UIPlugin`,
+`ObservabilityInstaller`, `Perses`, `PersesDashboard`, or
+`MultiClusterObservability` resources. It also did not introduce object
+storage, retention policy, flow collection, telemetry tenants, sample
+applications, tracing, service mesh, or workload onboarding.
+
+### Batch preflight
+
+Preflight used the standard path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Readiness checks passed before install:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3` masters and `3` workers Ready |
+| MCPs | updated, not updating, not degraded |
+| ClusterOperators | no non-steady rows |
+| Non-running pods | none |
+| Pending CSRs | none |
+| OADP DPA | `spoke-dc-v7`, `Reconciled=True` |
+| OADP BSL | `spoke-dc-v7`, `Available` |
+| OADP schedule | `platform-resource-daily`, enabled; last schedule observed at `2026-05-21T02:45:26Z` |
+| Existing target namespaces | absent |
+| Existing target Subscriptions | absent |
+
+The PackageManifests resolved from the mirrored Red Hat catalog:
+
+| Package | Default channel | Current CSV | Install mode |
+| --- | --- | --- | --- |
+| `cluster-observability-operator` | `stable` | `cluster-observability-operator.v1.4.0` | `AllNamespaces` |
+| `netobserv-operator` | `stable` | `network-observability-operator.v1.11.1` | `AllNamespaces` |
+
+Related image source prefixes identified for spoke mirror policy:
+
+```text
+registry.redhat.io/cluster-observability-operator
+registry.redhat.io/network-observability
+registry.redhat.io/openshift-logging
+```
+
+The hub already had broad mirror mappings for the observability source
+prefixes. The spoke did not, so Batch 2 added spoke-only mirror policy.
+
+### GitOps install
+
+Platform GitOps commit `dd6d1da` added:
+
+```text
+clusters/spoke-dc-v7/operators/cluster-observability-operator/
+clusters/spoke-dc-v7/operators/netobserv-operator/
+clusters/spoke-dc-v7/platform/image-mirrors/idms-observability-foundation.yaml
+```
+
+It also updated the spoke overlay kustomizations and the platform GitOps
+`CHANGELOG.md`.
+
+The new namespaces use sync wave `5`. The OperatorGroups and Subscriptions use
+sync wave `10`.
+
+`ImageDigestMirrorSet/idms-observability-foundation` maps the related Red Hat
+source prefixes to:
+
+```text
+quay.v7.comptech-lab.com/openshift-operators/cluster-observability-operator
+quay.v7.comptech-lab.com/openshift-operators/network-observability
+quay.v7.comptech-lab.com/openshift-operators/openshift-logging
+```
+
+GitOps render passed. Server-side dry-run passed for the new namespaces and
+IDMS. A full rendered-stream server-side dry-run hit the expected dry-run
+limitation where namespaced OperatorGroups and Subscriptions cannot be dry-run
+created into namespaces that only exist in the same dry-run stream; no live
+object was changed by that failed full-stream dry-run.
+
+The bootstrap clone on `gf-ocp-bootstrap-01` was then fast-forwarded to
+`dd6d1da`.
+
+### Validation
+
+Final validation:
+
+| Check | Result |
+| --- | --- |
+| Hub Argo view | `hub-dc-v7-bootstrap` and `spoke-dc-v7-cluster-config` `Healthy/Synced` at `dd6d1da61f01ff01be9069bf34d1be66a8c211d4` |
+| Spoke Argo view | `spoke-dc-v7-cluster-config` `Healthy/Synced` at `dd6d1da61f01ff01be9069bf34d1be66a8c211d4` |
+| IDMS | `idms-observability-foundation` present with all three mappings |
+| Cluster Observability Subscription | `AtLatestKnown`, installed/current `cluster-observability-operator.v1.4.0` |
+| NetObserv Subscription | `AtLatestKnown`, installed/current `network-observability-operator.v1.11.1` |
+| Cluster Observability CSV | `Succeeded`, version `1.4.0` |
+| NetObserv CSV | `Succeeded`, version `1.11.1` |
+| InstallPlans | approved, `Complete` |
+| Operator pods | Running |
+| Operand resources | no FlowCollector, FlowMetric, MonitoringStack, UIPlugin, ObservabilityInstaller, Perses, PersesDashboard, or MultiClusterObservability rows |
+| ClusterVersion | `4.20.18`, Available, not Progressing, not Failing |
+| MCPs | updated, not updating, not degraded |
+| ClusterOperators | no non-steady rows |
+| Non-running pods | none |
+| Pending CSRs | none |
+
+Operator pods observed Running:
+
+```text
+obo-prometheus-operator
+obo-prometheus-operator-admission-webhook
+observability-operator
+perses-operator
+netobserv-controller-manager
+netobserv-plugin-static
+```
+
+### Promotion decision
+
+Keep the install.
+
+The install is promoted because GitOps is synced, OLM is `AtLatestKnown`, both
+CSVs are `Succeeded`, operator pods are Running, no excluded operands were
+created, and spoke cluster health stayed steady.
+
+Rollback, if needed, is GitOps-first:
+
+1. Remove the two Batch 2 operator directories from the spoke overlay.
+2. Remove `idms-observability-foundation` only if no other installed workload
+   depends on those mirror mappings.
+3. Sync and validate OLM/operator pruning.
+4. Do not force-delete the newly introduced CRDs or operator namespaces
+   without a separate cleanup issue.
+
+Next operator batch:
+
+```text
+OP-GF-OPERATORS-23: Batch 3 tracing and mesh - Tempo, OpenTelemetry, Service Mesh, and Kiali
 ```
