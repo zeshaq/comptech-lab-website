@@ -112,6 +112,42 @@ Next decision gate:
 OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
 ```
 
+## 2026-05-21 install/defer decision
+
+`OP-GF-OPERATORS-19` selected the next operator install batch and separated
+the rest of the missing list into deferred tracks.
+
+Immediate next install candidate:
+
+| Package | Target | Scope |
+| --- | --- | --- |
+| `openshift-pipelines-operator-rh` | `spoke-dc-v7` only | operator-only, stop at readiness |
+
+Deferred tracks:
+
+| Track | Packages | Decision |
+| --- | --- | --- |
+| `OP-GF-OBS-01` | `cluster-observability-operator`, `netobserv-operator` | Design storage, retention, and resource posture before install. |
+| `OP-GF-TRACE-MESH-01` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Install only with app tracing or mesh requirements. |
+| `OP-GF-APPPLAT-01` | `open-liberty-certified`, `cloudnative-pg` | Defer to app-platform/golden-path work. |
+| `OP-GF-HARDENING-01` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Defer until workload evidence and disruption/profile ownership exist. |
+
+Replaced or removed expectations:
+
+| Package | Decision |
+| --- | --- |
+| `quay-operator` | Replaced by the external Quay registry architecture. |
+| `container-security-operator` | Removed from active expectation because RHACS is the current security control plane. |
+
+Out of active scope until explicitly reintroduced:
+
+| Package family | Reason |
+| --- | --- |
+| `nfd`, `gpu-operator-certified` | GPU enablement is not active scope. |
+| `rhods-operator` | OpenShift AI is not active scope. |
+| `kubevirt-hyperconverged` | Virtualization is not active scope. |
+| `serverless-operator` | Serverless workloads are not active scope. |
+
 ## Deferred operator packages
 
 | Catalog | Package | Channel | Version | Reason |

@@ -8,8 +8,9 @@ draft: false
 
 This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
 gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
-v6-to-v7 operator parity addendum so the manual does not gain another
-sidebar entry for a read-only audit.
+v6-to-v7 operator parity addendum and the `OP-GF-OPERATORS-19` missing-operator
+decision so the manual does not gain another sidebar entry for read-only
+planning gates.
 
 No live cluster state was changed.
 
@@ -247,4 +248,50 @@ Recommended next gate:
 
 ```text
 OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
+```
+
+## 2026-05-21 Missing-operator Decision
+
+`OP-GF-OPERATORS-19` converted the missing/deferred list into a concrete
+install/defer plan. No operators were installed or removed in that gate.
+
+The only immediate next install candidate is:
+
+```text
+OP-GF-OPERATORS-20: spoke OpenShift Pipelines operator-only install
+```
+
+Guardrails for that future gate:
+
+| Guardrail | Decision |
+| --- | --- |
+| Target | `spoke-dc-v7` only |
+| Source | mirrored `cs-redhat-operator-index-v4-20` |
+| Scope | operator readiness only |
+| Excluded work | no Tasks, Pipelines, Triggers, app namespaces, build workloads, or CI/CD credentials |
+| Rollback | GitOps-first; do not force-delete Tekton CRDs without a separate cleanup issue |
+
+Deferred tracks:
+
+| Track | Packages |
+| --- | --- |
+| `OP-GF-OBS-01` | Cluster Observability Operator and NetObserv |
+| `OP-GF-TRACE-MESH-01` | Tempo, OpenTelemetry, Service Mesh, and Kiali |
+| `OP-GF-APPPLAT-01` | Open Liberty and app-facing CloudNativePG |
+| `OP-GF-HARDENING-01` | Kube Descheduler and Security Profiles Operator |
+
+Removed or replaced active parity expectations:
+
+| Package | Decision |
+| --- | --- |
+| Quay Operator | Do not install for parity; v7 uses external Quay. |
+| Container Security Operator | Do not install for parity; RHACS is the active security control plane. |
+
+Kept out of active scope until explicitly reintroduced:
+
+```text
+NFD / NVIDIA GPU Operator
+OpenShift AI / RHODS
+OpenShift Virtualization
+Serverless
 ```
