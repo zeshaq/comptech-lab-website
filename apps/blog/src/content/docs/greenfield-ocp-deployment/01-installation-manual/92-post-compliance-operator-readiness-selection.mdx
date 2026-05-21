@@ -1,16 +1,17 @@
 ---
-title: "Installation Manual - 92 Post-compliance operator readiness selection"
-sidebar_label: "92 Post-compliance operator readiness selection"
-description: "Read-only operator readiness, parity audit, and next-gate selection after hub compliance cleanup."
+title: "Installation Manual - 92 Operator readiness and batch plan"
+sidebar_label: "92 Operator readiness and batch plan"
+description: "Read-only operator readiness, parity audit, install/defer decisions, and the consolidated v7 operator batch plan."
 last_reviewed: 2026-05-21
 draft: false
 ---
 
 This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
 gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
-v6-to-v7 operator parity addendum and the `OP-GF-OPERATORS-19` missing-operator
-decision so the manual does not gain another sidebar entry for read-only
-planning gates.
+v6-to-v7 operator parity addendum, the `OP-GF-OPERATORS-19` missing-operator
+decision, and the `OP-GF-OPERATORS-20` batch model so the manual keeps one
+coherent operator path instead of one sidebar entry per preflight,
+installation, validation, or rollback step.
 
 No live cluster state was changed.
 
@@ -290,6 +291,53 @@ Removed or replaced active parity expectations:
 Kept out of active scope until explicitly reintroduced:
 
 ```text
+NFD / NVIDIA GPU Operator
+OpenShift AI / RHODS
+OpenShift Virtualization
+Serverless
+```
+
+## 2026-05-21 Operator Batch Execution Model
+
+`OP-GF-OPERATORS-20` changed the remaining operator work into consolidated
+batches. Each batch now carries its own preflight, GitOps install, validation,
+rollback or promotion decision, and documentation closeout.
+
+The previous narrow next label,
+`OP-GF-OPERATORS-20: spoke OpenShift Pipelines operator-only install`, is
+superseded by the batch model. The Pipelines install remains the next actual
+operator action, but it moves to Batch 1:
+
+```text
+OP-GF-OPERATORS-21: Batch 1 app delivery foundation - spoke OpenShift Pipelines operator-only
+```
+
+Every operator batch must include:
+
+| Phase | Required outcome |
+| --- | --- |
+| Preflight | Issue, milestone, phase, ADR coverage, live health, OADP posture, catalog/package/channel/CSV/image availability, and GitOps render/diff are recorded. |
+| Install | Only batch-owned GitOps manifests are applied. Scope stays limited to the target cluster and operator family. |
+| Validation | Subscription, InstallPlan, CSV, operator pods, operands, Argo health, ClusterOperators, pods, CSRs, and domain smoke checks are recorded. |
+| Rollback or promotion | GitOps rollback path and CRD cleanup boundary are explicit. Forced CRD deletion requires a separate issue. |
+| Documentation | This page is updated as the single operator-batch record; the operator version-lock reference is updated when package status changes. |
+
+Planned batches:
+
+| Batch | Phase | Target | Packages | Gate posture |
+| --- | --- | --- | --- | --- |
+| 1 | `OP-GF-OPERATORS-21` | `spoke-dc-v7` | `openshift-pipelines-operator-rh` | Operator-only app delivery foundation. No Tasks, Pipelines, Triggers, app namespaces, build workloads, or CI/CD credentials. |
+| 2 | `OP-GF-OPERATORS-22` | hub/spoke after preflight | Cluster Observability Operator and NetObserv | Storage, retention, flow volume, and resource posture must be settled before install. |
+| 3 | `OP-GF-OPERATORS-23` | `spoke-dc-v7` | Tempo, OpenTelemetry, Service Mesh, and Kiali | Can end as defer/no-install if there is no sample app or mesh onboarding requirement. |
+| 4 | `OP-GF-OPERATORS-24` | `spoke-dc-v7` | Open Liberty and app-facing CloudNativePG | Requires tenant, backup/restore, image supply, and RHACS exception decisions. |
+| 5 | `OP-GF-OPERATORS-25` | hub/spoke after evidence | Kube Descheduler and Security Profiles Operator | Requires workload evidence, disruption budgets, profile ownership, and exception process. |
+
+Do not include these in the active batch queue unless their domain is
+explicitly reintroduced:
+
+```text
+Quay Operator
+Container Security Operator
 NFD / NVIDIA GPU Operator
 OpenShift AI / RHODS
 OpenShift Virtualization

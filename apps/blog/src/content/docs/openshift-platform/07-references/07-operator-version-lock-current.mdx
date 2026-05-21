@@ -117,11 +117,13 @@ OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
 `OP-GF-OPERATORS-19` selected the next operator install batch and separated
 the rest of the missing list into deferred tracks.
 
-Immediate next install candidate:
+The immediate next install candidate from `OP-GF-OPERATORS-19` was
+reconciled by `OP-GF-OPERATORS-20` into the operator batch model. The package
+choice is unchanged, but the execution label is now Batch 1:
 
 | Package | Target | Scope |
 | --- | --- | --- |
-| `openshift-pipelines-operator-rh` | `spoke-dc-v7` only | operator-only, stop at readiness |
+| `openshift-pipelines-operator-rh` | `spoke-dc-v7` only | Batch 1 / `OP-GF-OPERATORS-21`, operator-only, stop at readiness |
 
 Deferred tracks:
 
@@ -147,6 +149,20 @@ Out of active scope until explicitly reintroduced:
 | `rhods-operator` | OpenShift AI is not active scope. |
 | `kubevirt-hyperconverged` | Virtualization is not active scope. |
 | `serverless-operator` | Serverless workloads are not active scope. |
+
+## 2026-05-21 operator batch assignment
+
+Future operator execution uses one batch per install wave. Each batch includes
+preflight, GitOps install, validation, rollback or promotion decision, and
+documentation closeout.
+
+| Batch | Phase | Packages | Status |
+| --- | --- | --- | --- |
+| 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | Next actual operator execution, spoke-only, operator-only. |
+| 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | Deferred until storage, retention, and resource preflight pass. |
+| 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Deferred until workload tracing or mesh onboarding is required. |
+| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Deferred until app-platform tenancy, backup, image supply, and RHACS decisions are ready. |
+| 5 | `OP-GF-OPERATORS-25` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Deferred until workload evidence, disruption budgets, and profile ownership are ready. |
 
 ## Deferred operator packages
 
