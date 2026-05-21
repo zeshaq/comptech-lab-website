@@ -1,0 +1,149 @@
+---
+title: "Installation Manual - 108 v7 CIS and PCI DSS 4 scanner closure"
+sidebar_label: "108 v7 CIS and PCI DSS 4 scanner closure"
+description: "Single closeout record for the v7 CIS and PCI DSS 4 Compliance Operator remediation, scan validation, and evidence boundary."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-COMPLIANCE-21`, the single closure campaign for
+active v7 CIS and PCI DSS 4 OpenShift Compliance Operator findings across
+`hub-dc-v7` and `spoke-dc-v7`.
+
+The result is scanner-profile closure for the active OpenShift clusters. It
+is not a formal PCI DSS Report on Compliance, Attestation of Compliance, QSA
+signoff, business-process control assessment, physical control assessment, or
+external cardholder-data-scope validation.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `OP-GF-COMPLIANCE-21` / `#441` |
+| Milestone | `Workspace Governance` |
+| Governing ADR | `ADR 0016` |
+| Related ADRs | `ADR 0024`, `ADR 0027` |
+| Platform GitOps commit | `d5b3bfa` |
+
+## Scope
+
+| Item | Decision |
+| --- | --- |
+| Management cluster | `hub-dc-v7` |
+| Workload cluster | `spoke-dc-v7` |
+| Historical v6 clusters | not touched |
+| Primary evidence | OpenShift Compliance Operator CIS and PCI DSS 4 scans |
+| Formal PCI attestation | out of scope |
+
+## Desired State Changes
+
+The platform GitOps commit added:
+
+- hub PCI DSS 4 tailored profile and scan binding;
+- hub File Integrity Operator, all-node `FileIntegrity`, and alerting;
+- hub OAuth token inactivity settings and default OAuthClient inactivity
+  bounds;
+- hub and spoke master MachineConfigs for PCI DSS 4 audit-directory access
+  rules;
+- spoke tailored CIS profile for operator-owned SCC and namespace
+  NetworkPolicy findings;
+- spoke PCI DSS 4 tailoring for the Gatekeeper canary namespace and existing
+  VM disk encryption exception.
+
+The bootstrap clone on `gf-ocp-bootstrap-01` was fast-forwarded to the same
+commit, and Argo CD synced both clusters.
+
+## Rollout
+
+The live rollout used the established path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> v7 kubeconfigs
+```
+
+Operational sequence:
+
+1. Forced Argo CD hard refreshes.
+2. Waited for the master MachineConfig rollout on hub and spoke.
+3. Confirmed no MCP degradation.
+4. Triggered fresh CIS and PCI DSS 4 scans.
+5. Reinitialized File Integrity Operator AIDE databases after the planned
+   MachineConfig change.
+6. Restarted AIDE pods so post-baseline checks updated immediately.
+
+## Final Cluster Health
+
+Final snapshot: `2026-05-21T13:14:54Z`.
+
+| Check | `hub-dc-v7` | `spoke-dc-v7` |
+| --- | --- | --- |
+| Argo CD | `Synced / Healthy` at `d5b3bfa14807a2fc87467afb3ed71a2d2f506eb9` | `Synced / Healthy` at `d5b3bfa14807a2fc87467afb3ed71a2d2f506eb9` |
+| ClusterOperators | steady | steady |
+| MCPs | updated, not updating, not degraded | updated, not updating, not degraded |
+| File Integrity node status | `3/3` `Succeeded` | `6/6` `Succeeded` |
+
+## Compliance Scan Results
+
+### Hub
+
+| Scan | Phase | Result | Start | End |
+| --- | --- | --- | --- | --- |
+| `ocp4-cis` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:41Z` | `2026-05-21T13:04:20Z` |
+| `ocp4-cis-node-master` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:41Z` | `2026-05-21T13:04:33Z` |
+| `ocp4-pci-dss-4-0-hub-dc-v7` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:43Z` | `2026-05-21T13:04:43Z` |
+| `ocp4-pci-dss-node-4-0-master` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:53Z` | `2026-05-21T13:04:36Z` |
+
+Hub relevant check counts:
+
+| Scan | Pass | Manual | Fail |
+| --- | ---: | ---: | ---: |
+| `ocp4-cis` | 68 | 21 | 0 |
+| `ocp4-cis-node-master` | 94 | 0 | 0 |
+| `ocp4-pci-dss-4-0-hub-dc-v7` | 87 | 22 | 0 |
+| `ocp4-pci-dss-node-4-0-master` | 108 | 0 | 0 |
+
+### Spoke
+
+| Scan | Phase | Result | Start | End |
+| --- | --- | --- | --- | --- |
+| `ocp4-cis-spoke-dc-v7` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:41Z` | `2026-05-21T13:04:58Z` |
+| `ocp4-cis-node-master` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:46Z` | `2026-05-21T13:05:18Z` |
+| `ocp4-cis-node-worker` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:46Z` | `2026-05-21T13:05:08Z` |
+| `ocp4-pci-dss-4-0-spoke-dc-v7` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:46Z` | `2026-05-21T13:05:18Z` |
+| `ocp4-pci-dss-node-4-0-master` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:46Z` | `2026-05-21T13:05:18Z` |
+| `ocp4-pci-dss-node-4-0-worker` | `DONE` | `COMPLIANT` | `2026-05-21T13:03:46Z` | `2026-05-21T13:05:18Z` |
+
+Spoke relevant check counts:
+
+| Scan | Pass | Manual | Fail |
+| --- | ---: | ---: | ---: |
+| `ocp4-cis-spoke-dc-v7` | 68 | 21 | 0 |
+| `ocp4-cis-node-master` | 94 | 0 | 0 |
+| `ocp4-cis-node-worker` | 57 | 0 | 0 |
+| `ocp4-pci-dss-4-0-spoke-dc-v7` | 85 | 22 | 0 |
+| `ocp4-pci-dss-node-4-0-master` | 108 | 0 | 0 |
+| `ocp4-pci-dss-node-4-0-worker` | 59 | 0 | 0 |
+
+## Tailoring Record
+
+The scanner closure used tailored profiles where direct remediation would be
+wrong for the current lab state:
+
+- existing VM disk encryption is a non-retrofittable lab exception unless the
+  nodes are rebuilt;
+- RHACS is the selected image and runtime security control plane, so the
+  standalone Container Security Operator is not installed;
+- Security Profiles Operator remains a future hardening gate;
+- HTPasswd remains the temporary lab break-glass identity provider until
+  future OIDC/Keycloak work;
+- operator-owned SCC and namespace NetworkPolicy findings are tailored rather
+  than forcing broad default-deny policies into platform namespaces.
+
+## Closeout Position
+
+The active v7 clusters have no remaining CIS or PCI DSS 4 Compliance Operator
+`FAIL` results in the targeted profiles.
+
+Future work should focus on manual evidence binders, formal attestation
+scope, and optional hardening decisions such as full-disk encryption in a
+future rebuild and Security Profiles Operator onboarding.
