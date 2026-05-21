@@ -1,0 +1,327 @@
+---
+title: "Installation Manual - 123 hub-dr-v7 standby platform foundation and operators"
+sidebar_label: "123 hub-dr-v7 standby platform foundation and operators"
+description: "Batch 2 execution for hub-dr-v7: GitOps bootstrap, catalogs, mirrors, storage, Vault-backed secret sync, ACM/MCE, RHACS, OADP, Gatekeeper, logging, Compliance, and File Integrity."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records Batch 2 of the `hub-dr-v7` warm-standby management hub
+deployment. It combines issue `#453` and issue `#454` into one rebuildable
+manual page: bootstrap platform GitOps, wire disconnected catalogs and image
+mirrors, install the storage and secret foundation, install the management
+operators, validate the operands, and prove that the DR hub has not taken over
+`spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Batch | `hub-dr-v7` Batch 2: standby platform foundation and operators |
+| Issues | `#453` / `OP-GF-HUBDRV7-7`, `#454` / `OP-GF-HUBDRV7-8` |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-standby-platform-foundation-operators.md` |
+
+## Objective
+
+Turn the clean base `hub-dr-v7` OpenShift install into an operator-ready
+standby management hub.
+
+Target state:
+
+```text
+root GitOps app: hub-dr-v7-bootstrap
+catalog model: disconnected Red Hat and certified v4.20 catalogs
+storage: LVMS with lvms-vg1 default StorageClass
+secret source: R1 Vault through External Secrets Operator
+management: ACM/MCE installed for standby hub use
+security: RHACS Central/SecuredCluster, Gatekeeper, Compliance, File Integrity
+backup: OADP DPA, BSL, and daily platform-resource schedule
+logging: LokiStack and ClusterLogForwarder
+standby boundary: no spoke-dc-v7 import or takeover resources
+```
+
+## Non-Goals
+
+- Do not import `spoke-dc-v7`.
+- Do not enable a `hub-dr-v7` ApplicationSet that can prune resources managed
+  by `hub-dc-v7`.
+- Do not promote `hub-dr-v7` as the active management hub.
+- Do not execute a failover drill.
+- Do not claim CIS or PCI DSS 4 compliance closure in this batch.
+- Do not publish kubeconfigs, pull secrets, Vault tokens, object-storage
+  credentials, RHACS init-bundle values, PATs, passwords, private keys, or
+  full Secret manifests.
+
+## Entry Criteria
+
+Batch 1 had to be complete:
+
+- `hub-dr-v7` installed on OpenShift `4.20.18`;
+- all three compact masters Ready;
+- all ClusterOperators green;
+- master MCP updated;
+- no pods outside Running/Succeeded;
+- API, ingress, console, DNS, and VM boot state validated.
+
+Before mutation, the batch rechecked the base cluster and confirmed the
+governance objects for `#453`, `#454`, milestone `hub-dr-v7 Warm Standby
+Deployment`, and ADR coverage.
+
+## GitOps Desired State
+
+The platform desired state lives in:
+
+```text
+git@github.com:zeshaq/openshift-platform-gitops.git
+clusters/hub-dr-v7
+```
+
+Commits pushed during this batch:
+
+```text
+0de88af Add hub-dr-v7 standby platform GitOps
+d32e0ad Fix hub-dr-v7 Argo namespace bootstrap order
+364f4bc Allow hub-dr-v7 CR sync before CRDs settle
+472a517 Fix hub-dr-v7 RHACS secret store sync order
+a6254d8 Stage hub-dr-v7 RHACS secured-cluster after Central
+04a2edc Let MCE own hub-dr-v7 local cluster namespace
+60bc2b8 Record hub-dr-v7 standby platform batch
+```
+
+The root app finished at:
+
+```text
+Synced Healthy Succeeded
+revision: 04a2edc90bea5b584dd08101c01e32d2ef397d13
+```
+
+The extra `60bc2b8` commit updates the platform GitOps changelog and does not
+change the rendered `clusters/hub-dr-v7` payload.
+
+## Execution
+
+High-level sequence:
+
+1. Clone the active platform GitOps repository locally.
+2. Create `clusters/hub-dr-v7/` from the working `hub-dc-v7` profile.
+3. Remove active spoke registration and takeover resources.
+4. Add `scripts/bootstrap-hub-dr-v7-gitops.sh`.
+5. Validate `oc kustomize clusters/hub-dr-v7`.
+6. Validate `oc kustomize clusters/hub-dr-v7/gitops-control`.
+7. Push the desired state.
+8. Pull the new desired state on `gf-ocp-bootstrap-01`.
+9. Seed required non-published values in R1 Vault for ESO, RHACS, OADP, and
+   logging.
+10. Configure Vault Kubernetes auth for `hub-dr-v7`.
+11. Run the bootstrap script to install OpenShift GitOps and seed the root
+    Application.
+12. Fix Argo ordering issues discovered during the first convergence.
+13. Generate an independent RHACS init bundle from the new `hub-dr-v7`
+    Central and store the required values in Vault.
+14. Remove the GitOps-created `local-cluster` namespace so MCE can own
+    self-management.
+15. Re-run the full validation pass after convergence.
+
+## Ordering Corrections
+
+Four ordering corrections became part of the final desired state.
+
+### Namespace Bootstrap
+
+Argo initially tried to apply namespaced resources before some namespaces
+existed. The correction added a bootstrap namespace bundle at sync wave `-20`.
+
+### Operator CRDs
+
+Several operator-owned custom resources are applied in the same root app as
+their operators. Those resources now use:
+
+```text
+argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+```
+
+This allows Argo to continue while operator CRDs settle.
+
+### RHACS Secret Staging
+
+RHACS now converges in this order:
+
+```text
+Vault ClusterSecretStore
+central-admin-password ExternalSecret
+Central
+init-bundle ExternalSecrets
+SecuredCluster
+```
+
+The init bundle was generated from the new Central endpoint for this cluster.
+Only decoded key/value material was written to Vault. No secret value or full
+Secret manifest is published here.
+
+### MCE Local Cluster Ownership
+
+The first namespace bootstrap included `local-cluster`. MCE waits for that
+namespace to be absent before it creates the self-managed
+`ManagedCluster/local-cluster`, so MCE remained `Progressing`.
+
+The correction:
+
+- removed `local-cluster` from the GitOps-created namespace bundle;
+- deleted the pre-created live namespace;
+- let MCE recreate it through its own self-management path;
+- moved the local-cluster NetworkPolicy to sync wave `90`.
+
+After that, MCE became Available and MCH became Running.
+
+## Vault And Secret Sync
+
+R1 Vault now has hub-dr-v7 Kubernetes auth coverage for:
+
+```text
+kubernetes-hub-dr-v7
+eso-secrets
+rhacs-secrets
+oadp-backup
+logging-loki
+```
+
+Final secret-sync validation:
+
+| Resource | Result |
+| --- | --- |
+| `ClusterSecretStore/vault-r1-eso-smoke` | Ready=True |
+| `ClusterSecretStore/vault-r1-rhacs` | Ready=True |
+| `ClusterSecretStore/vault-r1-oadp` | Ready=True |
+| `ClusterSecretStore/vault-r1-logging` | Ready=True |
+| ESO smoke ExternalSecret | SecretSynced / Ready=True |
+| OADP cloud credential ExternalSecret | SecretSynced / Ready=True |
+| Logging Loki S3 ExternalSecret | SecretSynced / Ready=True |
+| RHACS admin/init-bundle ExternalSecrets | SecretSynced / Ready=True |
+
+## Operator Versions
+
+| Operator | Installed CSV |
+| --- | --- |
+| OpenShift GitOps | `openshift-gitops-operator.v1.20.3` |
+| LVMS | `lvms-operator.v4.20.0` |
+| cert-manager | `cert-manager-operator.v1.19.0` |
+| External Secrets | `openshift-external-secrets-operator.v1.1.0` |
+| Advanced Cluster Management | `advanced-cluster-management.v2.16.1` |
+| Multicluster Engine | `multicluster-engine.v2.11.1` |
+| RHACS | `rhacs-operator.v4.10.2` |
+| OADP | `oadp-operator.v1.5.5` |
+| Compliance Operator | `compliance-operator.v1.9.0` |
+| Gatekeeper Operator | `gatekeeper-operator-product.v3.21.0` |
+| Cluster Logging | `cluster-logging.v6.5.0` |
+| Loki Operator | `loki-operator.v6.5.0` |
+| File Integrity Operator | `file-integrity-operator.v1.3.8` |
+
+All subscriptions reported `AtLatestKnown`, and every CSV reached
+`Succeeded`.
+
+## Operand Validation
+
+| Component | Result |
+| --- | --- |
+| Argo root app | `Synced Healthy Succeeded` |
+| ClusterVersion | `4.20.18`, Available=True, Progressing=False |
+| ClusterOperators | no non-green operators |
+| Nodes | 3/3 Ready |
+| MCP | master Updated=True, Updating=False, Degraded=False |
+| Pods | no pods outside Running/Succeeded |
+| LVMS | `LVMCluster/lvmcluster` Ready |
+| StorageClass | `lvms-vg1` default |
+| MCH | Running `2.16.1` |
+| MCE | Available `2.11.1` |
+| ManagedCluster | `local-cluster` Joined=True, Available=True |
+| RHACS | Central Available=True, SecuredCluster Available=True |
+| OADP | DPA Reconciled=True, BSL Available, schedule Enabled |
+| Gatekeeper | Gatekeeper CR present and pods running |
+| Logging | LokiStack and ClusterLogForwarder present |
+| Compliance | CIS and PCI DSS 4 scan objects created and completed |
+| File Integrity | FileIntegrity CR present and AIDE pods running |
+
+## Compliance Scan State
+
+Compliance ran successfully, but the cluster is not compliant yet.
+
+```text
+ocp4-cis: DONE / NON-COMPLIANT
+ocp4-cis-node-master: DONE / COMPLIANT
+ocp4-pci-dss-4-0-hub-dr-v7: DONE / NON-COMPLIANT
+ocp4-pci-dss-node-4-0-master: DONE / COMPLIANT
+```
+
+This is expected for Batch 2. The next batch owns remediation, tailoring,
+evidence, and operational acceptance.
+
+## Standby Safety
+
+Final standby checks:
+
+| Check | Result |
+| --- | --- |
+| `spoke-dc-v7` ManagedCluster | absent |
+| ApplicationSets in `openshift-gitops` | absent |
+| GitOpsCluster resources | absent |
+| ManagedCluster resources | only `local-cluster` |
+| Global placement | selects only local hub cluster |
+
+`hub-dr-v7` is now self-managed, which is normal for ACM/MCE, but it is not
+managing the active workload cluster.
+
+## Secrets Handling
+
+No kubeconfig, kubeadmin password, pull secret, PAT, private key, token,
+object-storage credential, RHACS init-bundle value, or full Secret manifest is
+published in this chapter.
+
+One transient RHACS init-bundle file existed only long enough to convert the
+generated bundle into Vault key/value entries. It was removed after the values
+were written.
+
+## Rollback Notes
+
+The GitOps rollback unit for this batch is the `clusters/hub-dr-v7/` desired
+state and the root Argo application.
+
+Safe rollback principles:
+
+- do not delete or alter `hub-dc-v7`;
+- do not delete or alter `spoke-dc-v7`;
+- do not remove Vault global auth or shared paths outside the hub-dr-v7 scope;
+- remove or revert only hub-dr-v7-specific GitOps resources;
+- preserve install artifacts under the governed hub-dr-v7 artifact path unless
+  a later destroy gate explicitly removes the cluster.
+
+## Residual Risks
+
+- CIS and PCI DSS 4 platform scans are non-compliant.
+- OADP has an enabled daily schedule and an available BSL, but restore has not
+  been drilled yet.
+- Logging uses an existing greenfield MinIO bucket/credential as a temporary
+  unblocker. A dedicated Loki bucket/user should be created in the
+  custody/backup batch.
+- Kubeadmin retirement, identity-provider integration, and pull-secret custody
+  proof remain open.
+- No failover or controlled `spoke-dc-v7` takeover has been rehearsed.
+
+## Exit State
+
+`hub-dr-v7` is now a GitOps-managed, operator-ready warm-standby management
+hub. It is not yet production-ready for failover because backup restore,
+custody closure, compliance hardening, operational readiness, and takeover
+drills are still pending.
+
+## Next Batch
+
+Proceed to:
+
+```text
+#455 OP-GF-HUBDRV7-9: prove hub-dr-v7 backup restore and secret custody
+#456 OP-GF-HUBDRV7-10: validate hub-dr-v7 compliance and hardening evidence
+#457 OP-GF-HUBDRV7-11: hub-dr-v7 operational readiness and SLO validation
+```
