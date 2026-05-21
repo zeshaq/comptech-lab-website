@@ -1,0 +1,77 @@
+---
+title: "Installation Manual - 110 v7 operator install batch model"
+sidebar_label: "110 v7 operator batch model"
+description: "The consolidated v7 operator installation batch model, queue, guardrails, and documentation pattern."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-20`, the decision to stop running
+operator work as many small manual entries and instead publish one coherent
+installation-manual chapter per operator batch.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#436` / `OP-GF-OPERATORS-20` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#435` / `OP-GF-OPERATORS-19` |
+| Blog commit | `f9e5d7f` / `Consolidate v7 operator batch plan` |
+
+## Decision
+
+Each operator batch must include the full lifecycle in one record:
+
+| Phase | Required outcome |
+| --- | --- |
+| Preflight | Issue, milestone, phase, ADR coverage, cluster health, OADP posture, catalog/package/channel/CSV/image availability, and GitOps render evidence. |
+| Install | Only batch-owned GitOps manifests are applied. Scope stays limited to the target cluster and operator family. |
+| Validation | Argo health, Subscription, InstallPlan, CSV, operator pods, excluded operands, ClusterOperators, pods, CSRs, and domain checks are recorded. |
+| Rollback or promotion | GitOps rollback path and CRD cleanup boundary are explicit. Forced CRD deletion requires a separate issue. |
+| Documentation | The batch gets one coherent blog chapter and the operator version-lock reference is updated when package state changes. |
+
+This preserves the user's requirement to avoid many separate installation
+manual pages for every preflight, install, validation, and rollback step while
+still making each completed operator batch visible in the manual index.
+
+## Batch Queue
+
+| Batch | Phase | Packages | Target | State |
+| --- | --- | --- | --- | --- |
+| 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | `spoke-dc-v7` | Completed as chapter 111. |
+| 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | `spoke-dc-v7` | Completed as chapter 112. |
+| 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | `spoke-dc-v7` | Completed as chapter 113. |
+| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, app-facing `cloudnative-pg` | `spoke-dc-v7` | Deferred by user decision as chapter 114. |
+| 5 | `OP-GF-OPERATORS-25` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | hub/spoke after evidence | Not started. |
+
+## Active Exclusions
+
+The following packages are not part of the active operator batch queue unless
+their domain is explicitly reintroduced:
+
+```text
+Quay Operator
+Container Security Operator
+NFD / NVIDIA GPU Operator
+OpenShift AI / RHODS
+OpenShift Virtualization
+Serverless
+```
+
+Quay is already external to OpenShift for this deployment. Container Security
+Operator is not required for parity while RHACS is the active security control
+plane.
+
+## Live Systems
+
+`OP-GF-OPERATORS-20` was planning and documentation only. It did not change
+OpenShift objects, GitOps desired state, VM services, DNS, HAProxy, routes, or
+secrets.
+
+## Validation
+
+The blog build passed when the batch model was published. Later chapters 111
+through 114 carry the batch-specific install or deferral validation.
+

@@ -9,12 +9,20 @@ draft: false
 This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
 gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
 v6-to-v7 operator parity addendum, the `OP-GF-OPERATORS-19` missing-operator
-decision, the `OP-GF-OPERATORS-20` batch model, and the
-`OP-GF-OPERATORS-21` Pipelines Batch 1 execution,
-`OP-GF-OPERATORS-22` observability foundation Batch 2 execution, and
-`OP-GF-OPERATORS-23` tracing/mesh Batch 3 execution so the manual keeps one
-coherent operator path instead of one sidebar entry per preflight,
-installation, validation, or rollback step.
+decision, and the `OP-GF-OPERATORS-20` batch model.
+
+The completed 2026-05-21 batch closeouts are also published as standalone
+installation-manual chapters so they are visible from the Greenfield manual
+index without splitting each batch into separate preflight, installation,
+validation, and rollback pages:
+
+| Chapter | Scope |
+| --- | --- |
+| [110 v7 operator batch model](/docs/greenfield-ocp-deployment/installation-manual/v7-operator-install-batch-model/) | Consolidated batch model and active/deferred queue. |
+| [111 Spoke Pipelines operator batch](/docs/greenfield-ocp-deployment/installation-manual/spoke-pipelines-operator-batch/) | `OP-GF-OPERATORS-21`, OpenShift Pipelines operator-only install. |
+| [112 Spoke observability foundation operators](/docs/greenfield-ocp-deployment/installation-manual/spoke-observability-foundation-operators/) | `OP-GF-OPERATORS-22`, Cluster Observability and NetObserv operator-only install. |
+| [113 Spoke tracing and mesh operators](/docs/greenfield-ocp-deployment/installation-manual/spoke-tracing-mesh-operators/) | `OP-GF-OPERATORS-23`, Tempo, OpenTelemetry, Service Mesh, and Kiali operator-only install. |
+| [114 App-platform batch deferral](/docs/greenfield-ocp-deployment/installation-manual/app-platform-batch-deferral/) | `OP-GF-OPERATORS-24`, Open Liberty and app-facing CloudNativePG deferral. |
 
 The initial readiness gate did not change live cluster state. Later batch
 sections state their live changes explicitly.

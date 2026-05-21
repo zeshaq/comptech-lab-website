@@ -1,0 +1,62 @@
+---
+title: "Installation Manual - 114 app-platform batch deferral"
+sidebar_label: "114 App-platform batch deferral"
+description: "The user decision to defer the Open Liberty and app-facing CloudNativePG operator batch from the active queue."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-24`, the decision to defer the
+previously listed Batch 4 app-platform operator wave.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#440` / `OP-GF-OPERATORS-24` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#439` / `OP-GF-OPERATORS-23` |
+| Blog commit | `0f9e8b9` / `Defer app platform operator batch` |
+
+## Decision
+
+The user clarified that the next batch previously listed as:
+
+```text
+OP-GF-OPERATORS-24: Batch 4 application platform - Open Liberty and app-facing CloudNativePG
+```
+
+is not needed now.
+
+Decision:
+
+| Item | State |
+| --- | --- |
+| Open Liberty Operator | Deferred |
+| App-facing CloudNativePG package | Deferred |
+| Active next operator install batch | None selected |
+| Future reintroduction | Requires an explicit app-platform onboarding issue |
+
+## Scope Boundary
+
+This was a planning-only decision. No live systems were touched. No cluster
+checks, remediations, GitOps syncs, Subscriptions, operands, image mirror
+sets, routes, DNS records, HAProxy changes, or secrets were changed for this
+deferral.
+
+## Follow-up Requirement
+
+If Open Liberty or app-facing CloudNativePG returns to scope later, create a
+new explicit app-platform onboarding issue that covers:
+
+| Area | Required decision |
+| --- | --- |
+| Tenant ownership | Which application team or namespace owns the platform. |
+| Backup/restore | What data is protected, where backups go, and how restore is validated. |
+| Image supply | Which image sources and mirror mappings are required. |
+| Security posture | RHACS policy expectations and exceptions. |
+| Runtime scope | Whether the work is operator-only or includes operands and sample apps. |
+
+Until then, do not present Open Liberty or app-facing CloudNativePG as the next
+active operator batch.

@@ -1,0 +1,114 @@
+---
+title: "Installation Manual - 113 spoke tracing and mesh operators"
+sidebar_label: "113 Spoke tracing and mesh operators"
+description: "Batch 3 tracing and mesh foundation: Tempo, OpenTelemetry, Service Mesh, and Kiali operator-only install, validation, and promotion decision."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-23`, the Batch 3 tracing and mesh
+operator foundation install for `spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#439` / `OP-GF-OPERATORS-23` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#438` / `OP-GF-OPERATORS-22` |
+| Platform GitOps commit | `0f08a74` / `Install spoke tracing and mesh operators` |
+| Blog commit | `50b7349` / `Document spoke tracing and mesh batch` |
+
+## Scope
+
+| Field | Value |
+| --- | --- |
+| Target | `spoke-dc-v7` |
+| Packages | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` |
+| CSVs | `tempo-operator.v0.20.0-3`, `opentelemetry-operator.v0.144.0-3`, `servicemeshoperator3.v3.3.2`, `kiali-operator.v2.22.2` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` |
+
+The batch installed operators only. It did not create `TempoStack`,
+`TempoMonolithic`, `OpenTelemetryCollector`, `OpAMPBridge`,
+`TargetAllocator`, `ServiceMeshControlPlane`, Sail `Istio`, `ztunnel`,
+`Kiali`, `OSSMConsole`, `Jaeger`, mesh membership, sample applications,
+storage, or retention configuration.
+
+## Preflight
+
+Preflight checked hub and spoke health, OADP, package and catalog resolution,
+related image prefixes, existing Subscriptions, CSVs, namespaces, CRDs, and
+excluded operands. GitOps render and per-resource server-side dry-run were
+completed before the push.
+
+One first preflight pass saw a transient spoke ODF status reporter pod in
+`ContainerCreating`; a recheck found no non-running pods.
+
+## GitOps Install
+
+Platform GitOps commit `0f08a74` added:
+
+```text
+clusters/spoke-dc-v7/operators/tempo-operator/
+clusters/spoke-dc-v7/operators/opentelemetry-operator/
+clusters/spoke-dc-v7/operators/service-mesh-operator/
+clusters/spoke-dc-v7/operators/kiali-operator/
+clusters/spoke-dc-v7/platform/image-mirrors/idms-tracing-mesh.yaml
+```
+
+`idms-tracing-mesh` maps the required `rhosdt`, `openshift4`,
+`openshift-service-mesh`, and `openshift-service-mesh-tech-preview` image
+source prefixes.
+
+## Validation
+
+Final validation:
+
+| Check | Result |
+| --- | --- |
+| Argo | hub-side and spoke-side views `Healthy/Synced` at `0f08a74502047e21d74fe6f4eea90d0dd81b780d` |
+| Tempo Subscription | `AtLatestKnown` |
+| Tempo CSV | `tempo-operator.v0.20.0-3`, `Succeeded` |
+| OpenTelemetry Subscription | `AtLatestKnown` |
+| OpenTelemetry CSV | `opentelemetry-operator.v0.144.0-3`, `Succeeded` |
+| Service Mesh Subscription | `AtLatestKnown` |
+| Service Mesh CSV | `servicemeshoperator3.v3.3.2`, `Succeeded` |
+| Kiali Subscription | `AtLatestKnown` |
+| Kiali CSV | `kiali-operator.v2.22.2`, `Succeeded` |
+| InstallPlans | `install-tj4jv`, `install-r54ld`, and `install-kz4wg`, approved and `Complete` |
+| Operator pods | Running |
+| ClusterVersion | `4.20.18`, Available, not Progressing, not Failing |
+| MCPs | updated, not degraded |
+| Non-steady ClusterOperators | none |
+| Non-running pods | none |
+| Pending CSRs | none |
+
+No tracing or mesh operands were created:
+
+```text
+TempoStack: 0
+TempoMonolithic: 0
+OpenTelemetryCollector: 0
+OpAMPBridge: 0
+TargetAllocator: 0
+Maistra ServiceMesh resources: 0
+Sail Istio resources: 0
+Kiali: 0
+OSSMConsole: 0
+Jaeger: 0
+```
+
+## Promotion Decision
+
+Keep the operator-only install. It establishes tracing and mesh operator
+readiness without activating trace storage, collectors, a mesh control plane,
+Kiali, Jaeger, mesh membership, telemetry pipelines, tenant namespaces, or
+sample applications.
+
+Rollback is GitOps-first. Full CRD, webhook, console-plugin, or cluster-scoped
+cleanup requires a separate issue.
+
+Follow-up planning: Batch 4 app-platform operators were deferred by user
+decision in [114 App-platform batch deferral](/docs/greenfield-ocp-deployment/installation-manual/app-platform-batch-deferral/).
+

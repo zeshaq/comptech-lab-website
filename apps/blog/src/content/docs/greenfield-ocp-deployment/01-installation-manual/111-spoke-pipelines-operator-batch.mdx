@@ -1,0 +1,120 @@
+---
+title: "Installation Manual - 111 spoke Pipelines operator batch"
+sidebar_label: "111 Spoke Pipelines operator batch"
+description: "Batch 1 app-delivery foundation: spoke OpenShift Pipelines operator-only install, validation, and promotion decision."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-21`, the Batch 1 app-delivery
+foundation install for `spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#437` / `OP-GF-OPERATORS-21` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#436` / `OP-GF-OPERATORS-20` |
+| Platform GitOps commit | `8c41a86` / `Install spoke OpenShift Pipelines operator` |
+| Blog commit | `b40c50c` / `Document spoke Pipelines operator batch` |
+
+## Scope
+
+| Field | Value |
+| --- | --- |
+| Target | `spoke-dc-v7` |
+| Package | `openshift-pipelines-operator-rh` |
+| Channel | `pipelines-1.22` |
+| CSV | `openshift-pipelines-operator-rh.v1.22.0` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` |
+
+The batch installed the operator through GitOps and stopped at operator
+readiness. It did not create app namespaces, CI/CD credentials, build
+workloads, `PipelineRuns`, `TaskRuns`, `TriggerBindings`,
+`TriggerTemplates`, or `EventListeners`.
+
+## Preflight
+
+Preflight used the standard v7 access path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Readiness checks passed before install:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3` masters and `3` workers Ready |
+| ClusterOperators | no non-steady rows |
+| Pending CSRs | none |
+| Existing Pipelines state | no namespace, Subscription, CSV, or Tekton API resources |
+| OADP DPA | `spoke-dc-v7`, `Reconciled=True` |
+| OADP BSL | `spoke-dc-v7`, `Available` |
+| OADP schedule | `platform-resource-daily`, enabled |
+
+The PackageManifest resolved from the mirrored Red Hat catalog. Related image
+source prefixes were mapped through `ImageDigestMirrorSet/idms-openshift-pipelines`.
+
+## GitOps Install
+
+Platform GitOps commit `8c41a86` added the Pipelines operator overlay and
+mirror policy:
+
+```text
+clusters/spoke-dc-v7/operators/openshift-pipelines-operator/
+clusters/spoke-dc-v7/platform/image-mirrors/idms-openshift-pipelines.yaml
+```
+
+The Subscription lives in `openshift-operators`, uses
+`cs-redhat-operator-index-v4-20`, channel `pipelines-1.22`, and starting CSV
+`openshift-pipelines-operator-rh.v1.22.0`.
+
+## Validation
+
+Final validation:
+
+| Check | Result |
+| --- | --- |
+| Argo | hub-side and spoke-side views `Healthy/Synced` at `8c41a86ebc59390f0be4aae765dfb17276a11602` |
+| Subscription | `AtLatestKnown` |
+| CSV | `openshift-pipelines-operator-rh.v1.22.0`, `Succeeded` |
+| TektonConfig | `config`, version `1.22.0`, `Ready=True` |
+| Operator pods | Running |
+| `openshift-pipelines` pods | Running |
+| ClusterVersion | `4.20.18`, Available, not Progressing, not Failing |
+| Non-running pods | none |
+| Pending CSRs | none |
+
+The operator created default operator-owned Tekton add-ons. At closeout there
+were still no workload runs or trigger entry points:
+
+```text
+pipelineruns.tekton.dev: 0
+taskruns.tekton.dev: 0
+triggerbindings.triggers.tekton.dev: 0
+triggertemplates.triggers.tekton.dev: 0
+eventlisteners.triggers.tekton.dev: 0
+```
+
+## Promotion Decision
+
+Keep the install. GitOps was synced, OLM was `AtLatestKnown`, the CSV was
+`Succeeded`, `TektonConfig` was Ready, operator pods were Running, and spoke
+cluster health stayed steady.
+
+Rollback is GitOps-first:
+
+1. Remove the Pipelines operator overlay from the spoke kustomization.
+2. Remove `idms-openshift-pipelines` only if no other workload needs those
+   mirror mappings.
+3. Sync and validate OLM/operator pruning.
+4. Do not force-delete Tekton CRDs or operator-created cluster-scoped objects
+   without a separate cleanup issue.
+
+Next completed operator batch: [112 Spoke observability foundation operators](/docs/greenfield-ocp-deployment/installation-manual/spoke-observability-foundation-operators/).
+

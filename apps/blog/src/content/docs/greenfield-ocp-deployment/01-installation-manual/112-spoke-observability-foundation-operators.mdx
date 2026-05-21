@@ -1,0 +1,101 @@
+---
+title: "Installation Manual - 112 spoke observability foundation operators"
+sidebar_label: "112 Spoke observability foundation operators"
+description: "Batch 2 observability foundation: Cluster Observability and NetObserv operator-only install, validation, and promotion decision."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-OPERATORS-22`, the Batch 2 observability
+foundation install for `spoke-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#438` / `OP-GF-OPERATORS-22` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#437` / `OP-GF-OPERATORS-21` |
+| Platform GitOps commit | `dd6d1da` / `Install spoke observability foundation operators` |
+| Blog commit | `4491b4e` / `Document spoke observability foundation batch` |
+
+## Scope
+
+| Field | Cluster Observability Operator | NetObserv Operator |
+| --- | --- | --- |
+| Target | `spoke-dc-v7` | `spoke-dc-v7` |
+| Package | `cluster-observability-operator` | `netobserv-operator` |
+| CSV | `cluster-observability-operator.v1.4.0` | `network-observability-operator.v1.11.1` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` | `cs-redhat-operator-index-v4-20` |
+
+The batch installed operators only. It did not create `FlowCollector`,
+`FlowMetric`, `MonitoringStack`, `UIPlugin`, Perses,
+`ObservabilityInstaller`, `MultiClusterObservability`, object storage,
+retention config, or tenant workloads.
+
+## Preflight
+
+Preflight checked hub and spoke health, OADP, storage classes, PVC posture,
+existing observability resources, package resolution, related image prefixes,
+GitOps render, and server-side dry-run.
+
+The install was approved because cluster health was steady and package
+resolution was deterministic from the mirrored Red Hat catalog.
+
+## GitOps Install
+
+Platform GitOps commit `dd6d1da` added:
+
+```text
+clusters/spoke-dc-v7/operators/cluster-observability-operator/
+clusters/spoke-dc-v7/operators/netobserv-operator/
+clusters/spoke-dc-v7/platform/image-mirrors/idms-observability-foundation.yaml
+```
+
+The mirror policy covers the required Cluster Observability, NetObserv, and
+OpenShift Logging image source prefixes.
+
+## Validation
+
+Final validation:
+
+| Check | Result |
+| --- | --- |
+| Argo | hub-side and spoke-side views `Healthy/Synced` at `dd6d1da61f01ff01be9069bf34d1be66a8c211d4` |
+| Cluster Observability Subscription | `AtLatestKnown` |
+| Cluster Observability CSV | `cluster-observability-operator.v1.4.0`, `Succeeded` |
+| NetObserv Subscription | `AtLatestKnown` |
+| NetObserv CSV | `network-observability-operator.v1.11.1`, `Succeeded` |
+| InstallPlans | `install-2h47t` and `install-b9srf`, approved and `Complete` |
+| Operator pods | Running |
+| ClusterVersion | `4.20.18`, Available, not Progressing, not Failing |
+| MCPs | updated, not degraded |
+| Non-steady ClusterOperators | none |
+| Non-running pods | none |
+| Pending CSRs | none |
+
+No observability operands were created:
+
+```text
+FlowCollector: 0
+FlowMetric: 0
+MonitoringStack: 0
+UIPlugin: 0
+ObservabilityInstaller: 0
+Perses: 0
+PersesDashboard: 0
+MultiClusterObservability: 0
+```
+
+## Promotion Decision
+
+Keep the operator-only install. It establishes the observability operator
+foundation without activating flow collection, durable observability storage,
+UI plugins, or tenant workloads.
+
+Rollback is GitOps-first. Full CRD or console-plugin cleanup requires a
+separate issue.
+
+Next completed operator batch: [113 Spoke tracing and mesh operators](/docs/greenfield-ocp-deployment/installation-manual/spoke-tracing-mesh-operators/).
+
