@@ -1,0 +1,425 @@
+---
+title: "Installation Manual - 124 hub-dr-v7 protection compliance and readiness"
+sidebar_label: "124 hub-dr-v7 protection compliance and readiness"
+description: "Batch 3 execution for hub-dr-v7: OADP restore, secret custody, CIS and PCI DSS 4 scanner closure, File Integrity, RHACS backup, and operational readiness."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records Batch 3 of the `hub-dr-v7` warm-standby management hub
+deployment. It combines issue `#455`, issue `#456`, and issue `#457` into one
+evidence set: backup and restore proof, Vault-backed secret custody, break-glass
+identity, `kubeadmin` retirement, CIS and PCI DSS 4 scanner closure, File
+Integrity evidence, RHACS backup, and operational readiness validation.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Batch | `hub-dr-v7` Batch 3: protection, compliance, and readiness |
+| Issues | `#455` / `OP-GF-HUBDRV7-9`, `#456` / `OP-GF-HUBDRV7-10`, `#457` / `OP-GF-HUBDRV7-11` |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-protection-compliance-readiness.md` |
+
+## Objective
+
+Close the third `hub-dr-v7` execution batch as a single operational evidence
+set.
+
+The target state was:
+
+- backup and restore readiness proven through OADP;
+- install pull-secret custody restored in Vault;
+- a Vault-backed break-glass identity available through OAuth;
+- install-time `kubeadmin` access removed after the replacement identity was
+  tested;
+- CIS and PCI DSS 4 Compliance Operator scans clean;
+- File Integrity node status clean after handling expected LVMS metadata churn;
+- RHACS Central backup captured and policy inventory reachable;
+- API, console, ingress, GitOps, Vault, ESO, OADP, logging, monitoring, RHACS,
+  registry mirror, standby-safety, and compact-node maintenance checks passed.
+
+## Non-Goals
+
+- Do not promote `hub-dr-v7`.
+- Do not import or actively manage `spoke-dc-v7`.
+- Do not create a failover `ApplicationSet`.
+- Do not execute live node drains or reboots.
+- Do not publish kubeconfigs, kubeadmin passwords, pull secrets, Vault tokens,
+  object-storage credentials, RHACS credentials, HTPasswd values, private keys,
+  PATs, or full Secret manifests.
+- Do not present scanner closure as formal PCI DSS ROC, AOC, or QSA
+  attestation.
+
+## Entry State
+
+`hub-dr-v7` entered this batch as an installed and GitOps-managed standby hub.
+The root Argo CD application was healthy at Git revision `60bc2b8`, and Batch 2
+had installed the management, security, backup, logging, compliance, and storage
+operators.
+
+The remaining compliance failures were concentrated around identity, kubeadmin
+removal, and one stale ACS sensor check:
+
+```text
+ocp4-cis                               DONE NON-COMPLIANT
+ocp4-cis-node-master                   DONE COMPLIANT
+ocp4-pci-dss-4-0-hub-dr-v7             DONE NON-COMPLIANT
+ocp4-pci-dss-node-4-0-master           DONE COMPLIANT
+```
+
+Failed check results at entry:
+
+```text
+ocp4-cis-idp-is-configured
+ocp4-cis-kubeadmin-removed
+ocp4-pci-dss-4-0-hub-dr-v7-acs-sensor-exists
+ocp4-pci-dss-4-0-hub-dr-v7-idp-is-configured
+ocp4-pci-dss-4-0-hub-dr-v7-kubeadmin-removed
+```
+
+The ACS sensor was already installed, so that item was treated as stale scan
+state and included in the rescan after identity remediation.
+
+## Stop Conditions
+
+The batch had to stop if any of these occurred:
+
+- R1 Vault was sealed or could not serve the required secret paths;
+- External Secrets could not materialize the HTPasswd Secret;
+- the `ze` OAuth login could not be proven before deleting `kubeadmin`;
+- compliance rescans reported new unrelated failures;
+- OADP restore failed or restored incorrect data;
+- File Integrity reported unexpected changes outside the known LVMS metadata
+  path;
+- RHACS Central was unavailable or the backup could not be produced;
+- standby boundary checks found `ApplicationSet`, `GitOpsCluster`, or
+  `spoke-dc-v7` import resources on `hub-dr-v7`.
+
+None of those stop conditions remained at closeout.
+
+## Live Systems Touched
+
+- `hub-dr-v7`;
+- `gf-ocp-bootstrap-01`;
+- `dl385-2`;
+- R1 Vault at `30.30.200.35`;
+- OADP object storage through `BackupStorageLocation/hub-dr-v7`;
+- RHACS Central on `hub-dr-v7`;
+- platform GitOps repository
+  `git@github.com:zeshaq/openshift-platform-gitops.git`;
+- bootstrap clone `/home/ze/greenfield-ops/openshift-gitops`.
+
+## GitOps Changes
+
+Two platform GitOps commits were added and synced:
+
+```text
+0064025 Add hub-dr-v7 identity readiness
+2dae30e Tune hub-dr-v7 file integrity baseline
+```
+
+The identity commit added:
+
+- `ClusterSecretStore/vault-r1-identity`;
+- `ExternalSecret/openshift-config/htpasswd-ze`;
+- `OAuth/cluster` identity provider `htpasswd-ze`;
+- `ClusterRoleBinding/platform-admin-ze`;
+- `OAuth/cluster` token configuration.
+
+The File Integrity commit added:
+
+- `ConfigMap/hub-dr-v7-aide-config`;
+- `FileIntegrity/hub-dr-v7-fileintegrity`;
+- a narrow AIDE exclusion for LVMS-maintained backup metadata under
+  `/hostroot/etc/lvm/backup/.*`.
+
+Final root app state:
+
+```text
+hub-dr-v7-bootstrap  Synced  Healthy  Succeeded  2dae30e
+```
+
+## Secret Custody
+
+R1 Vault was healthy before custody changes:
+
+```text
+initialized=true
+sealed=false
+standby=false
+version=1.21.1
+```
+
+Vault paths written or validated:
+
+```text
+secret/greenfield/openshift/hub-dr-v7/identity/htpasswd-ze
+secret/greenfield/openshift/hub-dr-v7/install/pull-secret
+secret/greenfield/openshift/hub-dr-v7/rhacs/admin
+secret/greenfield/object-storage/minio/users/oadp-backup
+```
+
+Only metadata was recorded. Secret values were not printed into the terminal
+history, reports, Git commits, or this article.
+
+The dedicated identity integration uses:
+
+```text
+policy: hub-dr-v7-identity-secrets
+auth mount: kubernetes-hub-dr-v7
+role: identity-secrets
+bound service account: external-secrets-operator-controller-manager
+bound namespace: external-secrets-operator
+audience: vault
+ttl: 3600s
+```
+
+ESO readiness at closeout:
+
+```text
+vault-r1-eso-smoke   Ready=True
+vault-r1-identity    Ready=True
+vault-r1-logging     Ready=True
+vault-r1-oadp        Ready=True
+vault-r1-rhacs       Ready=True
+```
+
+ExternalSecret readiness at closeout:
+
+```text
+external-secrets-operator/eso-smoke               Ready=True
+openshift-adp/oadp-cloud-credentials              Ready=True
+openshift-config/htpasswd-ze                      Ready=True
+openshift-logging/logging-loki-s3                 Ready=True
+stackrox/admission-control-tls                    Ready=True
+stackrox/central-admin-password                   Ready=True
+stackrox/collector-tls                            Ready=True
+stackrox/sensor-tls                               Ready=True
+```
+
+## Identity And kubeadmin Retirement
+
+The `ze` break-glass identity was tested with a real OAuth login using the
+Vault-backed password. The test kubeconfig was temporary and removed after the
+authorization check.
+
+Validation:
+
+```text
+OAuth identity provider: htpasswd-ze
+ze cluster-admin check: yes
+kubeadmin Secret: absent
+```
+
+Only after the `ze` path was proven was `Secret/kube-system/kubeadmin` deleted.
+
+## Compliance Closure
+
+All four scans were rerun after identity and kubeadmin remediation:
+
+```text
+ocp4-cis                               DONE COMPLIANT
+ocp4-cis-node-master                   DONE COMPLIANT
+ocp4-pci-dss-4-0-hub-dr-v7             DONE COMPLIANT
+ocp4-pci-dss-node-4-0-master           DONE COMPLIANT
+```
+
+Failed ComplianceCheckResult count:
+
+```text
+0
+```
+
+This is scanner closure for the OpenShift technical controls represented by
+the installed Compliance Operator profiles. It is not a replacement for
+external PCI DSS attestation, business-process evidence, vulnerability
+management process evidence, change-management records, or compensating
+control signoff.
+
+## File Integrity Evidence
+
+Initial File Integrity node results failed only on LVMS-generated LVM backup
+metadata:
+
+```text
+/hostroot/etc/lvm/backup/vg1
+```
+
+The fix was to tune the AIDE baseline through GitOps and exclude only the
+volatile LVM backup metadata path. Then the File Integrity baseline was
+reinitialized.
+
+Final node status:
+
+```text
+hub-dr-v7-master-0  Succeeded  2026-05-21T20:45:16Z
+hub-dr-v7-master-1  Succeeded  2026-05-21T20:45:08Z
+hub-dr-v7-master-2  Succeeded  2026-05-21T20:45:08Z
+```
+
+The `FileIntegrity` CR phase still showed `Initializing` immediately after the
+re-init cycle, but every `FileIntegrityNodeStatus.lastResult.condition` was
+`Succeeded`, which is the node-level evidence required for this batch.
+
+## OADP Backup And Restore Drill
+
+OADP steady state:
+
+```text
+DataProtectionApplication/hub-dr-v7  Reconciled=True
+BackupStorageLocation/hub-dr-v7      Available
+Schedule/platform-resource-daily     Enabled  15 2 * * *
+```
+
+Restore drill inputs:
+
+```text
+test namespace: hub-dr-v7-restore-smoke
+backup:         hub-dr-v7-restore-smoke-20260521202100
+restore:        hub-dr-v7-restore-smoke-20260521202100
+```
+
+Results:
+
+```text
+Backup phase:  Completed  2026-05-21T20:21:01Z -> 2026-05-21T20:21:04Z
+Restore phase: Completed  2026-05-21T20:21:19Z -> 2026-05-21T20:21:24Z
+Restored ConfigMap gate value: OP-GF-HUBDRV7-9
+Cleanup: restored smoke namespace removed after validation
+```
+
+This proves the standby hub can back up and restore namespace-scoped
+Kubernetes resources through the configured OADP object store without taking
+active managed-cluster authority.
+
+## RHACS Backup And Policy Posture
+
+RHACS readiness:
+
+```text
+Central          4.10.2  Available=True  Progressing=False
+SecuredCluster   4.10.2  Available=True  Progressing=False
+Secured clusters visible to Central: 1
+Policy count visible through Central API: 87
+```
+
+Central backup evidence:
+
+```text
+file:   /home/ze/greenfield-ocp-work-folder/secrets/rhacs/hub-dr-v7/central-backup-20260521T202247Z.zip
+size:   10507020 bytes
+sha256: f3c30836058322209937bc2b46734c97a7181a1705bf077e150eb4c4a562531a
+```
+
+The backup file is intentionally retained under the local secrets custody tree.
+It is not committed to Git and is not published as an artifact.
+
+## Operational Readiness Matrix
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Cluster version | `4.20.18`, Available=True, Progressing=False, Failing=False | Pass |
+| ClusterOperators | non-steady operator count `0` | Pass |
+| Nodes | three compact masters Ready | Pass |
+| MCP | master Updated=True, Updating=False, Degraded=False | Pass |
+| Pods | non-running/non-succeeded pod count `0` | Pass |
+| API | `/readyz` returned OK | Pass |
+| Console | console route returned HTTP 200 | Pass |
+| Ingress wildcard | wildcard smoke returned router HTTP 503 | Pass: VIP/router reachable, no app route expected |
+| GitOps | root app Synced/Healthy/Succeeded at `2dae30e` | Pass |
+| Vault | R1 Vault initialized, unsealed, active | Pass |
+| ESO | all five ClusterSecretStores and all eight ExternalSecrets Ready | Pass |
+| Backup | OADP DPA Reconciled, BSL Available, schedule Enabled | Pass |
+| Restore | smoke Backup and Restore Completed | Pass |
+| Logging | LokiStack, ClusterLogForwarder, and logging pods Running | Pass |
+| Monitoring | Prometheus and Alertmanager available, pods Running | Pass |
+| RHACS | Central and SecuredCluster Available, backup captured | Pass |
+| Registry and mirrors | image registry operator Available; integrated registry remains `Removed` to match `hub-dc-v7`; mirror IDMS/ITMS and disconnected catalog pods Running | Pass |
+| ACM standby | only `ManagedCluster/local-cluster`; no `ApplicationSet`; no `GitOpsCluster` | Pass |
+| Drain rehearsal | server dry-run drains pass with `--force` for compact master guard pods | Pass with compact-topology caveat |
+
+## Compact Node Drain Expectation
+
+`hub-dr-v7` is a compact three-master cluster. A normal drain dry-run without
+`--force` fails on OpenShift guard pods that have no controller:
+
+```text
+openshift-etcd/etcd-guard-*
+openshift-kube-apiserver/kube-apiserver-guard-*
+openshift-kube-controller-manager/kube-controller-manager-guard-*
+openshift-kube-scheduler/openshift-kube-scheduler-guard-*
+```
+
+With compact-node flags, server dry-run drains completed for all three masters:
+
+```text
+oc adm drain <node> --ignore-daemonsets --delete-emptydir-data --force --dry-run=server
+```
+
+Live drains or reboots remain maintenance-window actions only. Run one node at a
+time, confirm etcd and ClusterOperators between nodes, and keep `hub-dr-v7` in
+standby mode until a later failover gate explicitly promotes it.
+
+## Standby Safety
+
+The standby boundary remains intact:
+
+```text
+ManagedCluster objects: local-cluster only
+ApplicationSet objects: none
+GitOpsCluster objects: none
+spoke-dc-v7 import or takeover resources: absent
+```
+
+`hub-dr-v7` is operational as a warm-standby management hub, but it has not
+been promoted and does not manage `spoke-dc-v7`.
+
+## Rollback Notes
+
+- If the `ze` HTPasswd identity breaks, recover through the governed kubeconfig
+  on the bootstrap host and restore the Vault path or `ExternalSecret`.
+  Recreate `kubeadmin` only through a new governed access-recovery issue.
+- If AIDE reports unexpected changes outside the LVMS backup metadata
+  exclusion, treat that as a real integrity event and inspect the result
+  ConfigMap before any re-init.
+- OADP smoke backup and restore objects can remain as evidence; the smoke
+  namespace was cleaned after restore validation.
+- RHACS Central backup is sensitive and stays under
+  `/home/ze/greenfield-ocp-work-folder/secrets/rhacs/hub-dr-v7/`.
+
+## Residual Risks
+
+- No failover, takeover, or active management of `spoke-dc-v7` was performed in
+  this batch.
+- The integrated OpenShift image registry is `Removed`, matching `hub-dc-v7`.
+  Disconnected catalog and mirror access are healthy. Enable a storage-backed
+  integrated registry only if a future workload requirement needs in-cluster
+  image push or pull.
+- Logging still uses the existing greenfield MinIO credential as a temporary
+  unblocker until a dedicated Loki bucket and user are split out.
+- Compliance status is scanner-clean for the selected OpenShift profiles. It is
+  not formal PCI DSS attestation.
+
+## Batch Closeout
+
+Issue closeout:
+
+```text
+#455 OP-GF-HUBDRV7-9   closed
+#456 OP-GF-HUBDRV7-10  closed
+#457 OP-GF-HUBDRV7-11  closed
+```
+
+Parent issue `#448` was updated with the Batch 3 evidence summary.
+
+Next batch:
+
+```text
+#458 OP-GF-HUBDRV7-12: hub-dr-v7 failover runbook and dry-run rehearsal
+#459 OP-GF-HUBDRV7-13: controlled hub-dr-v7 takeover drill
+#460 OP-GF-HUBDRV7-14: hub-dr-v7 reproducibility certification evidence
+#461 OP-GF-HUBDRV7-15: hub-dr-v7 full manual and operational handoff
+```
