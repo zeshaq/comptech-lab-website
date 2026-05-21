@@ -89,10 +89,10 @@ packages that are mirrored or catalog-visible but not installed.
 | `openshift-pipelines-operator-rh` | absent | `1.22.0` | Present on spoke; Batch 1 / `OP-GF-OPERATORS-21` completed |
 | `cluster-observability-operator` | absent | `1.4.0` | Present on spoke; Batch 2 / `OP-GF-OPERATORS-22` completed operator-only |
 | `netobserv-operator` | absent | `1.11.1` | Present on spoke; Batch 2 / `OP-GF-OPERATORS-22` completed operator-only |
-| `tempo-product` | absent | absent | Missing/deferred |
-| `opentelemetry-product` | absent | absent | Missing/deferred |
-| `servicemeshoperator3` / Service Mesh | absent | absent | Missing/deferred |
-| `kiali-ossm` | absent | absent | Missing/deferred |
+| `tempo-product` | absent | `0.20.0-3` | Present on spoke; Batch 3 / `OP-GF-OPERATORS-23` completed operator-only |
+| `opentelemetry-product` | absent | `0.144.0-3` | Present on spoke; Batch 3 / `OP-GF-OPERATORS-23` completed operator-only |
+| `servicemeshoperator3` / Service Mesh | absent | `3.3.2` | Present on spoke; Batch 3 / `OP-GF-OPERATORS-23` completed operator-only |
+| `kiali-ossm` | absent | `2.22.2` | Present on spoke; Batch 3 / `OP-GF-OPERATORS-23` completed operator-only |
 | `jaeger-product` | absent | absent | Missing/deferred |
 | `quay-operator` | absent | absent | External registry path currently used |
 | `container-security-operator` | absent | absent | Missing/deferred |
@@ -130,7 +130,7 @@ Deferred tracks:
 | Track | Packages | Decision |
 | --- | --- | --- |
 | `OP-GF-OBS-01` | `cluster-observability-operator`, `netobserv-operator` | Batch 2 installed operator-only on `spoke-dc-v7`; FlowCollector, MonitoringStack, UIPlugin, Perses, ACM observability, storage, retention, and tenant telemetry operands remain deferred. |
-| `OP-GF-TRACE-MESH-01` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Install only with app tracing or mesh requirements. |
+| `OP-GF-TRACE-MESH-01` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Batch 3 installed operator-only on `spoke-dc-v7`; TempoStack, OpenTelemetryCollector, ServiceMeshControlPlane, Istio/Sail, Kiali, Jaeger, mesh membership, telemetry pipelines, storage/retention, sample workloads, and tenant namespaces remain deferred. |
 | `OP-GF-APPPLAT-01` | `open-liberty-certified`, `cloudnative-pg` | Defer to app-platform/golden-path work. |
 | `OP-GF-HARDENING-01` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Defer until workload evidence and disruption/profile ownership exist. |
 
@@ -160,8 +160,8 @@ documentation closeout.
 | --- | --- | --- | --- |
 | 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | Completed on `spoke-dc-v7` at `1.22.0`; operator-only, no user workload runs or CI/CD credentials. |
 | 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | Completed on `spoke-dc-v7`; operator-only, no FlowCollector, MonitoringStack, UIPlugin, Perses, ACM observability, object storage, retention, or tenant telemetry operands. |
-| 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Next; deferred until workload tracing or mesh onboarding is required. |
-| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Deferred until app-platform tenancy, backup, image supply, and RHACS decisions are ready. |
+| 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Completed on `spoke-dc-v7`; operator-only, no TempoStack, OpenTelemetryCollector, ServiceMeshControlPlane, Istio/Sail, Kiali, Jaeger, mesh membership, telemetry pipeline, storage, retention, tenant namespace, or sample app operands. |
+| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Next; requires app-platform tenancy, backup, image supply, and RHACS decisions. |
 | 5 | `OP-GF-OPERATORS-25` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Deferred until workload evidence, disruption budgets, and profile ownership are ready. |
 
 ## 2026-05-21 Batch 1 live outcome
@@ -208,6 +208,31 @@ Scope note: no `FlowCollector`, `FlowMetric`, `MonitoringStack`, `UIPlugin`,
 `MultiClusterObservability` resources were created. Storage, retention, flow
 collection, ACM observability, tenant telemetry, tracing, service mesh, and
 sample workload onboarding remain future decisions.
+
+## 2026-05-21 Batch 3 live outcome
+
+`OP-GF-OPERATORS-23` installed the tracing and mesh foundation operators on
+`spoke-dc-v7`.
+
+| Field | Tempo | OpenTelemetry | Service Mesh 3 | Kiali |
+| --- | --- | --- | --- | --- |
+| Package | `tempo-product` | `opentelemetry-product` | `servicemeshoperator3` | `kiali-ossm` |
+| Channel | `stable` | `stable` | `stable-3.3` | `stable` |
+| CSV | `tempo-operator.v0.20.0-3` | `opentelemetry-operator.v0.144.0-3` | `servicemeshoperator3.v3.3.2` | `kiali-operator.v2.22.2` |
+| Version | `0.20.0-3` | `0.144.0-3` | `3.3.2` | `2.22.2` |
+| Namespace | `openshift-tempo-operator` | `openshift-opentelemetry-operator` | `openshift-operators` | `openshift-operators` |
+| Target | `spoke-dc-v7` | `spoke-dc-v7` | `spoke-dc-v7` | `spoke-dc-v7` |
+| Source | `cs-redhat-operator-index-v4-20` | `cs-redhat-operator-index-v4-20` | `cs-redhat-operator-index-v4-20` | `cs-redhat-operator-index-v4-20` |
+| GitOps commit | `0f08a74` | `0f08a74` | `0f08a74` | `0f08a74` |
+| OLM status | Subscription `AtLatestKnown`, CSV `Succeeded` | Subscription `AtLatestKnown`, CSV `Succeeded` | Subscription `AtLatestKnown`, CSV `Succeeded` | Subscription `AtLatestKnown`, CSV `Succeeded` |
+
+Scope note: no `TempoStack`, `TempoMonolithic`,
+`OpenTelemetryCollector`, `OpAMPBridge`, `TargetAllocator`,
+`ServiceMeshControlPlane`, `ServiceMeshMemberRoll`, `ServiceMeshMember`,
+Sail `Istio`, `IstioRevision`, `ztunnel`, `Kiali`, `OSSMConsole`, or
+`Jaeger` resources were created. Mesh membership, telemetry pipelines,
+trace storage, retention, tenant namespaces, and sample workloads remain
+future decisions.
 
 ## Deferred operator packages
 
