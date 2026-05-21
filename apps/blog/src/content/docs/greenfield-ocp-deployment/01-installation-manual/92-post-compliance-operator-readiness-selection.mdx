@@ -1,7 +1,7 @@
 ---
-title: "Installation Manual - 92 Operator readiness and batch plan"
-sidebar_label: "92 Operator readiness and batch plan"
-description: "Read-only operator readiness, parity audit, install/defer decisions, and the consolidated v7 operator batch plan."
+title: "Installation Manual - 92 Operator readiness and batch execution"
+sidebar_label: "92 Operator readiness and batch execution"
+description: "Read-only operator readiness, parity audit, install/defer decisions, the consolidated v7 operator batch plan, and the spoke Pipelines Batch 1 execution."
 last_reviewed: 2026-05-21
 draft: false
 ---
@@ -9,11 +9,13 @@ draft: false
 This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
 gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
 v6-to-v7 operator parity addendum, the `OP-GF-OPERATORS-19` missing-operator
-decision, and the `OP-GF-OPERATORS-20` batch model so the manual keeps one
+decision, the `OP-GF-OPERATORS-20` batch model, and the
+`OP-GF-OPERATORS-21` Pipelines Batch 1 execution so the manual keeps one
 coherent operator path instead of one sidebar entry per preflight,
 installation, validation, or rollback step.
 
-No live cluster state was changed.
+The initial readiness gate did not change live cluster state. Later batch
+sections state their live changes explicitly.
 
 ## Governance
 
@@ -326,8 +328,8 @@ Planned batches:
 
 | Batch | Phase | Target | Packages | Gate posture |
 | --- | --- | --- | --- | --- |
-| 1 | `OP-GF-OPERATORS-21` | `spoke-dc-v7` | `openshift-pipelines-operator-rh` | Operator-only app delivery foundation. No Tasks, Pipelines, Triggers, app namespaces, build workloads, or CI/CD credentials. |
-| 2 | `OP-GF-OPERATORS-22` | hub/spoke after preflight | Cluster Observability Operator and NetObserv | Storage, retention, flow volume, and resource posture must be settled before install. |
+| 1 | `OP-GF-OPERATORS-21` | `spoke-dc-v7` | `openshift-pipelines-operator-rh` | Completed. Operator-only app delivery foundation; no user workload runs, triggers, app namespaces, build workloads, or CI/CD credentials. |
+| 2 | `OP-GF-OPERATORS-22` | hub/spoke after preflight | Cluster Observability Operator and NetObserv | Next. Storage, retention, flow volume, and resource posture must be settled before install. |
 | 3 | `OP-GF-OPERATORS-23` | `spoke-dc-v7` | Tempo, OpenTelemetry, Service Mesh, and Kiali | Can end as defer/no-install if there is no sample app or mesh onboarding requirement. |
 | 4 | `OP-GF-OPERATORS-24` | `spoke-dc-v7` | Open Liberty and app-facing CloudNativePG | Requires tenant, backup/restore, image supply, and RHACS exception decisions. |
 | 5 | `OP-GF-OPERATORS-25` | hub/spoke after evidence | Kube Descheduler and Security Profiles Operator | Requires workload evidence, disruption budgets, profile ownership, and exception process. |
@@ -342,4 +344,157 @@ NFD / NVIDIA GPU Operator
 OpenShift AI / RHODS
 OpenShift Virtualization
 Serverless
+```
+
+## 2026-05-21 Batch 1: spoke OpenShift Pipelines
+
+`OP-GF-OPERATORS-21` installed the Red Hat OpenShift Pipelines operator on
+`spoke-dc-v7` as the first consolidated operator batch.
+
+Governance:
+
+| Field | Value |
+| --- | --- |
+| Issue | `#437` / `OP-GF-OPERATORS-21` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0024` |
+| Predecessor | `#436` / `OP-GF-OPERATORS-20` |
+
+Scope:
+
+| Field | Value |
+| --- | --- |
+| Target | `spoke-dc-v7` only |
+| Package | `openshift-pipelines-operator-rh` |
+| Channel | `pipelines-1.22` |
+| CSV | `openshift-pipelines-operator-rh.v1.22.0` |
+| CatalogSource | `cs-redhat-operator-index-v4-20` |
+| GitOps commit | `8c41a86` / `Install spoke OpenShift Pipelines operator` |
+
+The batch remained operator-only from a user workload perspective. It did not
+create application namespaces, CI/CD credentials, build workloads,
+`PipelineRuns`, `TaskRuns`, `TriggerBindings`, `TriggerTemplates`, or
+`EventListeners`.
+
+### Batch preflight
+
+Preflight used the standard path:
+
+```text
+local workspace -> dl385-2 -> gf-ocp-bootstrap-01 -> spoke-dc-v7 kubeconfig
+```
+
+Readiness checks passed before install:
+
+| Check | Result |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| ClusterVersion | Available, not Progressing, not Failing |
+| Nodes | `3` masters and `3` workers Ready |
+| ClusterOperators | no non-steady rows |
+| Pending CSRs | none |
+| Existing Pipelines state | no namespace, Subscription, CSV, or Tekton API resources |
+| OADP DPA | `spoke-dc-v7`, `Reconciled=True` |
+| OADP BSL | `spoke-dc-v7`, `Available` |
+| OADP schedule | `platform-resource-daily`, enabled |
+
+The PackageManifest resolved from the mirrored Red Hat catalog with default
+channel `pipelines-1.22` and current CSV
+`openshift-pipelines-operator-rh.v1.22.0`. The package supports
+`AllNamespaces` install mode.
+
+Related image source prefixes identified for mirror policy:
+
+```text
+registry.redhat.io/openshift-pipelines
+registry.redhat.io/openshift-serverless-1
+registry.redhat.io/rhel9
+registry.redhat.io/source-to-image
+registry.redhat.io/ubi9
+```
+
+### GitOps install
+
+Platform GitOps commit `8c41a86` added:
+
+```text
+clusters/spoke-dc-v7/operators/openshift-pipelines-operator/kustomization.yaml
+clusters/spoke-dc-v7/operators/openshift-pipelines-operator/subscription.yaml
+clusters/spoke-dc-v7/platform/image-mirrors/idms-openshift-pipelines.yaml
+```
+
+It also updated the spoke overlay kustomizations and the platform GitOps
+`CHANGELOG.md`.
+
+The Subscription lives in `openshift-operators`, uses source
+`cs-redhat-operator-index-v4-20`, channel `pipelines-1.22`, and starting CSV
+`openshift-pipelines-operator-rh.v1.22.0`.
+
+`ImageDigestMirrorSet/idms-openshift-pipelines` maps the related Red Hat
+source prefixes to `quay.v7.comptech-lab.com/openshift-operators/*`.
+
+GitOps render and server-side dry-run passed before push. The bootstrap clone
+on `gf-ocp-bootstrap-01` was then fast-forwarded to `8c41a86`.
+
+### Validation
+
+Final validation:
+
+| Check | Result |
+| --- | --- |
+| Hub Argo view | `hub-dc-v7-bootstrap` and `spoke-dc-v7-cluster-config` `Healthy/Synced` at `8c41a86ebc59390f0be4aae765dfb17276a11602` |
+| Spoke Argo view | `spoke-dc-v7-cluster-config` `Healthy/Synced` at `8c41a86ebc59390f0be4aae765dfb17276a11602` |
+| IDMS | `idms-openshift-pipelines` present |
+| Subscription | `AtLatestKnown` |
+| CSV | `openshift-pipelines-operator-rh.v1.22.0`, `Succeeded` |
+| InstallPlan | approved, `Complete` |
+| TektonConfig | `config`, version `1.22.0`, `Ready=True` |
+| Operator pods | Running |
+| `openshift-pipelines` pods | Running |
+| ClusterVersion | `4.20.18`, Available, not Progressing, not Failing |
+| Non-running pods | none |
+| Pending CSRs | none |
+
+All `TektonInstallerSet` objects reported Ready.
+
+### Scope caveat
+
+The operator creates default operator-owned Tekton add-ons. At validation time
+those included default `Task` and `Pipeline` resources owned by
+`TektonInstallerSet` objects.
+
+The batch still created no workload runs or trigger entry points:
+
+```text
+pipelineruns.tekton.dev: 0
+taskruns.tekton.dev: 0
+triggerbindings.triggers.tekton.dev: 0
+triggertemplates.triggers.tekton.dev: 0
+eventlisteners.triggers.tekton.dev: 0
+```
+
+Treat the default Tasks/Pipelines as operator-managed add-ons, not tenant
+application delivery onboarding.
+
+### Promotion decision
+
+Keep the install.
+
+The install is promoted because GitOps is synced, OLM is
+`AtLatestKnown`, the CSV is `Succeeded`, `TektonConfig` is Ready, operator
+pods are Running, and spoke cluster health stayed steady.
+
+Rollback, if needed, is GitOps-first:
+
+1. Remove `operators/openshift-pipelines-operator` from the spoke overlay.
+2. Remove `idms-openshift-pipelines` only if no other installed workload
+   depends on those mirror mappings.
+3. Sync and validate OLM/operator pruning.
+4. Do not force-delete Tekton CRDs, the operator-created namespace, or
+   cluster-scoped Tekton objects without a separate cleanup issue.
+
+Next operator batch:
+
+```text
+OP-GF-OPERATORS-22: Batch 2 observability foundation - Cluster Observability and NetObserv
 ```

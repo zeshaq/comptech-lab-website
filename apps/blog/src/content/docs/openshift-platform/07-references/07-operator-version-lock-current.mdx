@@ -86,7 +86,7 @@ packages that are mirrored or catalog-visible but not installed.
 | `loki-operator` | `6.5.0` | `6.5.0` | Present |
 | `cluster-logging` | `6.5.0` | `6.5.0` | Present |
 | `file-integrity-operator` | absent | `1.3.8` | Present on spoke |
-| `openshift-pipelines-operator-rh` | absent | absent | Missing/deferred |
+| `openshift-pipelines-operator-rh` | absent | `1.22.0` | Present on spoke; Batch 1 / `OP-GF-OPERATORS-21` completed |
 | `cluster-observability-operator` | absent | absent | Missing/deferred |
 | `netobserv-operator` | absent | absent | Missing/deferred |
 | `tempo-product` | absent | absent | Missing/deferred |
@@ -106,7 +106,7 @@ packages that are mirrored or catalog-visible but not installed.
 | `serverless-operator` | absent | absent | Deferred |
 | `rhods-operator` | absent | absent | Deferred |
 
-Next decision gate:
+Historical next decision gate from the parity audit:
 
 ```text
 OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
@@ -158,11 +158,33 @@ documentation closeout.
 
 | Batch | Phase | Packages | Status |
 | --- | --- | --- | --- |
-| 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | Next actual operator execution, spoke-only, operator-only. |
-| 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | Deferred until storage, retention, and resource preflight pass. |
+| 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | Completed on `spoke-dc-v7` at `1.22.0`; operator-only, no user workload runs or CI/CD credentials. |
+| 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | Next; deferred until storage, retention, flow-volume, backup, and resource preflight pass. |
 | 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Deferred until workload tracing or mesh onboarding is required. |
 | 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Deferred until app-platform tenancy, backup, image supply, and RHACS decisions are ready. |
 | 5 | `OP-GF-OPERATORS-25` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Deferred until workload evidence, disruption budgets, and profile ownership are ready. |
+
+## 2026-05-21 Batch 1 live outcome
+
+`OP-GF-OPERATORS-21` installed `openshift-pipelines-operator-rh` on
+`spoke-dc-v7`.
+
+| Field | Value |
+| --- | --- |
+| Package | `openshift-pipelines-operator-rh` |
+| Channel | `pipelines-1.22` |
+| CSV | `openshift-pipelines-operator-rh.v1.22.0` |
+| Version | `1.22.0` |
+| Target | `spoke-dc-v7` |
+| Source | `cs-redhat-operator-index-v4-20` |
+| GitOps commit | `8c41a86` |
+| OLM status | Subscription `AtLatestKnown`, CSV `Succeeded` |
+| Operand status | `TektonConfig/config` `Ready=True` |
+
+Scope note: no user PipelineRuns, TaskRuns, TriggerBindings,
+TriggerTemplates, EventListeners, app namespaces, build workloads, or CI/CD
+credentials were created. The operator did create default operator-owned
+Tekton Tasks/Pipelines as add-ons.
 
 ## Deferred operator packages
 
