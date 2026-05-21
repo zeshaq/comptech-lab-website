@@ -1,0 +1,192 @@
+---
+title: "Installation Manual - 122 hub-dr-v7 build and base install"
+sidebar_label: "122 hub-dr-v7 build and base install"
+description: "Batch 1 execution for hub-dr-v7: agent ISO, VM creation, install recovery, and base OpenShift validation."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records Batch 1 of the `hub-dr-v7` warm-standby management hub
+deployment. It combines issue `#451` and issue `#452` into one rebuildable
+manual page: build the VMs, install OpenShift, recover the install-time
+edge cases, and validate the base cluster.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Batch | `hub-dr-v7` Batch 1: build and base cluster |
+| Issues | `#451` / `OP-GF-HUBDRV7-5`, `#452` / `OP-GF-HUBDRV7-6` |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-build-base-install.md` |
+
+## Objective
+
+Install the base OpenShift cluster for `hub-dr-v7` as a clean warm-standby
+management hub foundation.
+
+Target state:
+
+```text
+cluster: hub-dr-v7.v7.comptech-lab.com
+release: OpenShift 4.20.18
+topology: compact 3 master / 0 worker
+API/API-int VIP: 30.30.220.10
+ingress VIP: 30.30.220.11
+masters: 30.30.220.13-15
+VM shape: 32 vCPU, 64 GiB RAM, secure boot, vTPM
+disks per VM: 300 GiB boot + 3 x 500 GiB data
+bridge: br33
+```
+
+## Non-Goals
+
+- Do not import `spoke-dc-v7`.
+- Do not promote `hub-dr-v7` as an active hub.
+- Do not install ACM, MCE, RHACS, ODF, OADP, cert-manager, External Secrets,
+  or GitOps payloads in this batch.
+- Do not copy `hub-dc-v7` identity, etcd, OAuth secrets, service account
+  signers, kubeconfigs, or runtime state.
+
+## Entry Criteria
+
+The prior prep batch had to be complete:
+
+- install inputs rendered and validated;
+- DNS records applied for API, API-int, wildcard apps, and master names;
+- HAProxy no-op decision recorded;
+- libvirt VM env files and XML dry-run validated;
+- issue, milestone, phase, and ADR coverage present.
+
+Pre-mutation checks were repeated before VM creation:
+
+```text
+planned domains: free
+planned MACs: free
+planned disk paths: free
+ISO destination: free
+br33: up
+libvirtd: active
+OVMF secure-boot files: present
+TPM tooling: present
+resolver 30.30.200.53: returned expected hub-dr-v7 DNS answers
+```
+
+## Execution
+
+The install was executed from `dl385-2` through `gf-ocp-bootstrap-01`.
+
+High-level sequence:
+
+1. Render fresh install inputs from `cluster.env`.
+2. Validate rendered YAML, mirror resources, Quay auth presence, trust bundle,
+   release image, catalog images, and FIPS installer path.
+3. Build the FIPS-enabled agent ISO.
+4. Copy the ISO to:
+
+```text
+/var/lib/libvirt/images/openshift/hub-dr-v7/hub-dr-v7-agent.iso
+```
+
+5. Create three libvirt VMs:
+
+```text
+gf-ocp-hub-dr-v7-master-0
+gf-ocp-hub-dr-v7-master-1
+gf-ocp-hub-dr-v7-master-2
+```
+
+6. Start `openshift-install agent wait-for bootstrap-complete`.
+7. Register the missing local assisted-service infraenv with the full static
+   network config when the assisted API came up without the infraenv object.
+8. Start the install through the local assisted API after the cluster reached
+   `ready`.
+9. Correct VM boot order to disk-first and eject the ISO after image write.
+10. Wait for bootstrap and install completion.
+11. Validate ClusterVersion, nodes, operators, MCPs, CSRs, pods, API, ingress,
+    and console route.
+
+## Recovery During Batch 1
+
+Two install-time issues were found and corrected.
+
+### Static Network Payload
+
+The first attempt was cancelled. Manual infraenv registration was used to
+recover from a missing local assisted-service infraenv, but the first manual
+registration omitted `static_network_config`. The live ISO boot used the
+planned static addresses, but after image write the non-bootstrap nodes
+rebooted with DHCP addresses.
+
+The successful rerun registered the infraenv with `static_network_config`
+derived from the rendered `agent-config.yaml`.
+
+Result after correction:
+
+```text
+hub-dr-v7-master-0 br-ex/enp1s0: 30.30.220.13
+hub-dr-v7-master-1 br-ex:        30.30.220.14
+hub-dr-v7-master-2 br-ex:        30.30.220.15
+```
+
+### Boot Order
+
+After image write, two nodes rebooted back into the agent ISO and entered an
+assisted installer pending-user-action state. The fix was to set persistent
+boot order to disk-first, eject the ISO, and reboot the affected guests from
+`vda`.
+
+After install, all VM definitions were left disk-first and the ISO was ejected
+from persistent config.
+
+## Validation Matrix
+
+| Validation | Result |
+| --- | --- |
+| Bootstrap wait | Passed |
+| Install-complete wait | Passed |
+| ClusterVersion | `4.20.18`, Available=True, Progressing=False |
+| Nodes | 3/3 Ready |
+| Node IPs | `30.30.220.13`, `30.30.220.14`, `30.30.220.15` |
+| ClusterOperators | all Available=True, Progressing=False, Degraded=False |
+| MCP | master Updated=True, 3/3 ready machines, Degraded=False |
+| CSRs | no pending CSRs |
+| Pods | no pods outside Running/Succeeded |
+| API | `30.30.220.10:6443` open |
+| Machine config server | `30.30.220.10:22623` open |
+| Ingress | `30.30.220.11:443` open |
+| Console route | HTTP 200 |
+| VM media | disk-first boot, ISO ejected from persistent config |
+
+## Secrets Handling
+
+Kubeconfig, kubeadmin credential files, pull secrets, private keys, tokens,
+PATs, passwords, and full Secret manifests are not published here.
+
+The install artifact custody path is:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7
+```
+
+The runtime auth files remain under that governed path on
+`gf-ocp-bootstrap-01`.
+
+## Exit State
+
+`hub-dr-v7` is now a clean base OpenShift cluster.
+
+It is not yet a complete standby management hub. The next batch must add the
+standby platform foundation through GitOps and management operators without
+importing or controlling `spoke-dc-v7`.
+
+## Next Batch
+
+Proceed to:
+
+```text
+#453 OP-GF-HUBDRV7-7: bootstrap GitOps catalogs mirrors and storage foundation
+#454 OP-GF-HUBDRV7-8: install management operators in standby mode
+```
