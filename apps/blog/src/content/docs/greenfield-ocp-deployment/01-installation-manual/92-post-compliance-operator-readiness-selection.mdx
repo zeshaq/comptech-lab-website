@@ -1,13 +1,15 @@
 ---
 title: "Installation Manual - 92 Post-compliance operator readiness selection"
 sidebar_label: "92 Post-compliance operator readiness selection"
-description: "Read-only operator readiness and next-gate selection after hub compliance cleanup."
-last_reviewed: 2026-05-19
+description: "Read-only operator readiness, parity audit, and next-gate selection after hub compliance cleanup."
+last_reviewed: 2026-05-21
 draft: false
 ---
 
 This chapter records the `OP-GF-OPERATORS-01` read-only operator-readiness
-gate for the greenfield v7 clusters.
+gate for the greenfield v7 clusters. It also carries the `OP-GF-OPERATORS-18`
+v6-to-v7 operator parity addendum so the manual does not gain another
+sidebar entry for a read-only audit.
 
 No live cluster state was changed.
 
@@ -179,3 +181,70 @@ Gatekeeper preflight and dry-run-only install design
 Gatekeeper is a reasonable governance/security next layer, but it affects
 admission. It should wait until catalog source resolution is clean and the
 install plan is dry-run reviewed.
+
+## 2026-05-21 Parity Addendum
+
+`OP-GF-OPERATORS-18` audited whether v7 has the operator shape planned from
+the retired v6 environment. v6 was not queried live because it is gone; the
+audit used historical local records for v6 and live read-only checks for
+`hub-dc-v7` and `spoke-dc-v7`.
+
+No live object, GitOps desired state, VM service, DNS record, HAProxy config,
+or secret was changed.
+
+Live v7 health at the audit point:
+
+| Check | `hub-dc-v7` | `spoke-dc-v7` |
+| --- | --- | --- |
+| OpenShift | `4.20.18` | `4.20.18` |
+| ClusterOperators | steady | steady |
+| Non-running pods | none | none |
+| OLM InstallPlans | no non-complete rows | no non-complete rows |
+| OperatorHub defaults | disabled | disabled |
+| Mirrored classic catalogs | `cs-redhat-operator-index-v4-20`, `cs-certified-operator-index-v4-20` ready | `cs-redhat-operator-index-v4-20`, `cs-certified-operator-index-v4-20` ready |
+
+Core parity is substantially present:
+
+| Area | Current v7 state |
+| --- | --- |
+| GitOps | Hub subscription installed; spoke GitOps service/application present, without a direct spoke OLM Subscription. |
+| ACM/MCE | Installed on hub; `local-cluster` and `spoke-dc-v7` are Available managed clusters. |
+| Storage | Hub LVMS Ready; spoke Local Storage plus ODF/NooBaa/Ceph Ready and `HEALTH_OK`. |
+| Backup | OADP installed on hub and spoke with available BSLs and enabled daily schedules. |
+| Secrets | External Secrets installed on both clusters; Vault stores and ExternalSecrets Ready. |
+| Security | RHACS Central on hub and SecuredCluster on hub/spoke are Available; Compliance Operator installed; Gatekeeper installed and non-enforcing by design. |
+| Logging | Logging/Loki installed on both clusters with `LokiStack` and `ClusterLogForwarder` Ready. |
+| File integrity | Installed on spoke only. |
+
+The audit also confirmed that not every first-mirror or catalog-visible
+operator package is installed in v7. Missing or deferred decision items are:
+
+```text
+OpenShift Pipelines
+Cluster Observability Operator / ACM observability operand
+NetObserv
+Tempo
+OpenTelemetry
+Service Mesh / Kiali / Jaeger
+Quay Operator
+Container Security Operator
+Open Liberty Operator
+Kube Descheduler
+Security Profiles Operator
+CloudNativePG package for application database use
+NFD / NVIDIA GPU Operator
+OpenShift Virtualization
+Serverless
+OpenShift AI / RHODS
+```
+
+The result is not an automatic install queue. The next operator gate should
+decide which missing families are required now, which stay mirrored but
+deferred, which are replaced by external services, and which should be removed
+from the active expectation.
+
+Recommended next gate:
+
+```text
+OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
+```

@@ -2,7 +2,7 @@
 title: "Operator Version Lock (current)"
 description: "Locked OpenShift release + operator versions for the dc-lab disconnected rebuild — channel, version, source catalog."
 sidebar_label: "Operator Version Lock"
-last_reviewed: 2026-05-11
+last_reviewed: 2026-05-21
 draft: false
 ---
 
@@ -62,6 +62,55 @@ entire channels.
 | `registry.redhat.io/ubi9/ubi-minimal:latest` | Red Hat |
 | `registry.access.redhat.com/ubi9/nodejs-22-minimal:latest` | Red Hat |
 | `icr.io/appcafe/open-liberty:25.0.0.6-kernel-slim-java17-openj9-ubi-minimal` | IBM (Open Liberty) |
+
+## 2026-05-21 live v7 installation status
+
+This table records the live `OP-GF-OPERATORS-18` read-only parity audit. It
+distinguishes packages that are installed in the active v7 clusters from
+packages that are mirrored or catalog-visible but not installed.
+
+| Package | `hub-dc-v7` | `spoke-dc-v7` | Status |
+| --- | --- | --- | --- |
+| `openshift-gitops-operator` | `1.20.3` | service/application present, no direct OLM Subscription | Present with spoke ownership caveat |
+| `advanced-cluster-management` | `2.16.1` | n/a | Present on hub |
+| `multicluster-engine` | `2.11.1` | n/a | Present on hub |
+| `lvms-operator` | `4.20.0` | n/a | Present on hub |
+| `local-storage-operator` | n/a | `4.20.0-202604140241` | Present on spoke |
+| `odf-operator` and dependencies | n/a | `4.20.10-rhodf` | Present on spoke |
+| `redhat-oadp-operator` | `1.5.5` | `1.5.5` | Present |
+| `openshift-cert-manager-operator` | `1.19.0` | `1.19.0` | Present |
+| `openshift-external-secrets-operator` | `1.1.0` | `1.1.0` | Present |
+| `rhacs-operator` | `4.10.2` | `4.10.2` | Present |
+| `compliance-operator` | `1.9.0` | `1.9.0` | Present |
+| `gatekeeper-operator-product` | `3.21.0` | `3.21.0` | Present, non-enforcing policy posture |
+| `loki-operator` | `6.5.0` | `6.5.0` | Present |
+| `cluster-logging` | `6.5.0` | `6.5.0` | Present |
+| `file-integrity-operator` | absent | `1.3.8` | Present on spoke |
+| `openshift-pipelines-operator-rh` | absent | absent | Missing/deferred |
+| `cluster-observability-operator` | absent | absent | Missing/deferred |
+| `netobserv-operator` | absent | absent | Missing/deferred |
+| `tempo-product` | absent | absent | Missing/deferred |
+| `opentelemetry-product` | absent | absent | Missing/deferred |
+| `servicemeshoperator3` / Service Mesh | absent | absent | Missing/deferred |
+| `kiali-ossm` | absent | absent | Missing/deferred |
+| `jaeger-product` | absent | absent | Missing/deferred |
+| `quay-operator` | absent | absent | External registry path currently used |
+| `container-security-operator` | absent | absent | Missing/deferred |
+| `cluster-kube-descheduler-operator` | absent | absent | Missing/deferred |
+| `security-profiles-operator` | absent | absent | Missing/deferred |
+| `cloudnative-pg` | absent | absent | Missing/deferred for app database use; ODF includes internal CNPG components |
+| `open-liberty-certified` | absent | absent | Missing/deferred app-platform operator |
+| `nfd` | absent | absent | Deferred |
+| `gpu-operator-certified` | absent | absent | Deferred |
+| `kubevirt-hyperconverged` | absent | absent | Deferred |
+| `serverless-operator` | absent | absent | Deferred |
+| `rhods-operator` | absent | absent | Deferred |
+
+Next decision gate:
+
+```text
+OP-GF-OPERATORS-19: v7 missing-operator decision and install/defer plan
+```
 
 ## Deferred operator packages
 
