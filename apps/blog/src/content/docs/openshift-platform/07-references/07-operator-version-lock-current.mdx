@@ -161,8 +161,16 @@ documentation closeout.
 | 1 | `OP-GF-OPERATORS-21` | `openshift-pipelines-operator-rh` | Completed on `spoke-dc-v7` at `1.22.0`; operator-only, no user workload runs or CI/CD credentials. |
 | 2 | `OP-GF-OPERATORS-22` | `cluster-observability-operator`, `netobserv-operator` | Completed on `spoke-dc-v7`; operator-only, no FlowCollector, MonitoringStack, UIPlugin, Perses, ACM observability, object storage, retention, or tenant telemetry operands. |
 | 3 | `OP-GF-OPERATORS-23` | `tempo-product`, `opentelemetry-product`, `servicemeshoperator3`, `kiali-ossm` | Completed on `spoke-dc-v7`; operator-only, no TempoStack, OpenTelemetryCollector, ServiceMeshControlPlane, Istio/Sail, Kiali, Jaeger, mesh membership, telemetry pipeline, storage, retention, tenant namespace, or sample app operands. |
-| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Next; requires app-platform tenancy, backup, image supply, and RHACS decisions. |
+| 4 | `OP-GF-OPERATORS-24` | `open-liberty-certified`, `cloudnative-pg` | Deferred by user decision in issue `#440`; not the active next operator batch. |
 | 5 | `OP-GF-OPERATORS-25` | `cluster-kube-descheduler-operator`, `security-profiles-operator` | Deferred until workload evidence, disruption budgets, and profile ownership are ready. |
+
+## 2026-05-21 app-platform batch deferral
+
+Issue `#440` records that Batch 4 is not needed now. Open Liberty and
+app-facing CloudNativePG remain mirrored/catalog-visible planning items, but
+they are not an active install queue entry. Reintroduce them only when there
+is an explicit app-platform onboarding requirement with tenant ownership,
+backup/restore, image supply, and RHACS policy decisions.
 
 ## 2026-05-21 Batch 1 live outcome
 

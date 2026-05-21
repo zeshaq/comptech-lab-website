@@ -333,7 +333,7 @@ Planned batches:
 | 1 | `OP-GF-OPERATORS-21` | `spoke-dc-v7` | `openshift-pipelines-operator-rh` | Completed. Operator-only app delivery foundation; no user workload runs, triggers, app namespaces, build workloads, or CI/CD credentials. |
 | 2 | `OP-GF-OPERATORS-22` | `spoke-dc-v7` | Cluster Observability Operator and NetObserv | Completed. Operator-only observability foundation; no FlowCollector, MonitoringStack, UIPlugin, Perses, ACM observability, object storage, retention, or tenant workload operands. |
 | 3 | `OP-GF-OPERATORS-23` | `spoke-dc-v7` | Tempo, OpenTelemetry, Service Mesh, and Kiali | Completed. Operator-only tracing and mesh foundation; no TempoStack, OpenTelemetryCollector, ServiceMeshControlPlane, Istio/Sail, Kiali, Jaeger, mesh membership, telemetry pipeline, storage, retention, tenant namespace, or sample app operands. |
-| 4 | `OP-GF-OPERATORS-24` | `spoke-dc-v7` | Open Liberty and app-facing CloudNativePG | Next. Requires tenant, backup/restore, image supply, and RHACS exception decisions. |
+| 4 | `OP-GF-OPERATORS-24` | `spoke-dc-v7` | Open Liberty and app-facing CloudNativePG | Deferred by user decision in issue `#440`; do not treat as the active next batch unless app-platform work is explicitly reintroduced. |
 | 5 | `OP-GF-OPERATORS-25` | hub/spoke after evidence | Kube Descheduler and Security Profiles Operator | Requires workload evidence, disruption budgets, profile ownership, and exception process. |
 
 Do not include these in the active batch queue unless their domain is
@@ -842,8 +842,20 @@ Rollback, if needed, is GitOps-first:
 4. Do not force-delete newly introduced CRDs or operator namespaces without a
    separate cleanup issue.
 
-Next operator batch:
+Operator queue decision:
 
 ```text
-OP-GF-OPERATORS-24: Batch 4 app platform - Open Liberty and app-facing CloudNativePG
+OP-GF-OPERATORS-24: deferred by user decision; no active next operator batch is selected.
 ```
+
+## 2026-05-21 App-platform batch deferral
+
+Issue `#440` records the user decision that the previously listed Batch 4 app
+platform operator wave is not needed now.
+
+No live clusters, GitOps desired state, Subscriptions, operands, image mirror
+sets, routes, DNS records, or secrets were changed for this decision. Open
+Liberty and app-facing CloudNativePG remain catalog-visible and documented as
+deferred app-platform items, but future sessions must not present them as the
+next operator batch unless the user explicitly reintroduces application
+platform onboarding.
