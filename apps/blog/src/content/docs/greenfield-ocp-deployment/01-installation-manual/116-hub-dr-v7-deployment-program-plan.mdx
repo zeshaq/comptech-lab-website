@@ -1,0 +1,149 @@
+---
+title: "Installation Manual - 116 hub-dr-v7 deployment program plan"
+sidebar_label: "116 hub-dr-v7 deployment program plan"
+description: "The milestone, workstream, phases, validation matrix, and reproducibility plan for the hub-dr-v7 warm standby deployment."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records the deployment program for `hub-dr-v7`, before live
+deployment work begins.
+
+The goal is a fully validated, documented, reproducible warm standby
+management cluster for `hub-dc-v7`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-HUBDRV7` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Completed design issue | `#446` / `OP-GF-HUBDRV7-1` |
+| Active next issue | `#447` / `OP-GF-HUBDRV7-2` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local plan | `plans/hub-dr-v7-warm-standby-deployment-program.md` |
+
+## Certification Boundary
+
+In this workstream, certified means internally certified for the CompTech lab:
+
+- every phase has evidence;
+- every live change has an issue and rollback path;
+- every important state is reproducible from recorded inputs;
+- OpenShift health, GitOps health, operator health, backup readiness,
+  compliance scans, security checks, and failover readiness are validated;
+- documentation exists locally and in this public installation manual.
+
+This is not an external Red Hat certification, PCI DSS ROC/AOC, QSA, ISO, or
+bank-auditor attestation. External attestation requires a separate auditor-led
+track.
+
+## Non-negotiable Controls
+
+- `hub-dr-v7` stays warm standby until a failover issue explicitly promotes it.
+- Do not clone `hub-dc-v7` identity: no copied etcd, cluster ID, kubeconfigs,
+  OAuth secrets, service-account signers, RHACS runtime secrets, or ACM
+  runtime state.
+- No live mutation without a phase issue, milestone, ADR coverage, validation
+  plan, rollback path, and closeout.
+- Do not print or commit secrets, kubeconfigs, pull secrets, PATs, Vault
+  tokens, private keys, passwords, or full Secret manifests.
+- Durable OpenShift state must be GitOps-first.
+- Every material cluster gate must update this installation manual before
+  closeout.
+
+## Target State
+
+| Area | Target |
+| --- | --- |
+| Role | Warm standby management hub |
+| Topology | Compact 3-node VM-only cluster |
+| Release | Match `hub-dc-v7`, currently OpenShift `4.20.18` |
+| Node role | `control-plane,master,worker` |
+| VM spec | 32 vCPU, 64 GiB RAM per master |
+| VM disks | 300 GiB boot + 3 x 500 GiB data per master |
+| Candidate API/API-int VIP | `30.30.220.10` |
+| Candidate ingress VIP | `30.30.220.11` |
+| Candidate masters | `30.30.220.13-15` |
+| Candidate MACs | `52:54:00:23:00:00-02` |
+| Cluster network | `10.128.0.0/14`, host prefix `23` |
+| Service network | `172.30.0.0/16` |
+
+## Phase Line
+
+| Phase | Issue | Gate |
+| --- | --- | --- |
+| `OP-GF-HUBDRV7-0` | `#448` | Program ownership and certification evidence plan |
+| `OP-GF-HUBDRV7-1` | `#446` | Design and read-only preflight, completed |
+| `OP-GF-HUBDRV7-2` | `#447` | Render install inputs and edge plan |
+| `OP-GF-HUBDRV7-3` | `#449` | Reserve IPAM, DNS, and HAProxy edge plan |
+| `OP-GF-HUBDRV7-4` | `#450` | Prepare VM env and libvirt dry-run |
+| `OP-GF-HUBDRV7-5` | `#451` | Render agent ISO and create VMs |
+| `OP-GF-HUBDRV7-6` | `#452` | Validate base OpenShift install |
+| `OP-GF-HUBDRV7-7` | `#453` | Bootstrap GitOps, catalogs, mirrors, and storage foundation |
+| `OP-GF-HUBDRV7-8` | `#454` | Install management operators in standby mode |
+| `OP-GF-HUBDRV7-9` | `#455` | Prove backup, restore, and secret custody |
+| `OP-GF-HUBDRV7-10` | `#456` | Close compliance and hardening evidence |
+| `OP-GF-HUBDRV7-11` | `#457` | Operational readiness and SLO validation |
+| `OP-GF-HUBDRV7-12` | `#458` | Write and dry-run failover runbook |
+| `OP-GF-HUBDRV7-13` | `#459` | Controlled takeover drill |
+| `OP-GF-HUBDRV7-14` | `#460` | Reproducibility certification evidence and closeout |
+| `OP-GF-HUBDRV7-15` | `#461` | Full installation manual and handoff |
+
+## Gate Model
+
+Every phase must close with:
+
+- issue comment with what changed;
+- validation evidence;
+- files touched;
+- live systems touched;
+- rollback or promotion decision;
+- residual risks;
+- next gate;
+- local session record;
+- updated local memory files;
+- blog chapter or blog update when the gate is material.
+
+## Validation Matrix
+
+| Domain | Required evidence |
+| --- | --- |
+| Governance | Issue, milestone, phase, ADR coverage |
+| Network | IPAM, DNS, HAProxy validation and rollback |
+| VM | Libvirt domain, CPU, RAM, disk, NIC, boot state |
+| Install inputs | `install-config`, `agent-config`, mirror resources, FIPS, host count |
+| Base cluster | ClusterVersion, nodes, MCPs, ClusterOperators, CSRs, pods |
+| GitOps | Root app, revision, sync, health, render validation |
+| Operators | Subscription, InstallPlan, CSV, operand readiness |
+| Secrets | Vault/ESO path and readiness, no value disclosure |
+| Backup | DPA, BSL, schedule, backup, restore or dry-run evidence |
+| Security | RHACS health, Gatekeeper health, NetworkPolicies, image policy |
+| Compliance | CIS, PCI DSS 4, File Integrity, exception register |
+| Operations | API, console, ingress, monitoring, logging, alerting |
+| DR | Failover runbook, dry-run, takeover drill, rollback |
+| Documentation | Local report, session log, runbook, blog chapter |
+| Reproducibility | Source paths, commits, commands, artifacts, rebuild notes |
+
+## Final Done Criteria
+
+`hub-dr-v7` is complete only when all are true:
+
+1. cluster is installed and healthy;
+2. platform GitOps is synced and healthy;
+3. management services are installed in standby-safe mode;
+4. backup, restore readiness, and secret custody are proven;
+5. compliance and hardening evidence is closed or explicitly excepted;
+6. operational readiness checks pass;
+7. failover runbook dry-run is complete;
+8. controlled takeover drill is completed or explicitly deferred;
+9. public installation manual and local runbooks are complete;
+10. reproducibility evidence pack is complete.
+
+## Next Gate
+
+The next phase is `#447` / `OP-GF-HUBDRV7-2`.
+
+That gate renders install inputs, prepares DNS and HAProxy changes, prepares
+VM env files, validates the artifacts, and stops before VM creation.
