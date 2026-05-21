@@ -1,0 +1,264 @@
+---
+title: "Installation Manual - 121 hub-dr-v7 batched execution model"
+sidebar_label: "121 hub-dr-v7 batched execution model"
+description: "The remaining hub-dr-v7 deployment batches, blog article standard, stop conditions, and evidence model for the warm standby build."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter updates the `hub-dr-v7` deployment program after the VM dry-run
+gate. The remaining work should be executed and documented in larger batches,
+not as a long series of thin blog entries.
+
+The GitHub issues remain granular because they are useful for audit control,
+but the public manual should read like an end-to-end rebuild guide.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Completed prep issues | `#446`, `#447`, `#449`, `#450` |
+| Remaining issues | `#451` through `#461` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local plan | `plans/hub-dr-v7-warm-standby-deployment-program.md` |
+| Local report | `reports/platform/hub-dr-v7/20260521/hub-dr-v7-batched-execution-doc-model.md` |
+
+## Why The Model Changes
+
+The completed preparation work needed fine-grained gates because the topology,
+DNS, access path, and VM plan were still being established. From here, the
+remaining work is easier to understand as operational batches:
+
+- build the cluster;
+- add the standby platform foundation;
+- prove protection and readiness;
+- rehearse DR and close certification.
+
+That shape is also better for the blog. A future rebuild operator should not
+have to jump through many small entries to understand one install window.
+
+## Completed Prep Batch
+
+The preparation batch is complete.
+
+| Issue | Result |
+| --- | --- |
+| `#446` | Warm standby design, mirror sizing, candidate IP/MAC allocation |
+| `#447` | Install inputs, agent config, mirror resources, VM env files |
+| `#449` | PowerDNS records, HAProxy no-op decision, edge access readiness |
+| `#450` | VM env review, conflict checks, libvirt XML dry-run |
+
+Prepared state:
+
+```text
+cluster: hub-dr-v7
+release: OpenShift 4.20.18 target
+topology: compact 3 master / 0 worker
+API/API-int: 30.30.220.10
+ingress: 30.30.220.11
+masters: 30.30.220.13-15
+MACs: 52:54:00:23:00:00-02
+VM shape: 32 vCPU, 64 GiB RAM, br33, 300 GiB boot, 3 x 500 GiB data
+```
+
+## Batch 1: Build And Base Cluster
+
+Issues:
+
+```text
+#451 OP-GF-HUBDRV7-5: render hub-dr-v7 agent ISO and create VMs
+#452 OP-GF-HUBDRV7-6: validate base hub-dr-v7 OpenShift install
+```
+
+Objective:
+
+- render the approved agent ISO;
+- copy it to `dl385-2`;
+- create the three VM boot and data disks;
+- define and boot the three libvirt domains;
+- monitor agent install progress at summary level;
+- capture kubeconfig custody without printing it;
+- validate the base OpenShift cluster.
+
+Stop conditions:
+
+- any VM name, MAC, disk path, or ISO destination conflict appears;
+- agent ISO generation fails;
+- a VM fails to boot or attach the expected bridge and disks;
+- static network configuration does not match the agent config;
+- ClusterVersion cannot reach Available;
+- any ClusterOperator is degraded without a documented accepted exception.
+
+Minimum evidence:
+
+| Area | Required evidence |
+| --- | --- |
+| ISO | creation command summary, source release, destination path |
+| VMs | domain names, CPU, RAM, disks, bridge, MACs, boot state |
+| Install | install progress summary and final status |
+| Base health | ClusterVersion, nodes, ClusterOperators, MCPs, CSRs, non-running pods |
+| Custody | kubeconfig path and custody rule, no value disclosure |
+| Rollback | VM destroy/undefine and disk/ISO delete commands |
+
+Public article:
+
+```text
+hub-dr-v7 build and base OpenShift validation
+```
+
+## Batch 2: Standby Platform Foundation
+
+Issues:
+
+```text
+#453 OP-GF-HUBDRV7-7: bootstrap hub-dr-v7 GitOps catalogs mirrors and storage foundation
+#454 OP-GF-HUBDRV7-8: install hub-dr-v7 management operators standby mode
+```
+
+Objective:
+
+- create `hub-dr-v7` GitOps desired state;
+- add root Argo CD application;
+- configure disconnected catalog and image mirror policy;
+- add storage, cert-manager, ESO/Vault auth, and baseline network policy;
+- install management operators in standby-safe mode;
+- keep `spoke-dc-v7` managed only by `hub-dc-v7`.
+
+Stop conditions:
+
+- root GitOps app cannot reconcile cleanly;
+- catalog or mirror policy breaks operator resolution;
+- ESO/Vault auth cannot prove non-secret readiness;
+- ACM/MCE or RHACS would assume active authority over `spoke-dc-v7`;
+- any required operator CSV fails.
+
+Minimum evidence:
+
+| Area | Required evidence |
+| --- | --- |
+| GitOps | commit, root app, revision, sync, health |
+| Catalogs | catalog sources, mirror policy, package visibility |
+| Storage | LVMS or equivalent readiness |
+| Secrets | ESO/Vault paths and auth status, no values |
+| Operators | Subscriptions, InstallPlans, CSVs, pods, standby-safe operands |
+| Guardrail | explicit proof that no spoke takeover is active |
+
+Public article:
+
+```text
+hub-dr-v7 standby platform foundation
+```
+
+## Batch 3: Protection, Custody, Hardening, And Operations
+
+Issues:
+
+```text
+#455 OP-GF-HUBDRV7-9: prove hub-dr-v7 backup restore and secret custody
+#456 OP-GF-HUBDRV7-10: close hub-dr-v7 compliance and hardening evidence
+#457 OP-GF-HUBDRV7-11: hub-dr-v7 operational readiness and SLO validation
+```
+
+Objective:
+
+- prove backup and restore readiness;
+- repair or document installer pull-secret custody;
+- validate secret custody through Vault/ESO;
+- run compliance and hardening evidence;
+- prove monitoring, alerting, logging, API, console, and ingress readiness.
+
+Stop conditions:
+
+- backup storage is not reachable;
+- a restore or dry-run restore cannot be evidenced;
+- secret custody relies on untracked local-only knowledge;
+- compliance findings are left unclassified;
+- monitoring or alerting cannot see the standby hub.
+
+Minimum evidence:
+
+| Area | Required evidence |
+| --- | --- |
+| Backup | DPA/BSL/schedule or equivalent, backup object, restore evidence |
+| Custody | secret path map and access model without values |
+| Compliance | CIS/PCI DSS 4/File Integrity status or exception register |
+| Hardening | GitOps commits, MCP health, policy status |
+| Operations | console/API/ingress checks, alerts, logs, SLO checks |
+
+Public article:
+
+```text
+hub-dr-v7 protection hardening and readiness
+```
+
+## Batch 4: DR Rehearsal, Certification, And Handoff
+
+Issues:
+
+```text
+#458 OP-GF-HUBDRV7-12: write hub-dc-v7 to hub-dr-v7 failover runbook dry-run
+#459 OP-GF-HUBDRV7-13: controlled hub-dr-v7 takeover drill
+#460 OP-GF-HUBDRV7-14: reproducibility certification evidence and closeout
+#461 OP-GF-HUBDRV7-15: publish hub-dr-v7 full installation manual and handoff
+```
+
+Objective:
+
+- write and dry-run the failover runbook;
+- run a controlled takeover drill only under explicit approval;
+- prove rollback or restore to normal authority;
+- assemble reproducibility evidence;
+- publish the final manual and handoff.
+
+Stop conditions:
+
+- split-brain risk is not controlled;
+- `hub-dc-v7` is still authoritative and takeover approval is missing;
+- rollback criteria are not written before the drill;
+- the reproducibility pack cannot rebuild the cluster without chat history.
+
+Minimum evidence:
+
+| Area | Required evidence |
+| --- | --- |
+| Runbook | failover, validation, rollback, and authority rules |
+| Drill | timestamps, objects changed, validation, rollback or promote decision |
+| Reproducibility | source paths, commits, artifact paths, command summaries |
+| Handoff | operating model, residual risks, next queue |
+
+Public article:
+
+```text
+hub-dr-v7 DR rehearsal certification and handoff
+```
+
+## Article Standard
+
+Every future batch article must include:
+
+- objective and non-goals;
+- issue and ADR coverage;
+- entry criteria;
+- stop conditions;
+- live systems touched;
+- execution sequence;
+- rollback path before mutation;
+- validation matrix;
+- secret handling without values;
+- GitOps commits and live deltas;
+- residual risks;
+- next batch decision.
+
+The local workspace may still keep detailed per-gate reports. The public blog
+should prioritize a coherent rebuild story.
+
+## Next Execution Unit
+
+The next unit is Batch 1:
+
+```text
+#451 + #452: render the hub-dr-v7 agent ISO, create/boot VMs, and validate
+the base OpenShift install.
+```

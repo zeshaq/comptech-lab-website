@@ -195,6 +195,18 @@ This gate did not:
 create the VMs, but it must repeat the conflict checks immediately before
 execution if any time has passed.
 
+## Batch Placement
+
+This gate closes the preparation batch for `hub-dr-v7`. From this point,
+execution should move in larger batches:
+
+| Batch | Issues | Documentation expectation |
+| --- | --- | --- |
+| Batch 1: build and base cluster | `#451`, `#452` | One comprehensive article covering ISO render, VM creation, install watch, and base OpenShift validation |
+| Batch 2: standby platform foundation | `#453`, `#454` | One article covering GitOps foundation plus management operators in standby-safe mode |
+| Batch 3: protection and readiness | `#455`, `#456`, `#457` | One article covering backup, custody, compliance, hardening, and operational readiness |
+| Batch 4: DR certification and handoff | `#458`, `#459`, `#460`, `#461` | One article covering failover rehearsal, certification evidence, and handoff |
+
 Next gate:
 
 ```text

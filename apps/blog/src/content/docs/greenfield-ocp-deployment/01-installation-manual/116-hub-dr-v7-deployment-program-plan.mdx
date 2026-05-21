@@ -20,7 +20,7 @@ management cluster for `hub-dc-v7`.
 | Milestone | `hub-dr-v7 Warm Standby Deployment` |
 | Parent issue | `#448` / `OP-GF-HUBDRV7-0` |
 | Completed design issue | `#446` / `OP-GF-HUBDRV7-1` |
-| Active next issue | `#447` / `OP-GF-HUBDRV7-2` |
+| Active next issue | `#451` / `OP-GF-HUBDRV7-5` |
 | Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
 | Local plan | `plans/hub-dr-v7-warm-standby-deployment-program.md` |
 
@@ -72,24 +72,46 @@ track.
 
 ## Phase Line
 
-| Phase | Issue | Gate |
+The issue line remains granular for auditability. Execution and public
+documentation from `#451` onward should be batched so each article reads as a
+complete runbook.
+
+| Phase | Issue | Status | Gate |
+| --- | --- | --- | --- |
+| `OP-GF-HUBDRV7-0` | `#448` | Open | Program ownership and certification evidence plan |
+| `OP-GF-HUBDRV7-1` | `#446` | Closed | Design and read-only preflight |
+| `OP-GF-HUBDRV7-2` | `#447` | Closed | Render install inputs and edge plan |
+| `OP-GF-HUBDRV7-3` | `#449` | Closed | Reserve IPAM, DNS, and HAProxy edge plan |
+| `OP-GF-HUBDRV7-4` | `#450` | Closed | Prepare VM env and libvirt dry-run |
+| `OP-GF-HUBDRV7-5` | `#451` | Open | Render agent ISO and create VMs |
+| `OP-GF-HUBDRV7-6` | `#452` | Open | Validate base OpenShift install |
+| `OP-GF-HUBDRV7-7` | `#453` | Open | Bootstrap GitOps, catalogs, mirrors, and storage foundation |
+| `OP-GF-HUBDRV7-8` | `#454` | Open | Install management operators in standby mode |
+| `OP-GF-HUBDRV7-9` | `#455` | Open | Prove backup, restore, and secret custody |
+| `OP-GF-HUBDRV7-10` | `#456` | Open | Close compliance and hardening evidence |
+| `OP-GF-HUBDRV7-11` | `#457` | Open | Operational readiness and SLO validation |
+| `OP-GF-HUBDRV7-12` | `#458` | Open | Write and dry-run failover runbook |
+| `OP-GF-HUBDRV7-13` | `#459` | Open | Controlled takeover drill |
+| `OP-GF-HUBDRV7-14` | `#460` | Open | Reproducibility certification evidence and closeout |
+| `OP-GF-HUBDRV7-15` | `#461` | Open | Full installation manual and handoff |
+
+## Batch Execution Model
+
+The remaining work is grouped into four execution batches. Each batch may
+close multiple child issues, but the public installation manual should get one
+comprehensive article per batch.
+
+| Batch | Issues | What It Proves |
 | --- | --- | --- |
-| `OP-GF-HUBDRV7-0` | `#448` | Program ownership and certification evidence plan |
-| `OP-GF-HUBDRV7-1` | `#446` | Design and read-only preflight, completed |
-| `OP-GF-HUBDRV7-2` | `#447` | Render install inputs and edge plan |
-| `OP-GF-HUBDRV7-3` | `#449` | Reserve IPAM, DNS, and HAProxy edge plan |
-| `OP-GF-HUBDRV7-4` | `#450` | Prepare VM env and libvirt dry-run |
-| `OP-GF-HUBDRV7-5` | `#451` | Render agent ISO and create VMs |
-| `OP-GF-HUBDRV7-6` | `#452` | Validate base OpenShift install |
-| `OP-GF-HUBDRV7-7` | `#453` | Bootstrap GitOps, catalogs, mirrors, and storage foundation |
-| `OP-GF-HUBDRV7-8` | `#454` | Install management operators in standby mode |
-| `OP-GF-HUBDRV7-9` | `#455` | Prove backup, restore, and secret custody |
-| `OP-GF-HUBDRV7-10` | `#456` | Close compliance and hardening evidence |
-| `OP-GF-HUBDRV7-11` | `#457` | Operational readiness and SLO validation |
-| `OP-GF-HUBDRV7-12` | `#458` | Write and dry-run failover runbook |
-| `OP-GF-HUBDRV7-13` | `#459` | Controlled takeover drill |
-| `OP-GF-HUBDRV7-14` | `#460` | Reproducibility certification evidence and closeout |
-| `OP-GF-HUBDRV7-15` | `#461` | Full installation manual and handoff |
+| Prep batch, completed | `#446`, `#447`, `#449`, `#450` | Design, install inputs, edge DNS, access, and VM dry-run readiness |
+| Batch 1: Build and base cluster | `#451`, `#452` | The VMs boot, the agent install completes, and base OpenShift health is clean |
+| Batch 2: Standby platform foundation | `#453`, `#454` | GitOps, catalogs, mirrors, storage, cert-manager, ESO/Vault auth, ACM/MCE, and RHACS are healthy without taking over `spoke-dc-v7` |
+| Batch 3: Protection and readiness | `#455`, `#456`, `#457` | Backup/restore, secret custody, compliance, hardening, monitoring, alerting, logging, and SLO checks are recorded |
+| Batch 4: DR certification and handoff | `#458`, `#459`, `#460`, `#461` | Failover runbook, controlled takeover drill, reproducibility evidence, and full handoff are complete |
+
+Future articles should include objective, non-goals, entry criteria, execution
+sequence, rollback, validation matrix, secrets handling, GitOps/live deltas,
+residual risks, and the next-batch decision.
 
 ## Gate Model
 
@@ -143,7 +165,12 @@ Every phase must close with:
 
 ## Next Gate
 
-The next phase is `#447` / `OP-GF-HUBDRV7-2`.
+The next execution unit is Batch 1:
 
-That gate renders install inputs, prepares DNS and HAProxy changes, prepares
-VM env files, validates the artifacts, and stops before VM creation.
+```text
+#451 / OP-GF-HUBDRV7-5: render hub-dr-v7 agent ISO and create VMs
+#452 / OP-GF-HUBDRV7-6: validate base hub-dr-v7 OpenShift install
+```
+
+The closeout should be one comprehensive build and base-install article, not
+two thin gate notes.
