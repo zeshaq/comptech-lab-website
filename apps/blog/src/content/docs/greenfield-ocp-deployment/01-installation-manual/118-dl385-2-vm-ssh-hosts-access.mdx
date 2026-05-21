@@ -1,0 +1,190 @@
+---
+title: "Installation Manual - 118 dl385-2 VM SSH and hosts access"
+sidebar_label: "118 dl385-2 VM SSH and hosts access"
+description: "The dl385-2 libvirt VM inventory, local hosts mappings, SSH alias setup, and edge access validation for the hub-dr-v7 deployment workstream."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records the `OP-GF-HUBDRV7-3` access prerequisite for the
+`hub-dr-v7` edge gate.
+
+The immediate problem was that `dl385-2` could not SSH into the PowerDNS and
+HAProxy VMs. Without that access, the next DNS and HAProxy changes for
+`hub-dr-v7` could not be performed safely.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#449` / `OP-GF-HUBDRV7-3` |
+| Milestone | `hub-dr-v7 Warm Standby Deployment` |
+| Parent | `#448` / `OP-GF-HUBDRV7-0` |
+| Predecessor | `#447` / `OP-GF-HUBDRV7-2` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Local report | `reports/platform/hub-dr-v7/20260521/dl385-2-vm-ssh-hosts-access.md` |
+
+## Scope
+
+Systems touched:
+
+- `dl385-2` `/etc/hosts`;
+- `dl385-2` `/home/ze/.ssh/config`;
+- guest `/home/ze/.ssh/authorized_keys` on QGA-capable Linux VMs with a
+  `ze` account.
+
+Systems not changed:
+
+- OpenShift API objects;
+- authoritative PowerDNS records;
+- HAProxy configuration;
+- libvirt VM definitions;
+- VM disks;
+- platform GitOps desired state;
+- private keys, kubeconfigs, pull secrets, Vault tokens, PATs, or passwords.
+
+## Backups
+
+Before editing local access files, backups were created:
+
+```text
+/etc/hosts.OP-GF-HUBDRV7-3.bak
+/home/ze/.ssh/config.OP-GF-HUBDRV7-3.bak
+```
+
+Each touched guest also received:
+
+```text
+/home/ze/.ssh/authorized_keys.OP-GF-HUBDRV7-3.bak
+```
+
+## VM Inventory Mappings
+
+A managed block was added to `dl385-2` `/etc/hosts`:
+
+```text
+# BEGIN OP-GF-HUBDRV7-3 dl385-2 libvirt VM inventory
+...
+# END OP-GF-HUBDRV7-3 dl385-2 libvirt VM inventory
+```
+
+Known management mappings:
+
+```text
+30.30.200.53    gf-ocp-pdns-01 gf-ocp-pdns-01.v7.comptech-lab.com pdns.v7.comptech-lab.com pdns
+30.30.200.102   gf-ocp-haproxy-01 gf-ocp-haproxy-01.v7.comptech-lab.com haproxy.v7.comptech-lab.com haproxy
+30.30.200.20    gf-ocp-gitlab-01 gf-ocp-gitlab-01.v7.comptech-lab.com gitlab.v7.comptech-lab.com
+30.30.200.22    gf-ocp-gitlab-runner-01 gf-ocp-gitlab-runner-01.v7.comptech-lab.com
+30.30.200.23    gf-ocp-netbox-01 gf-ocp-netbox-01.v7.comptech-lab.com netbox.v7.comptech-lab.com
+30.30.200.40    gf-ocp-quay-01 gf-ocp-quay-01.v7.comptech-lab.com quay.v7.comptech-lab.com
+30.30.200.41    gf-ocp-nexus-01 gf-ocp-nexus-01.v7.comptech-lab.com nexus-private.v7.comptech-lab.com
+30.30.200.60    gf-ocp-bootstrap-01 gf-ocp-bootstrap-01.v7.comptech-lab.com ocp-bootstrap bootstrap.v7.comptech-lab.com
+30.30.200.34    gf-ocp-vault-r1-seed-01 gf-ocp-vault-r1-seed-01.v7.comptech-lab.com
+30.30.200.35    gf-ocp-vault-r1-01 gf-ocp-vault-r1-01.v7.comptech-lab.com vault-r1-01.v7.comptech-lab.com
+30.30.200.36    gf-ocp-vault-r1-02 gf-ocp-vault-r1-02.v7.comptech-lab.com vault-r1-02.v7.comptech-lab.com
+30.30.200.37    gf-ocp-vault-r1-03 gf-ocp-vault-r1-03.v7.comptech-lab.com vault-r1-03.v7.comptech-lab.com
+30.30.210.13    gf-ocp-hub-dc-v7-master-0 hub-dc-v7-master-0 hub-dc-v7-master-0.v7.comptech-lab.com
+30.30.210.14    gf-ocp-hub-dc-v7-master-1 hub-dc-v7-master-1 hub-dc-v7-master-1.v7.comptech-lab.com
+30.30.210.15    gf-ocp-hub-dc-v7-master-2 hub-dc-v7-master-2 hub-dc-v7-master-2.v7.comptech-lab.com
+30.30.0.12      gf-ocp-spoke-dc-v7-master-0 spoke-dc-v7-master-0 spoke-dc-v7-master-0.v7.comptech-lab.com
+30.30.0.13      gf-ocp-spoke-dc-v7-master-1 spoke-dc-v7-master-1 spoke-dc-v7-master-1.v7.comptech-lab.com
+30.30.0.14      gf-ocp-spoke-dc-v7-master-2 spoke-dc-v7-master-2 spoke-dc-v7-master-2.v7.comptech-lab.com
+30.30.119.20    hpe-vme-hvm-01 hpe-vme-hvm-01.v7.comptech-lab.com
+30.30.119.21    hpe-vme-hvm-02 hpe-vme-hvm-02.v7.comptech-lab.com
+30.30.119.22    hpe-vme-hvm-03 hpe-vme-hvm-03.v7.comptech-lab.com
+```
+
+Unresolved domains were recorded as comments instead of guessed:
+
+```text
+insurance-app-vm
+acisim-6-2-1g
+insurance-app-dryrun
+gf-ocp-gitlab-restore-01
+```
+
+The first three did not expose a management IP through guest-agent, ARP, or
+libvirt lease. `gf-ocp-gitlab-restore-01` was shut off.
+
+## SSH Setup
+
+A managed SSH config block was added to `dl385-2`:
+
+```text
+# BEGIN OP-GF-HUBDRV7-3 dl385-2 libvirt VM ssh aliases
+...
+# END OP-GF-HUBDRV7-3 dl385-2 libvirt VM ssh aliases
+```
+
+Automatic `ze` login now uses the existing `dl385-2` key for:
+
+```text
+gf-ocp-pdns-01
+gf-ocp-haproxy-01
+gf-ocp-gitlab-01
+gf-ocp-gitlab-runner-01
+gf-ocp-netbox-01
+gf-ocp-quay-01
+gf-ocp-vault-r1-seed-01
+gf-ocp-vault-r1-01
+gf-ocp-vault-r1-02
+gf-ocp-vault-r1-03
+hpe-vme-hvm-01
+hpe-vme-hvm-02
+hpe-vme-hvm-03
+```
+
+Existing hand-tuned SSH entries for `gf-ocp-bootstrap-01` and
+`gf-ocp-nexus-01` were preserved and validated.
+
+The OpenShift RHCOS nodes were mapped in `/etc/hosts`, but no ad hoc SSH keys
+were injected into cluster nodes. Direct node SSH should be added only through
+a governed MachineConfig/GitOps change.
+
+## Validation
+
+Automatic SSH from `dl385-2` works for:
+
+```text
+gf-ocp-pdns-01
+gf-ocp-haproxy-01
+gf-ocp-gitlab-01
+gf-ocp-gitlab-runner-01
+gf-ocp-netbox-01
+gf-ocp-quay-01
+gf-ocp-nexus-01
+gf-ocp-bootstrap-01
+gf-ocp-vault-r1-seed-01
+gf-ocp-vault-r1-01
+gf-ocp-vault-r1-02
+gf-ocp-vault-r1-03
+hpe-vme-hvm-01
+hpe-vme-hvm-02
+hpe-vme-hvm-03
+```
+
+The two immediate edge hosts also allow passwordless sudo from `dl385-2`:
+
+```text
+gf-ocp-pdns-01       sudo-ok
+gf-ocp-haproxy-01    sudo-ok
+```
+
+Representative name resolution through local `/etc/hosts` passed for:
+
+```text
+gf-ocp-pdns-01
+gf-ocp-haproxy-01
+pdns.v7.comptech-lab.com
+haproxy.v7.comptech-lab.com
+hub-dc-v7-master-0
+spoke-dc-v7-master-0
+hpe-vme-hvm-01
+```
+
+## Outcome
+
+The #449 edge gate can now continue with actual PowerDNS and HAProxy
+inspection from `dl385-2`. This chapter does not mean authoritative DNS has
+been changed. It only records local `dl385-2` access and name-resolution
+readiness.
