@@ -1,0 +1,123 @@
+---
+title: "Installation Manual - 115 hub-dr-v7 warm standby design"
+sidebar_label: "115 hub-dr-v7 warm standby design"
+description: "The design and read-only preflight for the hub-dr-v7 warm standby management cluster."
+last_reviewed: 2026-05-21
+draft: false
+---
+
+This chapter records `OP-GF-HUBDRV7-1`, the first gate for the new
+`hub-dr-v7` OpenShift cluster.
+
+The cluster is planned as a third v7 cluster and a warm standby management hub
+for `hub-dc-v7`. It is not an active peer hub during normal operation.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Issue | `#446` / `OP-GF-HUBDRV7-1` |
+| Milestone | `Workspace Governance` |
+| Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Follow-up | `#447` / `OP-GF-HUBDRV7-2` |
+| Scope | Design, read-only preflight, and deployment handoff |
+
+## Decision
+
+`hub-dr-v7` will mirror `hub-dc-v7` as an intentionally equivalent management
+cluster, but with an independent cluster identity.
+
+The standby cluster must not clone `hub-dc-v7` etcd, certificates, kubeconfig,
+cluster ID, OAuth secrets, service-account signers, or runtime secrets. It
+must be installed as a fresh cluster and then converged through GitOps.
+
+Normal authority remains with `hub-dc-v7`. A later failover or promotion gate
+must explicitly declare `hub-dc-v7` unavailable or isolated before
+`hub-dr-v7` manages `spoke-dc-v7`.
+
+## Mirror Baseline
+
+Read-only validation captured the active `hub-dc-v7` shape:
+
+| Item | Value |
+| --- | --- |
+| OpenShift | `4.20.18` |
+| Topology | Compact, VM-only, 3 masters |
+| Node roles | `control-plane,master,worker` |
+| Node IPs | `30.30.210.13-15` |
+| API VIP | `30.30.210.10` |
+| Ingress VIP | `30.30.210.11` |
+| VM CPU | 32 vCPU per master |
+| VM RAM | 64 GiB per master |
+| VM network | `br33`, virtio |
+| VM disks | 300 GiB boot + 3 x 500 GiB data per master |
+
+`hub-dc-v7` was healthy during the preflight: ClusterVersion was Available and
+not Progressing, all ClusterOperators were Available and not Progressing or
+Degraded, MCPs were updated, and `hub-dc-v7-bootstrap` was `Synced/Healthy`
+at GitOps revision `d5b3bfa`.
+
+## Candidate hub-dr-v7 Allocation
+
+The initial candidate allocation is:
+
+| Item | Value |
+| --- | --- |
+| Cluster name | `hub-dr-v7` |
+| Base domain | `v7.comptech-lab.com` |
+| API/API-int VIP | `30.30.220.10` |
+| Ingress VIP | `30.30.220.11` |
+| Rendezvous IP | `30.30.220.13` |
+| Master 0 | `hub-dr-v7-master-0`, `30.30.220.13`, `52:54:00:23:00:00` |
+| Master 1 | `hub-dr-v7-master-1`, `30.30.220.14`, `52:54:00:23:00:01` |
+| Master 2 | `hub-dr-v7-master-2`, `30.30.220.15`, `52:54:00:23:00:02` |
+| Machine network | `30.30.0.0/16` |
+| Cluster network | `10.128.0.0/14`, host prefix `23` |
+| Service network | `172.30.0.0/16` |
+| DNS resolver | `30.30.200.53` |
+| Gateway | `30.30.0.1` |
+
+The planned libvirt VM names are:
+
+```text
+gf-ocp-hub-dr-v7-master-0
+gf-ocp-hub-dr-v7-master-1
+gf-ocp-hub-dr-v7-master-2
+```
+
+## Preflight Findings
+
+Read-only checks found:
+
+- no existing `hub-dr-v7` libvirt domains;
+- candidate IPs did not respond to ping from `dl385-2`;
+- candidate DNS names did not resolve yet;
+- candidate MACs were not observed on existing libvirt domain interfaces;
+- `dl385-2` had about 12 TiB free under `/var/lib/libvirt/images`, 512 CPU
+  threads, and about 990 GiB available memory.
+
+These are preflight signals, not formal IPAM reservation. The next gate must
+still reserve or record the addresses in the final source of truth.
+
+## Split-brain Control
+
+The main risk is split-brain management.
+
+`hub-dr-v7` may run local OpenShift GitOps, ACM/MCE, RHACS, OADP, External
+Secrets, cert-manager, Compliance Operator, Gatekeeper, and logging/audit
+components as standby services.
+
+It must not import or actively manage `spoke-dc-v7` while `hub-dc-v7` remains
+authoritative. It must also avoid ApplicationSet placement or pruning behavior
+that could overwrite active hub-managed resources.
+
+## Next Gate
+
+Issue `#447` / `OP-GF-HUBDRV7-2` owns the next build step:
+
+1. render `hub-dr-v7` install inputs;
+2. prepare DNS and HAProxy changes;
+3. prepare VM env files;
+4. validate the rendered artifacts;
+5. stop before VM creation until the artifacts and rollback notes are clean.
+
