@@ -1,0 +1,58 @@
+---
+title: "Installation Manual - 127 spoke-dr-v7 ADR and compact hot standby design"
+sidebar_label: "127 spoke-dr-v7 ADR and compact hot standby design"
+description: "The accepted architecture decision for spoke-dr-v7, including the compact VM-only hot standby model and the next gate."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records the architecture decision for `spoke-dr-v7`.
+
+The design gate is now accepted. `spoke-dr-v7` is approved as a compact
+three-node VM-only hot standby workload cluster for `spoke-dc-v7`. The next
+work is the parity baseline and workload inventory in `#466`.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-SPOKEDRV7` |
+| Milestone | `#37` / `spoke-dr-v7 Hot Standby Workload Cluster` |
+| Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
+| Design gate | `#465` / `OP-GF-SPOKEDRV7-1` |
+| Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
+| Next issue | `#466` / `OP-GF-SPOKEDRV7-2` |
+
+## Decision Summary
+
+The accepted design keeps the same logical structure as `spoke-dc-v7` while
+allowing a smaller physical footprint:
+
+- compact three-node VM-only topology;
+- same GitOps and operator model where it applies;
+- CNPG/database-layer replication for the insurance workload;
+- ODF or local storage for PVCs on the DR cluster;
+- no default ODF block-level replication for the database PVCs;
+- active/passive traffic control with split-brain prevention;
+- distinct cluster identity and separate secret custody.
+
+The active workload remains `spoke-dc-v7` until a later controlled failover
+drill promotes `spoke-dr-v7`.
+
+## Non-Goals
+
+- Do not create VMs, DNS records, HAProxy entries, install artifacts, GitOps
+  overlays, ACM imports, or live OpenShift resources in this gate.
+- Do not clone the active cluster identity or secret material.
+- Do not route traffic to `spoke-dr-v7` yet.
+
+## Validation
+
+- Accepted ADR exists at `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md`.
+- Issue `#465` is the design gate for this decision.
+- The design gate is closed and the next work item is `#466`.
+
+## Next Gate
+
+`#466 / OP-GF-SPOKEDRV7-2` will capture the `spoke-dc-v7` parity baseline and
+workload inventory that the later build phases will consume.
