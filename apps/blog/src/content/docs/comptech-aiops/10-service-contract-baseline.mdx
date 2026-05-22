@@ -10,6 +10,7 @@ The canonical service contract decision is `comptech-aiops` ADR 0020.
 The current RAG ingestion baseline is `comptech-aiops` ADR 0023.
 The durable RAG storage baseline is `comptech-aiops` ADR 0024.
 The operator portal MVP decision is `comptech-aiops` ADR 0025.
+The trusted-LAN portal ingress decision is `comptech-aiops` ADR 0026.
 
 This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
 
@@ -35,6 +36,7 @@ Canonical issue [#31](https://github.com/comptech-lab/comptech-aiops/issues/31) 
 Canonical issue [#32](https://github.com/comptech-lab/comptech-aiops/issues/32) implemented the first RAG ingestion pipeline skeleton.
 Canonical issue [#33](https://github.com/comptech-lab/comptech-aiops/issues/33) implemented durable RAG metadata and source object storage.
 Canonical issue [#34](https://github.com/comptech-lab/comptech-aiops/issues/34) implemented the first operator portal MVP against the portal API boundary.
+Canonical issue [#35](https://github.com/comptech-lab/comptech-aiops/issues/35) exposes only the portal ingress gateway on the trusted LAN path.
 
 Public-safe status:
 
@@ -53,6 +55,7 @@ Public-safe status:
 | RAG ingestion skeleton | Reviewed markdown/plain-text source content can be ingested into in-process source, job, and chunk records; query returns public-safe citations. |
 | Durable RAG storage | RAG source, job, and chunk metadata is stored in Postgres, with reviewed source object copies in MinIO when configured. |
 | Operator portal MVP | Browser UI exposes readiness, tasks, approvals, knowledge citations, inventory targets, evidence lookup, and task events through the portal API only; deployed smoke checks passed on `ze-tower`. |
+| LAN portal ingress | The existing portal ingress is reachable from trusted LAN clients; internal services remain Docker-internal. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -83,6 +86,8 @@ The durable RAG storage implementation does not add production-changing authorit
 The operator portal MVP does not add production-changing authority. It lets operators use existing safe Phase 1 portal API workflows from a browser while preserving the rule that internal services and target infrastructure are not called directly from the frontend.
 
 Deployment verification passed on `ze-tower` with public-safe smoke data. The smoke check confirmed the rendered portal, task creation, approval decision, task event history, knowledge citations, inventory route, evidence metadata lookup, and standard health check.
+
+The LAN portal ingress change does not add production-changing authority. It keeps the same portal API boundary and only changes how trusted LAN operators reach the existing ingress gateway.
 
 ## Shared Helpers
 

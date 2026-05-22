@@ -63,6 +63,8 @@ Docker networks are segmented by role:
 
 Services are internal by default. Host-facing exposure is by explicit exception.
 
+The operator portal is exposed through one trusted-LAN ingress path on `ze-tower`. Internal service endpoints, databases, model-serving APIs, and tool gateways remain Docker-internal unless a later ADR approves exposure.
+
 ## Superseded OpenWebUI Cleanup
 
 The historical `rag-open-webui` container from the earlier `/srv/rag` experiment was removed after the current AIOps control plane was verified. Its old data paths were preserved for recoverability pending a separate archive or deletion decision.
@@ -70,6 +72,8 @@ The historical `rag-open-webui` container from the earlier `/srv/rag` experiment
 ## Portal MVP Smoke Direction
 
 The portal MVP was verified through the deployed ingress after GitHub Actions deployment. Public-safe smoke scope included portal readiness, a non-secret execution task, approval queue behavior, task event history, knowledge query citations, inventory target rendering, evidence lookup behavior, and the standard health check.
+
+The LAN portal exposure uses the same portal API boundary. Final public-safe verification will record direct portal health, readiness, and browser-render checks without publishing credentials or private evidence.
 
 ## Remaining Guardrails
 

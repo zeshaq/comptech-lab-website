@@ -92,12 +92,15 @@ Public-safe status:
 | Internal clients | Portal API calls orchestrator, MCP gateway, and RAG service routes for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
 | Operator portal MVP | Browser UI for readiness, task creation/list/detail, approval decisions, knowledge search citations, inventory targets, evidence lookup, and task events through the Go/Gin portal API; deployed smoke checks passed on `ze-tower`. |
+| LAN portal ingress | Single trusted-LAN ingress path for the operator portal; internal services remain Docker-internal. |
 
 The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. Embedding generation and Qdrant indexing remain follow-up work before retrieval quality should be treated as semantic.
 
 These service increments do not implement real infrastructure actions.
 
 The operator portal MVP does not add production-changing authority. It gives operators a browser surface for already-governed Phase 1 API workflows while preserving the rule that the frontend only talks to the portal API.
+
+The LAN ingress change does not expose internal services or target infrastructure. It only makes the existing portal ingress reachable from trusted LAN clients.
 
 ## Knowledge Base Direction
 

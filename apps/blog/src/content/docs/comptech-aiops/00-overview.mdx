@@ -49,6 +49,8 @@ The first service contract baseline is now defined for the portal API, agent orc
 
 The first operator portal MVP is deployed. It exposes existing safe Phase 1 workflows for readiness, task tracking, approval decisions, knowledge search with citations, inventory targets, evidence lookup, and task event history through the portal API only.
 
+The portal is now being exposed through a single trusted-LAN ingress path on `ze-tower`. Internal services remain Docker-internal, and this access change does not enable production-changing agent authority.
+
 ## Non-Negotiables
 
 - No secrets in Git.
