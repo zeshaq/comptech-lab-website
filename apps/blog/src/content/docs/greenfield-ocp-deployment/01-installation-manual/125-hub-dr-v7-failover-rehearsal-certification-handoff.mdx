@@ -1,7 +1,7 @@
 ---
 title: "Installation Manual - 125 hub-dr-v7 failover rehearsal certification and handoff"
 sidebar_label: "125 hub-dr-v7 failover rehearsal certification and handoff"
-description: "Batch 4 execution for hub-dr-v7: failover runbook dry-run, controlled takeover no-go decision, warm-standby certification evidence, and operator handoff."
+description: "Batch 4 execution for hub-dr-v7: failover runbook dry-run, actual spoke-dc-v7 takeover, certification evidence, and operator handoff."
 last_reviewed: 2026-05-22
 draft: false
 ---
@@ -10,10 +10,14 @@ This chapter records Batch 4 of the `hub-dr-v7` warm-standby management hub
 deployment. It combines issue `#458`, issue `#459`, issue `#460`, and issue
 `#461` into one operational evidence set.
 
-The important result is deliberately conservative: the failover runbook was
-written and server-side dry-run validation passed, but the actual takeover was
-not executed because `hub-dc-v7` was healthy and still authoritative for
-`spoke-dc-v7`.
+The first pass through this chapter was deliberately conservative: the failover
+runbook was written and server-side dry-run validation passed, but the actual
+takeover was stopped because `hub-dc-v7` was healthy and still authoritative
+for `spoke-dc-v7`.
+
+The operator later explicitly requested the actual failover. On
+2026-05-22T05:54:43Z, `spoke-dc-v7` management authority was moved to
+`hub-dr-v7`, and the stale `hub-dc-v7` spoke authority was removed.
 
 ## Governance
 
@@ -26,6 +30,7 @@ not executed because `hub-dc-v7` was healthy and still authoritative for
 | Governing ADRs | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
 | Local runbook | `plans/hub-dr-v7-failover-runbook.md` |
 | Local evidence | `reports/platform/hub-dr-v7/20260522/hub-dr-v7-failover-rehearsal-certification-handoff.md` |
+| Actual takeover evidence | `reports/platform/hub-dr-v7/20260522/hub-dr-v7-actual-spoke-takeover.md` |
 
 ## Objective
 
@@ -211,6 +216,75 @@ This is not a failed drill. It is the correct safety outcome. Promoting
 `hub-dr-v7` while the active hub is healthy would create avoidable split-brain
 risk and violate the warm-standby design in ADR 0029.
 
+## Actual Takeover Execution
+
+After the dry-run/no-go result, the operator explicitly requested actual
+failover/takeover of `spoke-dc-v7` by `hub-dr-v7`. That request was treated as
+the planned failover/isolation window for issue `#459`.
+
+The execution sequence was:
+
+1. Remove active hub GitOps authority for `spoke-dc-v7`.
+2. Add equivalent management authority on `hub-dr-v7`.
+3. Sync both hub root Argo CD applications.
+4. Apply the `hub-dr-v7` generated ACM import CRDs and import payload directly
+   to `spoke-dc-v7` without printing the payload.
+5. Prune the stale active-hub `ManagedCluster/spoke-dc-v7` and namespace from
+   `hub-dc-v7`.
+6. Validate final authority, cluster health, addons, and ManifestWorks.
+
+Platform GitOps commits:
+
+```text
+a822c3e Move spoke management authority to hub-dr-v7
+0c7293c Prune spoke registration from active hub
+```
+
+Final authority state:
+
+```text
+hub-dc-v7:
+  ManagedCluster/local-cluster only
+  no ApplicationSet/spoke-cluster-config-pull
+  no GitOpsCluster/gitops-managed
+  no ManagedCluster/spoke-dc-v7
+
+hub-dr-v7:
+  ManagedCluster/local-cluster
+  ManagedCluster/spoke-dc-v7 Joined=True Available=True
+  ApplicationSet/openshift-gitops/spoke-cluster-config-pull
+  GitOpsCluster/openshift-gitops/gitops-managed
+```
+
+`spoke-dc-v7` Klusterlet validation:
+
+```text
+available=True
+applied=True
+```
+
+All hub-dr-v7 ManifestWorks in namespace `spoke-dc-v7` were
+`Applied=True` and `Available=True`, including the generated
+`spoke-dc-v7-cluster-config` ManifestWork.
+
+The generated Argo Application `spoke-dc-v7-cluster-config` remains
+`OutOfSync` and `Healthy` because it is intentionally annotated with:
+
+```text
+argocd.argoproj.io/skip-reconcile=true
+```
+
+For this OCM pull model, the ManifestWork status is the authoritative
+validation signal.
+
+The retain-or-rollback decision was:
+
+```text
+retain hub-dr-v7 authority
+```
+
+No split-brain condition remained at closeout.
+
 ## Failover Runbook
 
 The failover runbook now records:
@@ -254,7 +328,8 @@ If hub-dc-v7 is healthy and reachable, the correct drill result is no-go.
 ## Certification Boundary
 
 `hub-dr-v7` is internally certified as a protected warm-standby management hub
-for the CompTech lab.
+for the CompTech lab and, after the 2026-05-22 takeover, as the active
+management authority for `spoke-dc-v7`.
 
 The certification covers:
 
@@ -272,20 +347,19 @@ The certification covers:
 
 The certification does not cover:
 
-- a completed live authority transfer to `hub-dr-v7`;
 - formal external compliance attestation;
 - active-active hub operation.
 
 ## Operator Handoff
 
-Normal operation:
+Normal operation after takeover:
 
-1. Keep `hub-dc-v7` as the active management hub.
-2. Keep `hub-dr-v7` standby-only.
+1. Treat `hub-dr-v7` as the active management hub for `spoke-dc-v7`.
+2. Treat `hub-dc-v7` as non-authoritative for `spoke-dc-v7`.
 3. Monitor health, GitOps sync, OADP schedules, RHACS, Compliance Operator,
    File Integrity, and Vault/ESO readiness.
-4. Do not create `spoke-dc-v7` import resources on `hub-dr-v7` during normal
-   operations.
+4. Do not recreate `spoke-dc-v7` import resources on `hub-dc-v7` unless a
+   separate governed failback is approved.
 
 Incident operation:
 
@@ -299,21 +373,22 @@ Incident operation:
 
 ## Residual Risks
 
-- Actual `spoke-dc-v7` rehome/import remains unexecuted.
-- The next real takeover must start from a declared failure or isolation
-  condition.
+- Reverse failback to `hub-dc-v7` remains unexecuted.
+- `hub-dr-v7` is now the active management authority for `spoke-dc-v7`; future
+  operations must not assume `hub-dc-v7` still owns that spoke.
 - External audit attestation remains out of scope for this lab certification.
 
 ## Closeout
 
-Batch 4 reached its safe stop:
+Batch 4 first reached a dry-run safe stop, then completed the actual takeover:
 
 - failover runbook written;
 - dry-run validation passed;
 - active and standby authority boundaries proven;
-- no takeover executed because the active hub was healthy;
-- split-brain risk avoided;
+- `spoke-dc-v7` reimported to `hub-dr-v7`;
+- stale `hub-dc-v7` spoke authority removed;
+- split-brain risk avoided and then eliminated;
 - handoff evidence recorded.
 
-The cluster should remain in warm standby until a future governed failover
-window or real active-hub failure requires promotion.
+The fleet should now operate with `hub-dr-v7` as active management authority
+for `spoke-dc-v7` until a separate governed failback moves authority back.
