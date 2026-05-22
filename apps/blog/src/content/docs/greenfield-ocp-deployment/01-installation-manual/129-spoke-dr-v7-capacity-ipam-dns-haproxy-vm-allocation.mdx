@@ -1,0 +1,181 @@
+---
+title: "Installation Manual - 129 spoke-dr-v7 capacity IPAM DNS HAProxy and VM allocation"
+sidebar_label: "129 spoke-dr-v7 capacity IPAM DNS HAProxy and VM allocation"
+description: "The accepted non-secret capacity, IPAM, DNS, HAProxy, and VM allocation plan for the spoke-dr-v7 compact hot standby workload cluster."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records `#467 / OP-GF-SPOKEDRV7-3`, the capacity, IPAM, DNS,
+HAProxy, and VM allocation gate for `spoke-dr-v7`.
+
+The result is an accepted non-secret allocation, not a deployment start. No
+`spoke-dr-v7` VMs, DNS records, HAProxy changes, install inputs, GitOps
+desired state, ACM imports, storage resources, CNPG objects, routes, or
+application resources were created.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-SPOKEDRV7` |
+| Milestone | `#37` / `spoke-dr-v7 Hot Standby Workload Cluster` |
+| Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
+| Allocation gate | `#467` / `OP-GF-SPOKEDRV7-3` |
+| Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
+| Input baseline | `#466` parity baseline |
+| Next issue | `#468` / `OP-GF-SPOKEDRV7-4` |
+
+## Decision
+
+Reserve a compact three-node VM-only allocation for `spoke-dr-v7` on
+`dl385-2`, using bridge `br33` and the v7 cluster domain
+`spoke-dr-v7.v7.comptech-lab.com`.
+
+The allocation is logical parity, not physical parity. `spoke-dc-v7` has
+three VM control-plane nodes and three large physical workers. `spoke-dr-v7`
+is planned as compact VM-only because the current workload footprint is small
+and no live Open Liberty or user CloudNativePG application objects were found
+in the `#466` baseline.
+
+## Cluster Network Allocation
+
+| Purpose | Value |
+| --- | --- |
+| Cluster name | `spoke-dr-v7` |
+| Base domain | `v7.comptech-lab.com` |
+| Cluster domain | `spoke-dr-v7.v7.comptech-lab.com` |
+| Machine network | `30.30.0.0/16` |
+| Gateway | `30.30.0.1` |
+| Private resolver | `30.30.200.53` |
+| Public authoritative DNS checked | `59.153.29.101` |
+| API VIP | `30.30.230.10` |
+| API-int VIP | `30.30.230.10` |
+| Ingress VIP | `30.30.230.11` |
+| Rendezvous host | `spoke-dr-v7-master-0` / `30.30.230.13` |
+
+## VM Allocation
+
+| VM | Node | IP | MAC | Role | vCPU | RAM | Boot | Data disks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `gf-ocp-spoke-dr-v7-master-0` | `spoke-dr-v7-master-0` | `30.30.230.13` | `52:54:00:24:00:00` | compact master/worker | 32 | 96 GiB | 300 GiB | 3 x 500 GiB |
+| `gf-ocp-spoke-dr-v7-master-1` | `spoke-dr-v7-master-1` | `30.30.230.14` | `52:54:00:24:00:01` | compact master/worker | 32 | 96 GiB | 300 GiB | 3 x 500 GiB |
+| `gf-ocp-spoke-dr-v7-master-2` | `spoke-dr-v7-master-2` | `30.30.230.15` | `52:54:00:24:00:02` | compact master/worker | 32 | 96 GiB | 300 GiB | 3 x 500 GiB |
+
+Aggregate requested VM shape:
+
+- 96 vCPU;
+- 288 GiB RAM;
+- 900 GiB boot disk;
+- 4.5 TiB nominal ODF/local data disk capacity.
+
+This is larger than the minimal compact hub shape in memory because
+`spoke-dr-v7` must host ODF, logging, RHACS secured-cluster components,
+Compliance scans, and the eventual CNPG/Open Liberty standby workload.
+
+## DNS Plan
+
+Create these records in the implementation gate:
+
+| Record | Type | Target |
+| --- | --- | --- |
+| `api.spoke-dr-v7.v7.comptech-lab.com` | A | `30.30.230.10` |
+| `api-int.spoke-dr-v7.v7.comptech-lab.com` | A | `30.30.230.10` |
+| `*.apps.spoke-dr-v7.v7.comptech-lab.com` | A | `30.30.230.11` |
+| `spoke-dr-v7-master-0.v7.comptech-lab.com` | A | `30.30.230.13` |
+| `spoke-dr-v7-master-1.v7.comptech-lab.com` | A | `30.30.230.14` |
+| `spoke-dr-v7-master-2.v7.comptech-lab.com` | A | `30.30.230.15` |
+
+No DNS records were created in this gate.
+
+## HAProxy Decision
+
+HAProxy remains an explicit no-op for OpenShift API, Machine Config Server,
+and ingress traffic.
+
+Reasons:
+
+- current v7 clusters route OpenShift API and ingress directly to cluster VIPs;
+- `hub-dr-v7` uses the same no-HAProxy OpenShift path;
+- adding HAProxy into only the `spoke-dr-v7` OpenShift data path would create
+  an unnecessary architectural difference.
+
+Validation on `gf-ocp-haproxy-01` showed:
+
+- `haproxy -c -f /etc/haproxy/haproxy.cfg` passed;
+- no existing `spoke-dr-v7`, `hub-dr-v7`, `spoke-dc-v7`, `api.`, or `apps.`
+  OpenShift route references were found in the HAProxy config.
+
+## Conflict Validation
+
+Read-only checks were run from `dl385-2`.
+
+Host and capacity:
+
+- host identity: `385-2`;
+- bridge `br33` exists and is UP;
+- CPU threads observed: `512`;
+- memory observed: about `1.5 TiB` total and about `821 GiB` available;
+- `/var/lib/libvirt/images` has about `12 TiB` available.
+
+Candidate IP check:
+
+- `30.30.230.10` no ping response;
+- `30.30.230.11` no ping response;
+- `30.30.230.13` no ping response;
+- `30.30.230.14` no ping response;
+- `30.30.230.15` no ping response.
+
+Candidate DNS check:
+
+- private resolver `30.30.200.53` returned no records for the planned API,
+  API-int, representative apps, or node names;
+- public authoritative DNS `59.153.29.101` returned no records for the same
+  planned names.
+
+Candidate VM and MAC check:
+
+- libvirt domains `gf-ocp-spoke-dr-v7-master-0..2` are absent;
+- MACs `52:54:00:24:00:00-02` are free in current libvirt domain interfaces.
+
+Candidate disk path check:
+
+- all planned boot and data disk paths under `/var/lib/libvirt/images/` are
+  absent;
+- the planned agent ISO path
+  `/var/lib/libvirt/images/openshift/spoke-dr-v7/spoke-dr-v7-agent.iso` is
+  absent.
+
+Nearby known records:
+
+- `api.hub-dr-v7.v7.comptech-lab.com` resolves to `30.30.220.10`;
+- `api.spoke-dc-v7.v7.comptech-lab.com` resolves to `30.30.0.10`;
+- `api.spoke-dr-v7.v7.comptech-lab.com` has no record yet.
+
+## Stop Conditions For #468
+
+Do not render final install inputs if any of these become true:
+
+- candidate IPs begin responding to ping before allocation is applied;
+- candidate DNS records appear with different values;
+- libvirt domains or MACs appear before the VM creation gate;
+- `/var/lib/libvirt/images` free capacity drops below the requested VM shape
+  plus rollback margin;
+- `br33` is unavailable;
+- the OpenShift release or disconnected mirror source changes before render.
+
+## Result
+
+`#467` is complete. The capacity, IPAM, DNS, HAProxy/no-op, VM name, MAC, and
+disk allocation is accepted for `spoke-dr-v7`.
+
+This gate did not create infrastructure. The allocation must be rechecked in
+`#468` before install inputs are rendered and again in `#469` before VM
+creation.
+
+## Next Gate
+
+Proceed to `#468 / OP-GF-SPOKEDRV7-4` to render install inputs and
+disconnected artifacts using this allocation. DNS should be created in that
+execution path before or with install input validation. VMs still must not be
+created until `#469`.

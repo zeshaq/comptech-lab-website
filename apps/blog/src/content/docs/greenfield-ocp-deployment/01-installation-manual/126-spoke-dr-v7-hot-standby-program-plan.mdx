@@ -40,7 +40,8 @@ Live deployment must not begin until issue `#465` creates and accepts the new
 
 That design gate was accepted on 2026-05-22T19:10:15Z and issue `#465` is
 now closed. The parity baseline gate `#466` was completed on
-2026-05-22T19:24:59Z. The next gate is `#467`.
+2026-05-22T19:24:59Z. The allocation gate `#467` completed at
+2026-05-22T19:33:41Z. The next gate is `#468`.
 
 That ADR must cover:
 
@@ -101,8 +102,11 @@ bank-auditor attestation.
 | Compliance | CIS and PCI DSS 4 scanner posture as lab evidence |
 
 Candidate VIPs, node IPs, DNS names, VM MACs, disk layout, and final hypervisor
-placement remain unassigned until `#467` completes capacity, IPAM, DNS,
-HAProxy, and VM allocation planning.
+placement were assigned by `#467`. The accepted allocation reserves API/API-int
+VIP `30.30.230.10`, ingress VIP `30.30.230.11`, node IPs `30.30.230.13-15`,
+VM names `gf-ocp-spoke-dr-v7-master-0..2`, MACs `52:54:00:24:00:00-02`, and a
+per-node shape of 32 vCPU, 96 GiB RAM, 300 GiB boot, and 3 x 500 GiB data
+disks.
 
 ## Phase Line
 
@@ -111,7 +115,7 @@ HAProxy, and VM allocation planning.
 | `OP-GF-SPOKEDRV7-0` | `#464` | Open | Program ownership and certification evidence plan |
 | `OP-GF-SPOKEDRV7-1` | `#465` | Closed | ADR and compact hot-standby workload cluster design |
 | `OP-GF-SPOKEDRV7-2` | `#466` | Closed | `spoke-dc-v7` parity baseline and workload inventory |
-| `OP-GF-SPOKEDRV7-3` | `#467` | Open | Capacity, IPAM, DNS, HAProxy, and VM allocation plan |
+| `OP-GF-SPOKEDRV7-3` | `#467` | Closed | Capacity, IPAM, DNS, HAProxy, and VM allocation plan |
 | `OP-GF-SPOKEDRV7-4` | `#468` | Open | Render install inputs and disconnected artifacts |
 | `OP-GF-SPOKEDRV7-5` | `#469` | Open | Create compact VM nodes and boot agent install |
 | `OP-GF-SPOKEDRV7-6` | `#470` | Open | Validate base OpenShift compact install |
@@ -183,8 +187,9 @@ so each public article reads as one complete operational chapter.
 The next gate is:
 
 ```text
-#467 / OP-GF-SPOKEDRV7-3: capacity, IPAM, DNS, HAProxy, and VM allocation
+#468 / OP-GF-SPOKEDRV7-4: render install inputs and disconnected artifacts
 ```
 
-The design gate is complete; the next work now starts with workload inventory
-and parity baseline capture.
+Batch 0 is complete through allocation. The next work renders install inputs
+from the accepted allocation and stops before VM creation, which remains gated
+by `#469`.

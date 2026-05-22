@@ -24,7 +24,7 @@ were created.
 | Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
 | Baseline gate | `#466` / `OP-GF-SPOKEDRV7-2` |
 | Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
-| Next issue | `#467` / `OP-GF-SPOKEDRV7-3` |
+| Next issue | `#468` / `OP-GF-SPOKEDRV7-4` |
 
 ## Read-Only Access Path
 
@@ -195,11 +195,14 @@ app or user CNPG objects to mirror.
 
 ## Next Gate
 
-`#467 / OP-GF-SPOKEDRV7-3` should allocate:
+`#467 / OP-GF-SPOKEDRV7-3` allocated:
 
 - compact VM CPU and memory;
 - disk layout for boot, ODF/local storage, and platform overhead;
 - candidate IPs and MACs;
-- DNS records;
-- HAProxy change or explicit no-op;
+- DNS records to create in the implementation gate;
+- explicit HAProxy no-op;
 - validation and rollback checks before any VM creation.
+
+The next gate is `#468 / OP-GF-SPOKEDRV7-4`, which renders install inputs and
+disconnected artifacts from the accepted allocation.
