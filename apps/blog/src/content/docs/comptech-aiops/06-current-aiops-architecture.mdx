@@ -37,7 +37,7 @@ Target infrastructure remains outside `ze-tower`. The AIOps control plane reache
 | Tool boundary | MCP gateway |
 | Model gateway | LiteLLM |
 | Model serving | vLLM primary, TGI-class runtime optional |
-| Retrieval | Qdrant vector index, Postgres metadata, MinIO object storage |
+| Retrieval | Deterministic local embeddings, Qdrant vector index, Postgres metadata, MinIO object storage |
 | Workflow glue | n8n |
 | Worker tools | Codex CLI and Claude CLI as future policy-controlled tools |
 
@@ -85,7 +85,7 @@ Public-safe status:
 | Portal API | `/api/v1` route stubs, liveness, readiness, metrics, and container healthcheck mode. |
 | Agent orchestrator | Internal `/internal/v1/orchestrator` route stubs, liveness, readiness, and metrics. |
 | MCP gateway | Internal `/internal/v1/mcp` route stubs, liveness, readiness, and metrics. |
-| RAG ingestion | Internal `/internal/v1/rag` ingestion service with durable Postgres metadata, reviewed source object storage in MinIO, deterministic chunking, keyword query citations, liveness, readiness, and metrics. |
+| RAG ingestion | Internal `/internal/v1/rag` ingestion service with durable Postgres metadata, reviewed source object storage in MinIO, deterministic chunking, deterministic local embeddings, Qdrant indexing, vector-first query with keyword fallback, liveness, readiness, and metrics. |
 | Deployment | Compose health checks added for first-party service containers. |
 | Shared contracts | Request ID, task ID, error envelope, list envelope, and health/readiness helpers added for first-party service stubs. |
 | Operational store | Postgres-backed task records, approval requests and decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
@@ -94,7 +94,7 @@ Public-safe status:
 | Operator portal MVP | Browser UI for readiness, task creation/list/detail, approval decisions, knowledge search citations, inventory targets, evidence lookup, and task events through the Go/Gin portal API; deployed smoke checks passed on `ze-tower`. |
 | LAN portal ingress | Single trusted-LAN ingress path for the operator portal; internal services remain Docker-internal. |
 
-The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. Embedding generation and Qdrant indexing remain follow-up work before retrieval quality should be treated as semantic.
+The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. It now has a vector retrieval path through deterministic local embeddings and Qdrant, but retrieval quality should still be treated as a bootstrap baseline until a model-backed embedding service is selected and evaluated.
 
 These service increments do not implement real infrastructure actions.
 

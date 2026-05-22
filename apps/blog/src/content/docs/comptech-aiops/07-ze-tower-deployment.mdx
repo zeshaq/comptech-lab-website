@@ -36,7 +36,7 @@ The deployed Phase 1 baseline includes:
 - operator portal frontend MVP;
 - agent orchestrator placeholder;
 - MCP gateway placeholder;
-- RAG ingestion service with durable metadata;
+- RAG ingestion service with durable metadata and Qdrant indexing;
 - Postgres;
 - Qdrant;
 - Temporal;
@@ -74,6 +74,8 @@ The historical `rag-open-webui` container from the earlier `/srv/rag` experiment
 The portal MVP was verified through the deployed ingress after GitHub Actions deployment. Public-safe smoke scope included portal readiness, a non-secret execution task, approval queue behavior, task event history, knowledge query citations, inventory target rendering, evidence lookup behavior, and the standard health check.
 
 The LAN portal exposure uses the same portal API boundary. Public-safe verification confirmed direct portal health, readiness, placeholder operator profile, browser-render checks, and the standard remote health script without publishing credentials or private raw evidence.
+
+RAG semantic indexing verification should use public-safe reviewed source fixtures only. The smoke scope is ingestion, `indexed` chunk state, Qdrant point metadata, direct and portal-mediated citation queries, and the internal index rebuild endpoint. Secret values and raw private evidence are not published here.
 
 ## Remaining Guardrails
 

@@ -39,7 +39,7 @@ Governance requires:
 - Every material change needs an ADR reference.
 - Every change set updates the changelog.
 
-The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The baseline includes a custom operator portal MVP, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, placeholder agent/MCP processes, and a RAG ingestion service with durable metadata.
+The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The baseline includes a custom operator portal MVP, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, placeholder agent/MCP processes, and a RAG ingestion service with durable metadata and a first semantic indexing path.
 
 The old `rag-open-webui` container from the superseded local RAG experiment has been removed from the active host state. Legacy data paths were preserved for recoverability.
 
@@ -50,6 +50,8 @@ The first service contract baseline is now defined for the portal API, agent orc
 The first operator portal MVP is deployed. It exposes existing safe Phase 1 workflows for readiness, task tracking, approval decisions, knowledge search with citations, inventory targets, evidence lookup, and task event history through the portal API only.
 
 The portal is now being exposed through a single trusted-LAN ingress path on `ze-tower`. Internal services remain Docker-internal, and this access change does not enable production-changing agent authority.
+
+The RAG service now generates deterministic local embeddings for reviewed chunks, writes vectors to Qdrant when the index is healthy, and keeps keyword fallback for availability. This is a bootstrap semantic retrieval baseline, not the final model-backed embedding service.
 
 ## Non-Negotiables
 

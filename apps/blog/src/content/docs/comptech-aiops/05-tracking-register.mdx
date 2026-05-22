@@ -47,6 +47,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#33](https://github.com/comptech-lab/comptech-aiops/issues/33) | Implement durable RAG metadata and source object storage. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#34](https://github.com/comptech-lab/comptech-aiops/issues/34) | Build the operator portal MVP. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#35](https://github.com/comptech-lab/comptech-aiops/issues/35) | Expose the operator portal on the trusted `ze-tower` LAN ingress path. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#36](https://github.com/comptech-lab/comptech-aiops/issues/36) | Add deterministic RAG embeddings and Qdrant indexing. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -64,6 +65,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#15](https://github.com/zeshaq/comptech-lab/issues/15) | Publish public durable RAG storage status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#16](https://github.com/zeshaq/comptech-lab/issues/16) | Publish public operator portal MVP status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#17](https://github.com/zeshaq/comptech-lab/issues/17) | Publish public LAN portal exposure status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#18](https://github.com/zeshaq/comptech-lab/issues/18) | Publish public RAG semantic indexing status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -95,6 +97,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0024 - Durable RAG Storage Baseline` | Store RAG source, job, and chunk metadata in Postgres and reviewed source object copies in MinIO. |
 | `0025 - Operator Portal MVP` | Expose safe Phase 1 workflows in the custom portal while keeping the Go/Gin portal API as the only frontend-facing boundary. |
 | `0026 - LAN Operator Portal Ingress` | Expose only the operator portal ingress gateway on the trusted `ze-tower` LAN path while keeping internal services hidden. |
+| `0027 - RAG Embedding And Qdrant Indexing Baseline` | Use deterministic local embeddings and Qdrant as the first rebuildable semantic retrieval baseline. |
 
 ## Changelog Entries
 
@@ -138,6 +141,8 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-23 | `comptech-lab#16` | Refreshed this public-safe operator portal MVP status. |
 | 2026-05-23 | `comptech-aiops#35` | Exposed the operator portal through a single trusted-LAN ingress path. |
 | 2026-05-23 | `comptech-lab#17` | Refreshed this public-safe LAN portal exposure status. |
+| 2026-05-23 | `comptech-aiops#36` | Added deterministic RAG embeddings, Qdrant indexing, vector-first query, and an index rebuild endpoint. |
+| 2026-05-23 | `comptech-lab#18` | Refreshed this public-safe RAG semantic indexing status. |
 
 ## Current Deployment Evidence
 
@@ -153,12 +158,13 @@ This page is the public-safe tracking register for the current work. It names is
 - Public mirror commits `5b4df95` and `585019e` published this status and evidence.
 - Canonical Validate runs `26309420527` and `26309600604`, `ze-tower` Deploy runs `26309482441` and `26309633259`, and blog Deploy runs `26309420781` and `26309600523` passed.
 - LAN smoke verified portal health, readiness, the placeholder operator profile, the direct browser render at desktop and mobile viewport sizes, and the remote health script against the configured LAN bind. Credentials and private raw evidence are not published here.
+- Canonical issue #36 adds deterministic local embeddings, Qdrant indexing, vector-first query with keyword fallback, and an internal index rebuild endpoint. Deployment evidence will be recorded after the governed `ze-tower` workflow completes.
 
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
 - Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
-- Add embedding generation and Qdrant indexing for durable RAG chunks.
+- Replace deterministic local embeddings with a model-backed embedding service after retrieval evaluation.
 - Add evidence list/search API support for the operator portal.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
