@@ -1,0 +1,76 @@
+---
+title: "CompTech AIOps - backup and restore baseline"
+sidebar_label: "Backup and restore"
+description: "Public-safe summary of the ze-tower control-plane backup and restore baseline."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The `ze-tower` control plane needs a recovery baseline before production-changing agent authority or serious RAG ingestion is enabled.
+
+The canonical decision is ADR 0017 in the `comptech-aiops` repository. This page is the public-safe summary.
+
+## Recovery Model
+
+| Area | Recovery source |
+| --- | --- |
+| Repository source, ADRs, runbooks, deployment files | GitHub |
+| Secret values | GitHub Secrets and approved local custody |
+| Runtime env files | Re-rendered from GitHub Secrets |
+| Stateful databases and service data | Encrypted backups |
+| Rebuildable retrieval indexes | Restore if available, otherwise rebuild from source notes |
+| Object storage | Covered by a separate MinIO backup or replication decision |
+
+## Backup Tooling
+
+The Phase 1 direction uses Restic for encrypted backup repositories stored in the AIOps MinIO backup bucket.
+
+This matters because backup payloads can contain sensitive runtime state. They must be encrypted before upload.
+
+The public docs can name the tool and bucket role, but they do not publish:
+
+- passwords;
+- access keys;
+- private backup repository credentials;
+- sensitive snapshot IDs;
+- raw backup manifests;
+- operational evidence that exposes private details.
+
+## Stateful Services
+
+The backup baseline covers:
+
+- platform Postgres;
+- Temporal Postgres;
+- NetBox Postgres;
+- Qdrant;
+- n8n data;
+- Grafana data;
+- Prometheus data;
+- Loki data;
+- Tempo data;
+- NetBox Redis.
+
+The priority is not equal for all state. Databases and future source-of-truth services have higher restore priority than metrics, logs, traces, and rebuildable vector indexes.
+
+## Restore Drill Gate
+
+Production-changing agent capability remains blocked until a restore drill is completed and recorded.
+
+The restore drill must use a separate target path, not the live deployment root. The drill should prove that:
+
+- repository source can be restored or synced;
+- runtime configuration can be regenerated without printing secrets;
+- backup snapshots can be selected;
+- databases and volumes can be restored;
+- Compose validation works;
+- health checks and data checks can be captured safely.
+
+## Open Follow-Ups
+
+- Install and validate Restic on `ze-tower`.
+- Materialize backup runtime settings from GitHub Secrets.
+- Implement service-specific logical dumps.
+- Define retention policy.
+- Run and record the first restore drill.
+- Add a separate MinIO server backup or replication decision.

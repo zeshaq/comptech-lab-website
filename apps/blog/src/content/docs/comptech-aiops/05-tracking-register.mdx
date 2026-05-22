@@ -32,8 +32,10 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#18](https://github.com/comptech-lab/comptech-aiops/issues/18) | Run first non-dry-run `ze-tower` deployment. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#19](https://github.com/comptech-lab/comptech-aiops/issues/19) | Remove legacy OpenWebUI container from `ze-tower`. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#20](https://github.com/comptech-lab/comptech-aiops/issues/20) | Record public blog documentation mirror ADR. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#21](https://github.com/comptech-lab/comptech-aiops/issues/21) | Define `ze-tower` backup and restore baseline. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -55,6 +57,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0014 - Full Phase 1 Tooling Baseline` | Deploy the full Phase 1 control-plane tooling baseline. |
 | `0015 - GitHub Actions Deployment Bootstrap To ze-tower` | Use manual GitHub Actions deployment bootstrap to `ze-tower`. |
 | `0016 - Public Blog Documentation Mirror` | Keep this blog section as a public-safe mirror of the canonical repo. |
+| `0017 - ze-tower Control Plane Backup And Restore Baseline` | Use encrypted Restic backups in MinIO and require a restore drill before production-changing authority. |
 
 ## Changelog Entries
 
@@ -68,6 +71,8 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-aiops#19` | Removed the legacy `rag-open-webui` container while preserving old data paths. |
 | 2026-05-22 | `comptech-aiops#20` | Added ADR 0016 requiring public blog mirror updates or explicit skip records. |
 | 2026-05-22 | `comptech-lab#2` | Refreshed this public-safe docs mirror from current canonical records. |
+| 2026-05-22 | `comptech-aiops#21` | Added the `ze-tower` backup and restore baseline, including restore drill gate. |
+| 2026-05-22 | `comptech-lab#3` | Added this public-safe backup and restore baseline page. |
 
 ## Open Follow-Ups
 
