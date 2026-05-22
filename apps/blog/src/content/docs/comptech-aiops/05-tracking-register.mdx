@@ -158,7 +158,9 @@ This page is the public-safe tracking register for the current work. It names is
 - Public mirror commits `5b4df95` and `585019e` published this status and evidence.
 - Canonical Validate runs `26309420527` and `26309600604`, `ze-tower` Deploy runs `26309482441` and `26309633259`, and blog Deploy runs `26309420781` and `26309600523` passed.
 - LAN smoke verified portal health, readiness, the placeholder operator profile, the direct browser render at desktop and mobile viewport sizes, and the remote health script against the configured LAN bind. Credentials and private raw evidence are not published here.
-- Canonical issue #36 adds deterministic local embeddings, Qdrant indexing, vector-first query with keyword fallback, and an internal index rebuild endpoint. Deployment evidence will be recorded after the governed `ze-tower` workflow completes.
+- Canonical commit `e45119e` added deterministic local embeddings, Qdrant indexing, vector-first query with keyword fallback, and an internal index rebuild endpoint. Public mirror commit `6d3f019` published this public-safe status.
+- Canonical Validate run `26310550995`, `ze-tower` Deploy run `26310590640`, and blog Deploy run `26310550843` passed.
+- Public-safe smoke verified `rag-ingestion` readiness with Postgres, MinIO, Qdrant, and deterministic embeddings; a reviewed fixture reached `embedding_state: indexed`; direct RAG query returned a citation; the index rebuild endpoint reported indexed chunks; portal-mediated knowledge query returned citations; and the standard `ze-tower` health script passed.
 
 ## Open Follow-Ups
 

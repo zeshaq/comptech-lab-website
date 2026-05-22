@@ -88,6 +88,8 @@ The durable RAG storage implementation does not add production-changing authorit
 
 The RAG semantic indexing implementation does not add production-changing authority. It adds deterministic local embeddings, writes reviewed chunk vectors to Qdrant when the vector index is healthy, keeps keyword fallback for availability, and adds an internal rebuild endpoint for the Qdrant index.
 
+Deployment verification passed on `ze-tower` with a public-safe reviewed fixture. The smoke check confirmed RAG readiness with Postgres, MinIO, Qdrant, and deterministic embeddings; indexed chunk metadata; direct citation query; index rebuild; portal-mediated knowledge citations; and the standard health script.
+
 The operator portal MVP does not add production-changing authority. It lets operators use existing safe Phase 1 portal API workflows from a browser while preserving the rule that internal services and target infrastructure are not called directly from the frontend.
 
 Deployment verification passed on `ze-tower` with public-safe smoke data. The smoke check confirmed the rendered portal, task creation, approval decision, task event history, knowledge citations, inventory route, evidence metadata lookup, and standard health check.
