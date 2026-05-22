@@ -53,6 +53,8 @@ The portal is now being exposed through a single trusted-LAN ingress path on `ze
 
 The RAG service now generates deterministic local embeddings for reviewed chunks, writes vectors to Qdrant when the index is healthy, and keeps keyword fallback for availability. This is a bootstrap semantic retrieval baseline, not the final model-backed embedding service.
 
+The first reviewed RAG knowledge pack and retrieval evaluation fixture are now defined in the canonical repo. The fixture uses public-safe control-plane knowledge and checks that representative operator questions return expected citations before deployment.
+
 ## Non-Negotiables
 
 - No secrets in Git.

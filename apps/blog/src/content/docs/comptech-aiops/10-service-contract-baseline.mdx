@@ -12,6 +12,7 @@ The durable RAG storage baseline is `comptech-aiops` ADR 0024.
 The operator portal MVP decision is `comptech-aiops` ADR 0025.
 The trusted-LAN portal ingress decision is `comptech-aiops` ADR 0026.
 The RAG embedding and Qdrant indexing baseline is `comptech-aiops` ADR 0027.
+The reviewed knowledge pack and retrieval evaluation baseline is `comptech-aiops` ADR 0028.
 
 This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
 
@@ -39,6 +40,7 @@ Canonical issue [#33](https://github.com/comptech-lab/comptech-aiops/issues/33) 
 Canonical issue [#34](https://github.com/comptech-lab/comptech-aiops/issues/34) implemented the first operator portal MVP against the portal API boundary.
 Canonical issue [#35](https://github.com/comptech-lab/comptech-aiops/issues/35) exposes only the portal ingress gateway on the trusted LAN path.
 Canonical issue [#36](https://github.com/comptech-lab/comptech-aiops/issues/36) adds deterministic RAG embeddings and Qdrant indexing.
+Canonical issue [#37](https://github.com/comptech-lab/comptech-aiops/issues/37) adds the first reviewed RAG knowledge pack and retrieval evaluation fixture.
 
 Public-safe status:
 
@@ -59,6 +61,7 @@ Public-safe status:
 | Operator portal MVP | Browser UI exposes readiness, tasks, approvals, knowledge citations, inventory targets, evidence lookup, and task events through the portal API only; deployed smoke checks passed on `ze-tower`. |
 | LAN portal ingress | The existing portal ingress is reachable from trusted LAN clients; internal services remain Docker-internal. |
 | RAG semantic indexing | Reviewed chunks receive deterministic local embeddings and are indexed into Qdrant when available; Qdrant remains rebuildable from durable metadata. |
+| RAG retrieval evaluation | Public-safe reviewed source pack and fixture check that representative operator questions return expected citations before deployment. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -89,6 +92,8 @@ The durable RAG storage implementation does not add production-changing authorit
 The RAG semantic indexing implementation does not add production-changing authority. It adds deterministic local embeddings, writes reviewed chunk vectors to Qdrant when the vector index is healthy, keeps keyword fallback for availability, and adds an internal rebuild endpoint for the Qdrant index.
 
 Deployment verification passed on `ze-tower` with a public-safe reviewed fixture. The smoke check confirmed RAG readiness with Postgres, MinIO, Qdrant, and deterministic embeddings; indexed chunk metadata; direct citation query; index rebuild; portal-mediated knowledge citations; and the standard health script.
+
+The retrieval evaluation baseline does not add production-changing authority. It adds a reviewed control-plane knowledge pack plus a local fixture that verifies expected citations through the RAG service contract before deployment.
 
 The operator portal MVP does not add production-changing authority. It lets operators use existing safe Phase 1 portal API workflows from a browser while preserving the rule that internal services and target infrastructure are not called directly from the frontend.
 
@@ -222,4 +227,4 @@ Readiness failures should return safe dependency status without secret values.
 
 - Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
-- Replace deterministic local embeddings with a model-backed embedding service after retrieval evaluation.
+- Add target-infrastructure knowledge packs, then compare deterministic local embeddings with a model-backed embedding service after more evaluated packs exist.

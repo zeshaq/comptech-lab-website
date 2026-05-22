@@ -93,8 +93,11 @@ Public-safe status:
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
 | Operator portal MVP | Browser UI for readiness, task creation/list/detail, approval decisions, knowledge search citations, inventory targets, evidence lookup, and task events through the Go/Gin portal API; deployed smoke checks passed on `ze-tower`. |
 | LAN portal ingress | Single trusted-LAN ingress path for the operator portal; internal services remain Docker-internal. |
+| RAG retrieval evaluation | First reviewed `phase1-control-plane` knowledge pack and local fixture verify expected citations before deployment. |
 
 The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. It now has a vector retrieval path through deterministic local embeddings and Qdrant, but retrieval quality should still be treated as a bootstrap baseline until a model-backed embedding service is selected and evaluated.
+
+The first retrieval fixture does not call private infrastructure. It ingests reviewed markdown into the in-memory RAG store and checks expected source citations for public-safe control-plane questions.
 
 These service increments do not implement real infrastructure actions.
 
@@ -119,3 +122,5 @@ Good source material includes:
 - validated command outputs with sensitive values removed.
 
 GitHub and source systems remain authoritative. Qdrant is a rebuildable retrieval index, not the source of truth.
+
+The first reviewed pack is a control-plane pack. Future packs should cover target infrastructure domains such as OpenShift/Kubernetes, hypervisors, network, facilities, and software platforms after public-safety and operational review.

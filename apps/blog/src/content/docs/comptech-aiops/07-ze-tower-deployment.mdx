@@ -77,6 +77,8 @@ The LAN portal exposure uses the same portal API boundary. Public-safe verificat
 
 RAG semantic indexing verification uses public-safe reviewed source fixtures only. The latest smoke scope confirmed ingestion, `indexed` chunk state, Qdrant point metadata, direct and portal-mediated citation queries, the internal index rebuild endpoint, and the standard remote health script. Secret values and raw private evidence are not published here.
 
+Retrieval evaluation now also runs before deployment in canonical validation. The current fixture checks public-safe control-plane questions against the reviewed knowledge pack using the in-memory RAG store; deployed Qdrant behavior is still checked separately by smoke tests.
+
 ## Remaining Guardrails
 
 Before production-changing tools are enabled, the platform still needs:
