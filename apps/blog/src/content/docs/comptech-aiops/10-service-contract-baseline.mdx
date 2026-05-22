@@ -1,0 +1,125 @@
+---
+title: "CompTech AIOps - service contract baseline"
+sidebar_label: "Service contracts"
+description: "Public-safe summary of the Phase 1 service contracts for the comptech-aiops platform."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The canonical service contract decision is `comptech-aiops` ADR 0020.
+
+This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
+
+## Contract Principles
+
+- The portal frontend talks only to the Go/Gin portal API.
+- Operator-facing APIs use `/api/v1`.
+- Internal first-party services use `/internal/v1`.
+- Tool execution goes through the MCP gateway and policy path.
+- RAG retrieval informs plans and answers; it does not override source systems, approvals, policy, or operator decisions.
+- Mutating operations must be auditable.
+- Evidence references must not expose secret values.
+- Every first-party service needs liveness and readiness checks.
+
+## Service Boundaries
+
+| Service | Public-safe contract role |
+| --- | --- |
+| Portal API | Operator-facing API for chat, tasks, approvals, evidence, inventory, knowledge query, and live events. |
+| Agent orchestrator | Internal task planning, durable workflow coordination, plan revision, approval waits, and task event emission. |
+| MCP gateway | Internal tool registry, policy checks, target binding, tool-run mediation, and tool-run evidence. |
+| RAG service | Reviewed source ingestion, metadata normalization, chunking, embedding, retrieval, and citation metadata. |
+| Evidence records | Metadata references to artifacts, outputs, approvals, plans, validation results, and reviewed evidence. |
+| Event stream | Server-Sent Events for task, plan, approval, tool-run, evidence, RAG ingestion, and system status updates. |
+
+## Portal API
+
+The portal API is the only operator-facing service boundary for the frontend.
+
+Initial public-safe resource groups:
+
+| Resource group | Purpose |
+| --- | --- |
+| Actor profile | Current user, roles, and autonomy limits. |
+| Chat sessions | Operator chat sessions and messages. |
+| Tasks | Task creation, task state, cancellation, event history, and evidence references. |
+| Approvals | Pending and historical approval decisions. |
+| Evidence | Evidence metadata and safe previews. |
+| Inventory | Known target scopes from approved sources of truth. |
+| Knowledge query | Portal-mediated RAG query. |
+| Events | Live Server-Sent Events stream. |
+
+## Internal Contracts
+
+The orchestrator, MCP gateway, and RAG service are internal boundaries. They are not called directly by the portal frontend.
+
+| Internal service | Baseline path | Key responsibility |
+| --- | --- | --- |
+| Agent orchestrator | `/internal/v1/orchestrator` | Own task state, planning, plan revision, approval waits, and orchestration events. |
+| MCP gateway | `/internal/v1/mcp` | Own policy checks, tool registry, target binding, tool-run state, and safe output metadata. |
+| RAG service | `/internal/v1/rag` | Own ingestion jobs, source metadata, chunk metadata, and retrieval for planning. |
+
+## State Models
+
+Initial task states:
+
+- `draft`
+- `queued`
+- `planning`
+- `awaiting_approval`
+- `running`
+- `blocked`
+- `succeeded`
+- `failed`
+- `cancelled`
+
+Initial approval states:
+
+- `requested`
+- `approved`
+- `denied`
+- `expired`
+- `superseded`
+
+Initial tool-run states:
+
+- `proposed`
+- `policy_checking`
+- `approval_required`
+- `queued`
+- `running`
+- `succeeded`
+- `failed`
+- `cancelled`
+- `denied`
+
+## Evidence And Events
+
+Evidence records point to artifacts and outputs stored in approved systems. They carry metadata such as type, title, object reference, digest, content type, size, redaction status, and creation time.
+
+Allowed redaction states:
+
+| State | Meaning |
+| --- | --- |
+| `raw_private` | Private artifact, not safe for public issue or blog use. |
+| `review_required` | Needs human review before sharing. |
+| `reviewed_internal` | Safe for internal operators. |
+| `reviewed_public_safe` | Safe for public docs or public issue comments. |
+
+Initial event types include task updates, plan creation, approval requests and decisions, tool-run updates, evidence creation, RAG ingestion updates, and system degradation signals.
+
+## Health And Readiness
+
+Every first-party service must expose:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `/healthz` | Liveness check. The service process can respond. |
+| `/readyz` | Readiness check. Required dependencies for the service role are reachable. |
+| `/metrics` | Internal Prometheus metrics. |
+
+Readiness failures should return safe dependency status without secret values.
+
+## Next Implementation Step
+
+The next implementation step is to replace placeholder services with contract-shaped endpoint stubs and tests before adding production behavior.

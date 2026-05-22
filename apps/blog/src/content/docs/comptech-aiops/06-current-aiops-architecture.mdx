@@ -56,6 +56,24 @@ The expected pattern is:
 
 Production-changing autonomy is not enabled in Phase 1. Tool presence does not grant production authority.
 
+## Service Contract Baseline
+
+The first contract baseline is defined in the canonical repo under ADR 0020.
+
+Public-safe boundaries:
+
+| Boundary | Contract direction |
+| --- | --- |
+| Portal frontend | Calls only the portal API. |
+| Portal API | Operator-facing `/api/v1` boundary. |
+| Agent orchestrator | Internal planning and durable task coordination. |
+| MCP gateway | Internal tool registry, policy check, target binding, and tool-run mediation. |
+| RAG service | Internal ingestion and retrieval, plus portal-mediated knowledge query. |
+| Events | Server-Sent Events for task, approval, tool-run, evidence, and system updates. |
+| Health/readiness | Every first-party service exposes liveness and readiness checks. |
+
+The baseline does not grant production-changing authority. It defines the API shape that later implementation work must follow.
+
 ## Knowledge Base Direction
 
 The knowledge base should be built from reviewed source notes, not random chat memory.
