@@ -82,7 +82,27 @@ Public-safe outcomes:
 
 Private values, endpoint details, raw evidence manifests, and secret material are intentionally excluded from this public page.
 
+## Retention Policy
+
+The canonical retention decision is `comptech-aiops` ADR 0018.
+
+Phase 1 keeps:
+
+| Restore point class | Count |
+| --- | --- |
+| Latest snapshots | 10 |
+| Hourly snapshots | 24 |
+| Daily snapshots | 14 |
+| Weekly snapshots | 8 |
+| Monthly snapshots | 12 |
+| Yearly snapshots | 3 |
+
+Retention is scoped to `ze-tower` control-plane snapshots. The workflow defaults to dry-run mode, which records what would be kept or forgotten without deleting backup data.
+
+Apply mode is explicit. It runs the policy and prunes unreferenced encrypted data only after the dry-run evidence has been reviewed.
+
+The first retention dry-run and apply-mode run completed successfully. The current public-safe outcome is that the proven restore snapshot remains retained.
+
 ## Open Follow-Ups
 
-- Define retention policy.
 - Add a separate MinIO server backup or replication decision.

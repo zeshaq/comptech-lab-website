@@ -34,10 +34,12 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#20](https://github.com/comptech-lab/comptech-aiops/issues/20) | Record public blog documentation mirror ADR. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#21](https://github.com/comptech-lab/comptech-aiops/issues/21) | Define `ze-tower` backup and restore baseline. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#22](https://github.com/comptech-lab/comptech-aiops/issues/22) | Implement encrypted `ze-tower` backups and first restore drill. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#23](https://github.com/comptech-lab/comptech-aiops/issues/23) | Define Restic retention and prune policy. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#4](https://github.com/zeshaq/comptech-lab/issues/4) | Publish public encrypted backup implementation status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#5](https://github.com/zeshaq/comptech-lab/issues/5) | Publish public Restic retention policy. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -60,6 +62,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0015 - GitHub Actions Deployment Bootstrap To ze-tower` | Use manual GitHub Actions deployment bootstrap to `ze-tower`. |
 | `0016 - Public Blog Documentation Mirror` | Keep this blog section as a public-safe mirror of the canonical repo. |
 | `0017 - ze-tower Control Plane Backup And Restore Baseline` | Use encrypted Restic backups in MinIO and require a restore drill before production-changing authority. |
+| `0018 - Restic Retention And Prune Policy` | Keep a conservative Phase 1 snapshot set and require explicit apply mode for prune operations. |
 
 ## Changelog Entries
 
@@ -77,10 +80,11 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-lab#3` | Added this public-safe backup and restore baseline page. |
 | 2026-05-22 | `comptech-aiops#22` | Implemented encrypted Restic backups for `ze-tower` and completed the first restore drill. |
 | 2026-05-22 | `comptech-lab#4` | Refreshed this public-safe backup implementation status. |
+| 2026-05-22 | `comptech-aiops#23` | Defined the Restic retention and prune policy, including dry-run and apply workflow controls. |
+| 2026-05-22 | `comptech-lab#5` | Refreshed this public-safe retention policy status. |
 
 ## Open Follow-Ups
 
-- Define retention and prune policy for Restic snapshots.
 - Add a separate MinIO server backup or replication decision.
 - Replace placeholder agent, MCP, and RAG services with real service contracts and health checks.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
