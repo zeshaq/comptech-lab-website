@@ -1,0 +1,185 @@
+---
+title: "Installation Manual - 126 spoke-dr-v7 hot standby program plan"
+sidebar_label: "126 spoke-dr-v7 hot standby program plan"
+description: "The milestone, workstream, phases, batch model, and execution boundary for the spoke-dr-v7 compact hot standby workload cluster."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records the planning scaffold for `spoke-dr-v7`, a compact
+VM-only hot standby workload cluster for `spoke-dc-v7`.
+
+The intent is to make the DR spoke reproducible and auditable before the first
+VM is created. `spoke-dr-v7` should mirror `spoke-dc-v7` logically: same
+platform structure, GitOps model, operator baseline, storage pattern, policy
+posture, backup posture, CNPG-backed application data continuity, Open Liberty
+standby deployment, and failover/failback controls.
+
+The physical topology is intentionally different. `spoke-dc-v7` has three VM
+control-plane nodes and three physical worker nodes. `spoke-dr-v7` is planned
+as a compact three-node VM-only cluster because the current workload is small:
+one Open Liberty insurance application backed by CloudNativePG.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-SPOKEDRV7` |
+| Milestone | `#37` / `spoke-dr-v7 Hot Standby Workload Cluster` |
+| Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
+| First required issue | `#465` / `OP-GF-SPOKEDRV7-1` |
+| Governing ADRs already cited | `ADR 0016`, `ADR 0017`, `ADR 0024`, `ADR 0025`, `ADR 0029` |
+| Required new ADR | Compact VM-only workload standby, CNPG/database-layer DR, traffic cutover, split-brain controls, and failback/resync |
+| Local plan | `plans/spoke-dr-v7-hot-standby-deployment-program.md` |
+| Local report | `reports/platform/spoke-dr-v7/20260522/spoke-dr-v7-program-issue-plan.md` |
+
+## Execution Boundary
+
+Live deployment must not begin until issue `#465` creates and accepts the new
+`spoke-dr-v7` architecture ADR.
+
+That ADR must cover:
+
+- compact VM-only workload cluster topology;
+- logical parity with `spoke-dc-v7`;
+- CNPG/database-layer replication for the insurance application;
+- route and traffic cutover controls;
+- split-brain prevention;
+- failback and resync principles.
+
+Until that ADR is accepted, do not create VMs, DNS records, HAProxy entries,
+install artifacts, GitOps overlays, ACM imports, ODF resources, CNPG resources,
+Open Liberty standby resources, or route cutovers for `spoke-dr-v7`.
+
+## Certification Boundary
+
+Certified in this workstream means internally certified for the CompTech lab:
+
+- every phase has an issue and validation evidence;
+- every live change has a rollback or promotion decision;
+- install inputs, GitOps overlays, operator state, CNPG replication, app
+  standby, backup, policy, and failover/failback steps are reproducible from
+  documented sources;
+- public installation-manual documentation is coherent and batched;
+- operational readiness is validated before `spoke-dr-v7` is treated as a
+  usable hot standby.
+
+This is not external Red Hat certification, PCI DSS ROC/AOC, QSA, ISO, or
+bank-auditor attestation.
+
+## Non-Goals
+
+- Do not clone `spoke-dc-v7` identity, etcd, certificates, kubeconfigs,
+  cluster ID, OAuth secrets, service account signers, RHACS runtime secrets,
+  ACM runtime state, or application secrets.
+- Do not let both clusters act as active writers for the database.
+- Do not route production traffic to `spoke-dr-v7` before the failover drill
+  explicitly allows the traffic shift.
+- Do not assume ODF block-level replication for database PVC continuity.
+- Do not publish kubeconfigs, kubeadmin passwords, pull secrets, Vault tokens,
+  object-storage credentials, RHACS credentials, HTPasswd values, private
+  keys, PATs, import payloads, or full Secret manifests.
+
+## Target State
+
+| Area | Target |
+| --- | --- |
+| Role | Hot standby workload cluster for `spoke-dc-v7` |
+| Management authority | `hub-dr-v7` through ACM and pull GitOps |
+| Topology | Compact 3-node VM-only OpenShift cluster |
+| Node role | `control-plane,master,worker` on all three nodes |
+| Release | Match active v7 fleet, currently OpenShift `4.20.18` |
+| Logical structure | Mirror `spoke-dc-v7` platform, operator, policy, GitOps, storage, and app model |
+| Storage | ODF/local storage provider for DR-cluster PVCs |
+| Database DR | CNPG replica cluster and controlled promotion |
+| Application DR | Open Liberty standby overlay with route disabled or isolated until failover |
+| Backup | OADP/resource backup and application recovery evidence |
+| Compliance | CIS and PCI DSS 4 scanner posture as lab evidence |
+
+Candidate VIPs, node IPs, DNS names, VM MACs, disk layout, and final hypervisor
+placement remain unassigned until `#467` completes capacity, IPAM, DNS,
+HAProxy, and VM allocation planning.
+
+## Phase Line
+
+| Phase | Issue | Status | Gate |
+| --- | --- | --- | --- |
+| `OP-GF-SPOKEDRV7-0` | `#464` | Open | Program ownership and certification evidence plan |
+| `OP-GF-SPOKEDRV7-1` | `#465` | Open | ADR and compact hot-standby workload cluster design |
+| `OP-GF-SPOKEDRV7-2` | `#466` | Open | `spoke-dc-v7` parity baseline and workload inventory |
+| `OP-GF-SPOKEDRV7-3` | `#467` | Open | Capacity, IPAM, DNS, HAProxy, and VM allocation plan |
+| `OP-GF-SPOKEDRV7-4` | `#468` | Open | Render install inputs and disconnected artifacts |
+| `OP-GF-SPOKEDRV7-5` | `#469` | Open | Create compact VM nodes and boot agent install |
+| `OP-GF-SPOKEDRV7-6` | `#470` | Open | Validate base OpenShift compact install |
+| `OP-GF-SPOKEDRV7-7` | `#471` | Open | GitOps bootstrap, catalogs, mirrors, and storage foundation |
+| `OP-GF-SPOKEDRV7-8` | `#472` | Open | Import `spoke-dr-v7` into `hub-dr-v7` and enable pull GitOps |
+| `OP-GF-SPOKEDRV7-9` | `#473` | Open | Operator and security parity baseline |
+| `OP-GF-SPOKEDRV7-10` | `#474` | Open | ODF local storage parity and CNPG storage readiness |
+| `OP-GF-SPOKEDRV7-11` | `#475` | Open | CNPG replica cluster bootstrap and replication validation |
+| `OP-GF-SPOKEDRV7-12` | `#476` | Open | Open Liberty standby app overlay and traffic isolation |
+| `OP-GF-SPOKEDRV7-13` | `#477` | Open | Hot-standby failover drill and traffic shift |
+| `OP-GF-SPOKEDRV7-14` | `#478` | Open | Failback and resync plan with dry-run constraints |
+| `OP-GF-SPOKEDRV7-15` | `#479` | Open | Backup, compliance, soak, documentation, and handoff |
+
+## Batch Execution Model
+
+The issue line is granular for auditability. Execution should still be batched
+so each public article reads as one complete operational chapter.
+
+| Batch | Issues | What It Proves |
+| --- | --- | --- |
+| Batch 0: Program and design | `#464`, `#465`, `#466`, `#467` | ADR, parity inventory, workload inventory, capacity, network, DNS, HAProxy, and VM allocation are ready |
+| Batch 1: Build and base cluster | `#468`, `#469`, `#470` | Install inputs render, VMs boot, agent install completes, and base OpenShift health is clean |
+| Batch 2: Platform and management integration | `#471`, `#472`, `#473`, `#474` | GitOps, catalogs, mirrors, ACM import, pull GitOps, operators, security, policies, backup foundation, and storage readiness converge |
+| Batch 3: Stateful app standby | `#475`, `#476` | CNPG replication and Open Liberty standby deployment are healthy while traffic remains isolated |
+| Batch 4: DR drill and handoff | `#477`, `#478`, `#479` | Failover, traffic shift, failback/resync, backup, compliance, soak, documentation, and handoff evidence are complete |
+
+## Validation Matrix
+
+| Domain | Required Evidence |
+| --- | --- |
+| Governance | Issue, milestone, phase, ADR coverage, parent issue update |
+| Architecture | Accepted ADR for compact VM-only hot standby and CNPG/database-layer DR |
+| Parity | `spoke-dc-v7` operator, namespace, storage, policy, route, and workload inventory |
+| Network | IPAM, DNS, HAProxy or explicit no-op, rollback, and resolver validation |
+| VM | Capacity, domain XML, CPU, RAM, disks, NICs, MACs, boot state |
+| Install | `install-config`, `agent-config`, mirror resources, FIPS, host count |
+| OpenShift | ClusterVersion, nodes, MCPs, ClusterOperators, CSRs, pods |
+| GitOps | Root app, revision, sync, health, render validation |
+| ACM | ManagedCluster, Klusterlet, addons, ManifestWorks, pull GitOps placement |
+| Operators | Subscriptions, InstallPlans, CSVs, operands, policy compliance |
+| Storage | ODF/local storage health, default StorageClass, CNPG storage class selection |
+| Database | CNPG replica bootstrap, WAL flow, lag, promotion precheck, rollback |
+| Application | Open Liberty standby deployment, service/route isolation, smoke test |
+| Backup | DPA, BSL, schedule, backup, restore or dry-run evidence |
+| Security | RHACS, Gatekeeper, image policy, NetworkPolicies, secret custody |
+| Compliance | CIS, PCI DSS 4, File Integrity, exception register |
+| DR | Failover drill, traffic shift, split-brain controls, failback/resync |
+| Documentation | Local report, session log, runbook, public blog chapter |
+| Reproducibility | Source paths, commits, commands, artifacts, rebuild notes |
+
+## Final Done Criteria
+
+`spoke-dr-v7` is complete only when all are true:
+
+1. the compact VM-only OpenShift cluster is installed and healthy;
+2. `hub-dr-v7` imports and manages it cleanly;
+3. platform GitOps is synced and healthy;
+4. operator, policy, storage, backup, and security parity is complete or
+   explicitly excepted;
+5. CNPG replication is validated and promotion is controlled;
+6. the Open Liberty standby app is deployed and traffic-isolated;
+7. failover and failback/resync evidence is recorded;
+8. compliance scans and soak evidence are complete;
+9. public installation-manual chapters are comprehensive and current;
+10. parent and child issues contain closeout comments with evidence.
+
+## Next Gate
+
+The next gate is:
+
+```text
+#465 / OP-GF-SPOKEDRV7-1: ADR and compact hot-standby workload cluster design
+```
+
+No live build should start before that ADR is accepted.
