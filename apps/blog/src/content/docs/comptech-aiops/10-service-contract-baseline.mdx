@@ -7,6 +7,7 @@ draft: false
 ---
 
 The canonical service contract decision is `comptech-aiops` ADR 0020.
+The current RAG ingestion baseline is `comptech-aiops` ADR 0023.
 
 This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
 
@@ -29,6 +30,7 @@ Canonical issue [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) 
 Canonical issue [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) wired the portal API to the internal orchestrator, MCP gateway, and RAG service stubs.
 Canonical issue [#30](https://github.com/comptech-lab/comptech-aiops/issues/30) implemented the first approval decision and evidence metadata API behavior.
 Canonical issue [#31](https://github.com/comptech-lab/comptech-aiops/issues/31) implemented the first orchestrator approval-wait workflow.
+Canonical issue [#32](https://github.com/comptech-lab/comptech-aiops/issues/32) implemented the first RAG ingestion pipeline skeleton.
 
 Public-safe status:
 
@@ -37,13 +39,14 @@ Public-safe status:
 | Portal API | Exposes `/api/v1` stubs, `/healthz`, `/readyz`, `/metrics`, and a container healthcheck mode. |
 | Agent orchestrator | Exposes `/internal/v1/orchestrator` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | MCP gateway | Exposes `/internal/v1/mcp` stubs, `/healthz`, `/readyz`, and `/metrics`. |
-| RAG ingestion | Exposes `/internal/v1/rag` stubs, `/healthz`, `/readyz`, and `/metrics`. |
+| RAG ingestion | Exposes reviewed source ingestion, source/job/chunk reads, keyword query citations, `/healthz`, `/readyz`, and `/metrics`. |
 | Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
 | Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
 | Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
 | Internal client wiring | Portal API readiness, task enqueue/cancel, inventory targets, and knowledge query now call internal service stubs. |
 | Approval and evidence API | Portal API lists/reads approvals, records approval decisions as audit events, and reads evidence metadata. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied. |
+| RAG ingestion skeleton | Reviewed markdown/plain-text source content can be ingested into in-process source, job, and chunk records; query returns public-safe citations. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -64,6 +67,8 @@ Deployment verification passed on `ze-tower` using public-safe smoke fixtures. T
 The approval-wait workflow implementation does not add production-changing authority. It links task enqueue, durable approval request creation, operator decision, task state transition, and orchestrator resume or stop notification behind the existing service contract.
 
 Deployment verification passed on `ze-tower` with a public-safe smoke task. The smoke check confirmed an execution task entered `awaiting_approval`, a durable approval request was created, approval through the portal API returned the task to `queued`, task events contained the expected approval request and decision events, and the standard health script passed.
+
+The RAG ingestion skeleton does not add production-changing authority. It creates contract-valid source, job, chunk, and keyword query behavior for reviewed non-secret fixtures only. Runtime RAG state is currently in process; durable Postgres metadata, MinIO source object handling, embedding generation, and Qdrant indexing remain follow-up work.
 
 ## Shared Helpers
 
@@ -187,5 +192,6 @@ Readiness failures should return safe dependency status without secret values.
 
 ## Next Implementation Steps
 
-- Replace internal service stub responses with contract-compliant service behavior.
+- Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
+- Wire the RAG ingestion service to durable Postgres metadata, MinIO source objects, embedding generation, and Qdrant indexing.

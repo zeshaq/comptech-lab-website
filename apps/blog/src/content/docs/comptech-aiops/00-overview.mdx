@@ -39,7 +39,7 @@ Governance requires:
 - Every material change needs an ADR reference.
 - Every change set updates the changelog.
 
-The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The deployed baseline includes a custom portal skeleton, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, and placeholder agent/MCP/RAG processes.
+The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The deployed baseline includes a custom portal skeleton, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, placeholder agent/MCP processes, and a first RAG ingestion skeleton.
 
 The old `rag-open-webui` container from the superseded local RAG experiment has been removed from the active host state. Legacy data paths were preserved for recoverability.
 
