@@ -24,6 +24,7 @@ This page is the public-safe summary. It describes boundaries and API shapes, bu
 ## Implementation Status
 
 Canonical issue [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) implemented the first contract-shaped service stubs and tests.
+Canonical issue [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) implemented shared service contract helpers for those stubs.
 
 Public-safe status:
 
@@ -34,10 +35,25 @@ Public-safe status:
 | MCP gateway | Exposes `/internal/v1/mcp` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | RAG ingestion | Exposes `/internal/v1/rag` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
+| Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
 Deployment verification corrected the ingress health route so `/healthz`, `/readyz`, and `/api/*` are served by the portal API rather than the portal web container. The corrected deployment passed remote health checks on `ze-tower`.
+
+The helper implementation does not add production-changing authority. It only makes the first-party services use consistent contract shapes before database state and real tool execution are added.
+
+## Shared Helpers
+
+Public-safe helper scope:
+
+| Area | Purpose |
+| --- | --- |
+| Request IDs | Preserve incoming `X-Request-ID` values or generate `req_...` IDs. |
+| Task IDs | Generate and validate opaque `task_...` IDs. |
+| Error envelopes | Return consistent `error.code`, `error.message`, `error.request_id`, and `error.details`. |
+| List envelopes | Return consistent `items` and `page` wrappers. |
+| Health and readiness | Return consistent `service`, `status`, `version`, and safe dependency status. |
 
 ## Service Boundaries
 
@@ -140,6 +156,5 @@ Readiness failures should return safe dependency status without secret values.
 
 ## Next Implementation Steps
 
-- Add shared request ID, task ID, error-envelope, and health/readiness helpers.
 - Add Postgres-backed task, approval, evidence, and audit tables.
 - Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.

@@ -38,6 +38,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#24](https://github.com/comptech-lab/comptech-aiops/issues/24) | Define office MinIO backup and replication strategy. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#25](https://github.com/comptech-lab/comptech-aiops/issues/25) | Define real service contracts for the AIOps platform. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) | Implement contract-shaped service stubs and tests. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) | Add shared service contract helpers. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -46,6 +47,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#6](https://github.com/zeshaq/comptech-lab/issues/6) | Publish public office MinIO backup and replication strategy. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#7](https://github.com/zeshaq/comptech-lab/issues/7) | Publish public AIOps service contract baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#8](https://github.com/zeshaq/comptech-lab/issues/8) | Publish public contract-shaped service stub implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#9](https://github.com/zeshaq/comptech-lab/issues/9) | Publish public shared service contract helper implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -96,11 +98,12 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-lab#7` | Published this public-safe service contract baseline. |
 | 2026-05-22 | `comptech-aiops#26` | Implemented contract-shaped service stubs and tests, then corrected ingress health routing during deployment verification. |
 | 2026-05-22 | `comptech-lab#8` | Refreshed this public-safe service stub implementation and deployment verification status. |
+| 2026-05-22 | `comptech-aiops#27` | Added shared service contract helpers. |
+| 2026-05-22 | `comptech-lab#9` | Refreshed this public-safe shared helper implementation status. |
 
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
-- Add shared request ID, task ID, error-envelope, and health/readiness helpers.
 - Add Postgres-backed task, approval, evidence, and audit tables.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
 - Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.
