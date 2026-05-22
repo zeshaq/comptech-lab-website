@@ -55,7 +55,7 @@ The priority is not equal for all state. Databases and future source-of-truth se
 
 ## Restore Drill Gate
 
-Production-changing agent capability remains blocked until a restore drill is completed and recorded.
+Production-changing agent capability required at least one completed restore drill before moving forward.
 
 The restore drill must use a separate target path, not the live deployment root. The drill should prove that:
 
@@ -66,11 +66,23 @@ The restore drill must use a separate target path, not the live deployment root.
 - Compose validation works;
 - health checks and data checks can be captured safely.
 
+## Implementation Status
+
+The first encrypted backup implementation is complete in the canonical `comptech-aiops` repository under issue [#22](https://github.com/comptech-lab/comptech-aiops/issues/22).
+
+Public-safe outcomes:
+
+- Restic was installed and validated on `ze-tower`.
+- Backup runtime settings were rendered from GitHub Secrets into a non-repository runtime file.
+- The encrypted Restic repository was initialized in the AIOps backup bucket.
+- The backup workflow created logical dumps for Postgres-backed services.
+- The backup workflow archived selected non-Postgres Docker volumes.
+- The first restore drill completed against a non-production target.
+- The drill verified checksums, compressed database dumps, and volume archives.
+
+Private values, endpoint details, raw evidence manifests, and secret material are intentionally excluded from this public page.
+
 ## Open Follow-Ups
 
-- Install and validate Restic on `ze-tower`.
-- Materialize backup runtime settings from GitHub Secrets.
-- Implement service-specific logical dumps.
 - Define retention policy.
-- Run and record the first restore drill.
 - Add a separate MinIO server backup or replication decision.
