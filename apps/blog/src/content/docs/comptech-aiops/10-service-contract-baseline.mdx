@@ -51,6 +51,8 @@ The operational store implementation does not add production-changing authority.
 
 The internal client wiring does not add production-changing authority. It connects the portal API to existing contract stubs and preserves request/task headers across the service boundary.
 
+The internal client wiring deployment passed canonical validation and `ze-tower` deployment verification. Live smoke checks confirmed portal readiness reports Postgres, orchestrator, MCP gateway, and RAG as reachable, task create/cancel preserves task identity across the orchestrator boundary, and inventory/RAG portal routes proxy to the internal stubs.
+
 ## Shared Helpers
 
 Public-safe helper scope:
