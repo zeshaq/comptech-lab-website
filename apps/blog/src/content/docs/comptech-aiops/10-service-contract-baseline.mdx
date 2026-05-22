@@ -27,6 +27,7 @@ Canonical issue [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) 
 Canonical issue [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) implemented shared service contract helpers for those stubs.
 Canonical issue [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) implemented the first Postgres-backed operational store for portal-owned task state and task audit events.
 Canonical issue [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) wired the portal API to the internal orchestrator, MCP gateway, and RAG service stubs.
+Canonical issue [#30](https://github.com/comptech-lab/comptech-aiops/issues/30) implemented the first approval decision and evidence metadata API behavior.
 
 Public-safe status:
 
@@ -40,6 +41,7 @@ Public-safe status:
 | Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
 | Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
 | Internal client wiring | Portal API readiness, task enqueue/cancel, inventory targets, and knowledge query now call internal service stubs. |
+| Approval and evidence API | Portal API lists/reads approvals, records approval decisions as audit events, and reads evidence metadata. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -52,6 +54,8 @@ The operational store implementation does not add production-changing authority.
 The internal client wiring does not add production-changing authority. It connects the portal API to existing contract stubs and preserves request/task headers across the service boundary.
 
 The internal client wiring deployment passed canonical validation and `ze-tower` deployment verification. Live smoke checks confirmed portal readiness reports Postgres, orchestrator, MCP gateway, and RAG as reachable, task create/cancel preserves task identity across the orchestrator boundary, and inventory/RAG portal routes proxy to the internal stubs.
+
+The approval and evidence API implementation does not add production-changing authority. It exposes the operator decision and evidence metadata contract so future orchestrator workflows can pause for human approval and attach evidence safely.
 
 ## Shared Helpers
 
@@ -176,4 +180,4 @@ Readiness failures should return safe dependency status without secret values.
 ## Next Implementation Steps
 
 - Replace internal service stub responses with contract-compliant service behavior.
-- Implement approval and evidence API behavior on top of the table baseline.
+- Implement orchestrator approval-wait workflow on top of the approval API.
