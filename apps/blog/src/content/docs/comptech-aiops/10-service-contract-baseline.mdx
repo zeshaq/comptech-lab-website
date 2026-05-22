@@ -2,7 +2,7 @@
 title: "CompTech AIOps - service contract baseline"
 sidebar_label: "Service contracts"
 description: "Public-safe summary of the Phase 1 service contracts for the comptech-aiops platform."
-last_reviewed: 2026-05-22
+last_reviewed: 2026-05-23
 draft: false
 ---
 
@@ -28,6 +28,7 @@ Canonical issue [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) 
 Canonical issue [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) implemented the first Postgres-backed operational store for portal-owned task state and task audit events.
 Canonical issue [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) wired the portal API to the internal orchestrator, MCP gateway, and RAG service stubs.
 Canonical issue [#30](https://github.com/comptech-lab/comptech-aiops/issues/30) implemented the first approval decision and evidence metadata API behavior.
+Canonical issue [#31](https://github.com/comptech-lab/comptech-aiops/issues/31) implemented the first orchestrator approval-wait workflow.
 
 Public-safe status:
 
@@ -42,6 +43,7 @@ Public-safe status:
 | Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
 | Internal client wiring | Portal API readiness, task enqueue/cancel, inventory targets, and knowledge query now call internal service stubs. |
 | Approval and evidence API | Portal API lists/reads approvals, records approval decisions as audit events, and reads evidence metadata. |
+| Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -58,6 +60,8 @@ The internal client wiring deployment passed canonical validation and `ze-tower`
 The approval and evidence API implementation does not add production-changing authority. It exposes the operator decision and evidence metadata contract so future orchestrator workflows can pause for human approval and attach evidence safely.
 
 Deployment verification passed on `ze-tower` using public-safe smoke fixtures. The smoke check confirmed approval list/read/decision, `approval.decided` task events, evidence metadata read, and the standard health script.
+
+The approval-wait workflow implementation does not add production-changing authority. It links task enqueue, durable approval request creation, operator decision, task state transition, and orchestrator resume or stop notification behind the existing service contract.
 
 ## Shared Helpers
 
@@ -182,4 +186,4 @@ Readiness failures should return safe dependency status without secret values.
 ## Next Implementation Steps
 
 - Replace internal service stub responses with contract-compliant service behavior.
-- Implement orchestrator approval-wait workflow on top of the approval API.
+- Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.

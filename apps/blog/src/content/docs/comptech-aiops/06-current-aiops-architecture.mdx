@@ -2,7 +2,7 @@
 title: "CompTech AIOps - current AIOps architecture"
 sidebar_label: "Current architecture"
 description: "Public-safe summary of the custom agentic AIOps architecture now tracked in comptech-aiops."
-last_reviewed: 2026-05-22
+last_reviewed: 2026-05-23
 draft: false
 ---
 
@@ -88,8 +88,9 @@ Public-safe status:
 | RAG ingestion | Internal `/internal/v1/rag` route stubs, liveness, readiness, and metrics. |
 | Deployment | Compose health checks added for first-party service containers. |
 | Shared contracts | Request ID, task ID, error envelope, list envelope, and health/readiness helpers added for first-party service stubs. |
-| Operational store | Postgres-backed task records, approval decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
-| Internal clients | Portal API calls orchestrator, MCP gateway, and RAG stubs for readiness, task enqueue/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
+| Operational store | Postgres-backed task records, approval requests and decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
+| Internal clients | Portal API calls orchestrator, MCP gateway, and RAG stubs for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
+| Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority. |
 
 These are executable stubs only. They do not implement real infrastructure actions.
 
