@@ -70,6 +70,8 @@ Deployment verification passed on `ze-tower` with a public-safe smoke task. The 
 
 The RAG ingestion skeleton does not add production-changing authority. It creates contract-valid source, job, chunk, and keyword query behavior for reviewed non-secret fixtures only. Runtime RAG state is currently in process; durable Postgres metadata, MinIO source object handling, embedding generation, and Qdrant indexing remain follow-up work.
 
+Deployment verification passed on `ze-tower` with a public-safe RAG fixture. The smoke check confirmed source ingestion, job completion, source and chunk reads, direct RAG query citations, portal-mediated knowledge query citations, and the standard health script.
+
 ## Shared Helpers
 
 Public-safe helper scope:
