@@ -20,7 +20,7 @@ The project should be GitOps-oriented, but not locked to one platform. Docker Co
 | Reconciliation where practical | Long-running platforms should pull or reconcile from Git instead of relying only on ad hoc pushes. |
 | Secret separation | GitHub secrets hold values; Git holds references and inventory metadata. |
 
-## Proposed Future Shape
+## Current Shape
 
 ```text
 comptech-aiops/
@@ -34,6 +34,31 @@ comptech-aiops/
     memory/
     operations/
     tools/
+  apps/
+    portal-web/
+  services/
+    portal-api/
+    agent-orchestrator/
+    mcp-gateway/
+    rag-ingestion/
+  deploy/
+    compose/
+    inventory/
+    scripts/
+  infra/
+    ansible/
+    opentofu/
+    policies/
+    observability/
+  templates/
+```
+
+The shape can grow, but the ownership rule is stable: canonical platform memory and desired state live in `comptech-aiops`; generated runtime files and secret values do not.
+
+## Possible Future Shape
+
+```text
+comptech-aiops/
   governance/
     github/
     policies/
@@ -42,7 +67,6 @@ comptech-aiops/
     stage/
     prod/
   services/
-    rag/
     future-services/
   deployments/
     compose/
@@ -74,7 +98,9 @@ Not every GitHub setting can be perfectly managed from the same repo without a b
 
 ## Deployment Track
 
-Deployments should move in stages:
+Deployment is currently bootstrapped through a manual GitHub Actions workflow that syncs the repository to `ze-tower`, renders runtime configuration from GitHub Secrets, and runs Docker Compose with a health gate.
+
+Deployments should continue moving in stages:
 
 1. Document the current manual/runtime state.
 2. Convert runtime files into declarative source.

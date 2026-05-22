@@ -1,0 +1,56 @@
+---
+title: "CompTech AIOps - public blog mirror policy"
+sidebar_label: "Public blog mirror"
+description: "How the public blog docs mirror the canonical comptech-aiops repository without exposing sensitive details."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The canonical source of truth is the `comptech-aiops` repository. The blog is a public-safe mirror.
+
+That means blog pages summarize approved facts for public reading, but they do not replace:
+
+- ADRs;
+- changelog entries;
+- infrastructure notes;
+- deployment records;
+- runbooks;
+- source notes for RAG ingestion.
+
+## Update Rule
+
+For every architecture, deployment, governance, security, toolchain, or operator-facing change, the canonical changelog should record one of these outcomes:
+
+- the blog docs were updated;
+- the blog docs were reviewed and no update was needed;
+- the blog update was intentionally skipped because the material was not public-safe or not suitable for the blog.
+
+## Public-Safety Boundary
+
+The blog must not include:
+
+- secret values;
+- tokens;
+- private keys;
+- passwords;
+- recovery material;
+- sensitive customer data;
+- regulated operational evidence;
+- command output that reveals sensitive environment details;
+- private access paths beyond intentionally public-safe summaries.
+
+The blog may include:
+
+- public-safe architecture decisions;
+- high-level deployment summaries;
+- governance rules;
+- non-sensitive service roles;
+- repository layout;
+- public GitHub issue links;
+- ADR titles and summaries.
+
+## Practical Meaning
+
+The repo changelog remains strict and complete. The blog remains readable and safe.
+
+If the two disagree, the canonical repository wins.

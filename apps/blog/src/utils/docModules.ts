@@ -32,7 +32,7 @@ export const MODULE_TAGLINES: Record<string, string> = {
   "security-lab":
     "Operating notes for the private security and networking lab — Kali, purple-team tooling, SIEM, vulnerability management, EVE-NG, and the Cisco NX-OS fabric learning track.",
   "comptech-aiops":
-    "Public-safe operating notes for the comptech-aiops repository — GitHub governance, ADR-driven work, secret custody, local RAG runtime, and the platform-neutral GitOps direction.",
+    "Public-safe operating notes for the comptech-aiops repository: governance, ADRs, secret custody, custom AIOps architecture, ze-tower deployment, and GitOps direction.",
 };
 
 export function moduleTitle(id: string): string {

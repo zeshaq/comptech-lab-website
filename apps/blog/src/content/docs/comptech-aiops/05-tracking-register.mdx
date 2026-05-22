@@ -14,16 +14,47 @@ This page is the public-safe tracking register for the current work. It names is
 | --- | --- | --- | --- | --- |
 | `comptech-lab/comptech-aiops` | [#1](https://github.com/comptech-lab/comptech-aiops/issues/1) | Establish ADR-driven change control and strict changelog. | Phase 0 - Governance Foundation | `phase:0-foundation` |
 | `comptech-lab/comptech-aiops` | [#2](https://github.com/comptech-lab/comptech-aiops/issues/2) | Register Cloudflare token in GitHub secrets. | Phase 0 - Governance Foundation | `phase:0-foundation` |
+| `comptech-lab/comptech-aiops` | [#3](https://github.com/comptech-lab/comptech-aiops/issues/3) | Inventory `ze-tower` for platform planning. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#4](https://github.com/comptech-lab/comptech-aiops/issues/4) | Provision office MinIO access and buckets. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#5](https://github.com/comptech-lab/comptech-aiops/issues/5) | Store MinIO admin details in approved local custody. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#6](https://github.com/comptech-lab/comptech-aiops/issues/6) | Record custom portal and direct model serving. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#7](https://github.com/comptech-lab/comptech-aiops/issues/7) | Record Go/Gin as portal backend framework. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#8](https://github.com/comptech-lab/comptech-aiops/issues/8) | Record React/Vite/TypeScript frontend stack. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#9](https://github.com/comptech-lab/comptech-aiops/issues/9) | Clarify `ze-tower` control-plane boundary. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#10](https://github.com/comptech-lab/comptech-aiops/issues/10) | Clarify cluster-resident GitOps controllers. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#11](https://github.com/comptech-lab/comptech-aiops/issues/11) | Record agent runtime architecture. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#12](https://github.com/comptech-lab/comptech-aiops/issues/12) | Record containerized control plane and network model. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#13](https://github.com/comptech-lab/comptech-aiops/issues/13) | Record Phase 1 tooling baseline and scaffold monorepo. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#14](https://github.com/comptech-lab/comptech-aiops/issues/14) | Fix validation workflow npm install path. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#15](https://github.com/comptech-lab/comptech-aiops/issues/15) | Bootstrap GitHub Actions deployment to `ze-tower`. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#16](https://github.com/comptech-lab/comptech-aiops/issues/16) | Configure deployment secrets and run dry-run deploy. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#17](https://github.com/comptech-lab/comptech-aiops/issues/17) | Install the `ze-tower` self-hosted runner. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#18](https://github.com/comptech-lab/comptech-aiops/issues/18) | Run first non-dry-run `ze-tower` deployment. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#19](https://github.com/comptech-lab/comptech-aiops/issues/19) | Remove legacy OpenWebUI container from `ze-tower`. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#20](https://github.com/comptech-lab/comptech-aiops/issues/20) | Record public blog documentation mirror ADR. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
 | ADR | Decision |
 | --- | --- |
 | `0001 - GitHub Repo As Operational Memory` | Use the `comptech-aiops` GitHub repo as durable project memory. |
-| `0002 - Local-First RAG On ZE Tower` | Run the first RAG stack locally with Ollama on the host and Open WebUI in Docker. |
+| `0002 - Local-First RAG On ZE Tower` | Superseded historical Open WebUI/Ollama RAG experiment. |
 | `0003 - ADR-Driven Change Control` | Require issue, milestone, phase, ADR, and changelog linkage for mutating work. |
 | `0004 - GitHub Secrets As Secret Custody` | Use GitHub secrets as the project secret custody system until superseded. |
+| `0005 - Office MinIO For AIOps Object Storage` | Use office MinIO as the initial object storage backend. |
+| `0006 - Custom Portal And Direct Model Serving` | Use a custom portal and direct vLLM/TGI-class serving; exclude Open WebUI and Ollama. |
+| `0007 - Go Gin For Custom Portal Backend` | Use Go/Gin for the portal backend/API. |
+| `0008 - React Vite TypeScript For Custom Portal Frontend` | Use React, Vite, TypeScript, TanStack, Tailwind, and live updates. |
+| `0009 - ze-tower Control Plane And Target Infrastructure Boundary` | Keep `ze-tower` as control plane; target infrastructure remains external. |
+| `0010 - Cluster-Resident GitOps Controllers` | Keep Argo CD/OpenShift GitOps inside target clusters. |
+| `0011 - Agent Runtime Architecture` | Use LangGraph, Temporal, MCP, OPA, LiteLLM, Postgres, Qdrant, and MinIO. |
+| `0012 - Containerized AIOps Control Plane On ze-tower` | Run the AIOps control plane as containers on `ze-tower`. |
+| `0013 - Docker Network Boundary Model` | Segment Docker networks by ingress, app, model, observability, and target access. |
+| `0014 - Full Phase 1 Tooling Baseline` | Deploy the full Phase 1 control-plane tooling baseline. |
+| `0015 - GitHub Actions Deployment Bootstrap To ze-tower` | Use manual GitHub Actions deployment bootstrap to `ze-tower`. |
+| `0016 - Public Blog Documentation Mirror` | Keep this blog section as a public-safe mirror of the canonical repo. |
 
 ## Changelog Entries
 
@@ -32,11 +63,15 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-aiops#1` | Created strict governance docs, ADR process, issue/PR templates, and changelog. |
 | 2026-05-22 | `comptech-aiops#2` | Registered `CLOUDFLARE_API_TOKEN` in GitHub secrets and documented the custody decision. |
 | 2026-05-22 | `comptech-lab#1` | Created the public docs section for `comptech-aiops`. |
+| 2026-05-22 | `comptech-aiops#6-#13` | Recorded the custom portal, frontend/backend stack, runtime architecture, network model, and Phase 1 tooling baseline. |
+| 2026-05-22 | `comptech-aiops#15-#18` | Bootstrapped GitHub Actions deployment, installed the self-hosted runner, and ran the first real `ze-tower` deployment. |
+| 2026-05-22 | `comptech-aiops#19` | Removed the legacy `rag-open-webui` container while preserving old data paths. |
+| 2026-05-22 | `comptech-aiops#20` | Added ADR 0016 requiring public blog mirror updates or explicit skip records. |
+| 2026-05-22 | `comptech-lab#2` | Refreshed this public-safe docs mirror from current canonical records. |
 
 ## Open Follow-Ups
 
-- Commit and push the initial `comptech-aiops` governance documentation.
-- Decide whether GitHub secrets should be repository-level or environment-level per target.
-- Add a restore workflow that materializes GitHub secrets onto a replacement machine without printing values.
-- Convert remaining host setup steps into declarative source and validation commands.
-- Keep this docs section updated whenever a new ADR, issue, phase, or runtime decision is added.
+- Add backup and restore ADR before production-changing authority is enabled.
+- Replace placeholder agent, MCP, and RAG services with real service contracts and health checks.
+- Decide whether to archive or delete preserved legacy `/srv/rag` data.
+- Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.

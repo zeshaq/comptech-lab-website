@@ -6,20 +6,22 @@ last_reviewed: 2026-05-22
 draft: false
 ---
 
-`comptech-aiops` is the operating repository for CompTech's AIOps, local RAG, GitHub governance, secret custody, and future declarative deployment work.
+`comptech-aiops` is the operating repository for CompTech's agentic AIOps platform, GitHub governance, secret custody, declarative deployment work, and public-safe documentation mirror.
 
-The important point is scope: this is not an OpenShift-specific project. Some earlier seed templates mentioned OpenShift because they came from platform documentation habits, but the project direction is broader and platform-neutral. The repository should be able to hold Docker Compose, systemd, VM automation, GitHub configuration, future Kubernetes manifests, GitOps controllers, and operational source notes without assuming one runtime.
+The important point is scope: this is not an OpenShift-specific project. The platform is intended to manage company development, datacenter systems, OpenShift/Kubernetes clusters, hypervisors, bare-metal servers, network devices, power and cooling systems, and software platforms through governed agent workflows.
+
+The current target is a custom portal and agentic control plane on `ze-tower`. Open WebUI and Ollama are not target platform components.
 
 ## Source Repositories
 
 | Repository | Purpose |
 | --- | --- |
-| `comptech-lab/comptech-aiops` | Durable operating memory, ADRs, changelog, RAG runtime config, GitOps direction, and future deployment source of truth. |
-| `zeshaq/comptech-lab` | Blog and documentation site that publishes this public documentation section. |
+| `comptech-lab/comptech-aiops` | Canonical operating memory, ADRs, changelog, service skeletons, deployment source, RAG source notes, and GitOps direction. |
+| `zeshaq/comptech-lab` | Blog and documentation site that publishes this public-safe mirror. |
 
 ## Current Work
 
-The first pass established the operating memory model:
+The foundation established the operating memory model:
 
 - A root `AGENTS.md` in `comptech-aiops` so future agents know how to work.
 - `docs/memory/` for stable project context.
@@ -29,7 +31,7 @@ The first pass established the operating memory model:
 - `docs/operations/` for change control and phases.
 - `CHANGELOG.md` for strict history.
 
-The second pass tightened governance:
+Governance requires:
 
 - Every repository-changing execution needs a GitHub issue.
 - Every issue needs a milestone.
@@ -37,7 +39,9 @@ The second pass tightened governance:
 - Every material change needs an ADR reference.
 - Every change set updates the changelog.
 
-The third pass defined GitHub secrets as the current secret custody system and registered the Cloudflare token in GitHub without exposing the value.
+The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The deployed baseline includes a custom portal skeleton, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, and placeholder agent/MCP/RAG processes.
+
+The old `rag-open-webui` container from the superseded local RAG experiment has been removed from the active host state. Legacy data paths were preserved for recoverability.
 
 ## Non-Negotiables
 
@@ -46,11 +50,15 @@ The third pass defined GitHub secrets as the current secret custody system and r
 - GitHub is the collaboration and custody control plane for now.
 - Runtime desired state should be declarative wherever practical.
 - GitHub Actions should validate and orchestrate; long-term deployments should move toward pull or reconcile patterns.
+- Public blog docs mirror the canonical repo only after a public-safety review.
 
 ## Current Public Documentation Pages
 
 - [Operating governance](/docs/comptech-aiops/operating-governance/)
 - [GitHub secret custody](/docs/comptech-aiops/github-secret-custody/)
-- [Local RAG runtime](/docs/comptech-aiops/local-rag-runtime/)
+- [Superseded local RAG runtime](/docs/comptech-aiops/local-rag-runtime/)
 - [Monorepo and GitOps direction](/docs/comptech-aiops/monorepo-and-gitops-direction/)
 - [Tracking register](/docs/comptech-aiops/tracking-register/)
+- [Current AIOps architecture](/docs/comptech-aiops/current-aiops-architecture/)
+- [ze-tower deployment](/docs/comptech-aiops/ze-tower-deployment/)
+- [Public blog mirror policy](/docs/comptech-aiops/public-blog-mirror-policy/)

@@ -1,0 +1,75 @@
+---
+title: "CompTech AIOps - current AIOps architecture"
+sidebar_label: "Current architecture"
+description: "Public-safe summary of the custom agentic AIOps architecture now tracked in comptech-aiops."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The current architecture is a custom agentic AIOps control plane. It is not an OpenShift-only project, and it does not use Open WebUI or Ollama as platform components.
+
+## What The Platform Is For
+
+The platform is intended to help manage:
+
+- company development workflows;
+- datacenter platforms;
+- OpenShift and Kubernetes clusters;
+- hypervisors and VM estates;
+- bare-metal servers;
+- network devices;
+- UPS, generator, and cooling systems;
+- storage systems;
+- internal software platforms.
+
+Target infrastructure remains outside `ze-tower`. The AIOps control plane reaches targets only through approved integrations, policy-controlled tools, and documented access paths.
+
+## Runtime Components
+
+| Layer | Current decision |
+| --- | --- |
+| Portal | Custom portal from day 1 |
+| Frontend | React, Vite, TypeScript, TanStack, Tailwind |
+| Backend API | Go with Gin |
+| Agent runtime | LangGraph supervisor and specialist agents |
+| Durable workflows | Temporal |
+| Policy | OPA |
+| Tool boundary | MCP gateway |
+| Model gateway | LiteLLM |
+| Model serving | vLLM primary, TGI-class runtime optional |
+| Retrieval | Qdrant vector index, Postgres metadata, MinIO object storage |
+| Workflow glue | n8n |
+| Worker tools | Codex CLI and Claude CLI as future policy-controlled tools |
+
+## Agent Shape
+
+The agent model should be multi-agent, not a single unrestricted shell bot.
+
+The expected pattern is:
+
+- supervisor agent for planning and task routing;
+- specialist agents for coding, infrastructure, RAG ingestion, documentation, observability, and operations;
+- Temporal workflows for durable execution and approval waits;
+- OPA decisions before tool actions;
+- MCP gateway for controlled tool access;
+- evidence capture for operator review.
+
+Production-changing autonomy is not enabled in Phase 1. Tool presence does not grant production authority.
+
+## Knowledge Base Direction
+
+The knowledge base should be built from reviewed source notes, not random chat memory.
+
+Good source material includes:
+
+- deployment procedures;
+- incident notes;
+- cluster inventories;
+- codebase architecture notes;
+- runbooks;
+- hardware and network inventory;
+- SOPs;
+- backup and recovery procedures;
+- validated command outputs with sensitive values removed.
+
+GitHub and source systems remain authoritative. Qdrant is a rebuildable retrieval index, not the source of truth.

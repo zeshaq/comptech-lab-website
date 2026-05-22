@@ -1,0 +1,80 @@
+---
+title: "CompTech AIOps - ze-tower deployment"
+sidebar_label: "ze-tower deployment"
+description: "Public-safe summary of the Phase 1 ze-tower control-plane deployment model."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+`ze-tower` is the Phase 1 AIOps control-plane host. It is not the location for managed OpenShift clusters, hypervisors, bare-metal estates, network devices, or facilities systems.
+
+## Deployment Model
+
+Deployment is defined in the canonical `comptech-aiops` repository and executed through a manual GitHub Actions workflow.
+
+The workflow:
+
+- runs from `main`;
+- uses the `ze-tower` GitHub environment;
+- runs on a repository-scoped self-hosted runner on `ze-tower`;
+- syncs the repository to the host;
+- renders runtime configuration from GitHub Secrets;
+- runs preflight checks;
+- starts the Docker Compose stack;
+- runs a portal and Compose stability health check.
+
+Secret values are not stored in the repository or in this blog.
+
+## Deployed Baseline
+
+The first non-dry-run deployment completed on 2026-05-22.
+
+The deployed Phase 1 baseline includes:
+
+- ingress gateway;
+- portal API;
+- portal frontend;
+- agent orchestrator placeholder;
+- MCP gateway placeholder;
+- RAG ingestion placeholder;
+- Postgres;
+- Qdrant;
+- Temporal;
+- OPA;
+- LiteLLM;
+- Keycloak;
+- NetBox;
+- n8n;
+- Prometheus, Alertmanager, Grafana, Loki, Tempo, and OpenTelemetry Collector.
+
+GPU model-serving profiles exist for vLLM and TGI-class runtimes but are optional profile services.
+
+## Network Boundary
+
+Docker networks are segmented by role:
+
+| Network | Purpose |
+| --- | --- |
+| `ingress` | Host-facing ingress boundary |
+| `app_internal` | Portal, API, stateful services, identity, agent runtime |
+| `model_internal` | Model gateway and model-serving services |
+| `observability_internal` | Metrics, logs, traces, dashboards |
+| `target_access` | Controlled path for future target integrations |
+
+Services are internal by default. Host-facing exposure is by explicit exception.
+
+## Superseded OpenWebUI Cleanup
+
+The historical `rag-open-webui` container from the earlier `/srv/rag` experiment was removed after the current AIOps control plane was verified. Its old data paths were preserved for recoverability pending a separate archive or deletion decision.
+
+## Remaining Guardrails
+
+Before production-changing tools are enabled, the platform still needs:
+
+- backup and restore design;
+- identity and role model;
+- approval workflow;
+- audit and evidence model;
+- first read-only agent workflows;
+- explicit MCP tool contracts;
+- service-level health checks beyond skeleton readiness.

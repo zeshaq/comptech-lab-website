@@ -1,24 +1,34 @@
 ---
-title: "CompTech AIOps - local RAG runtime"
-sidebar_label: "Local RAG runtime"
-description: "The current local-first RAG runtime shape: Open WebUI, Ollama, Docker Compose, and host boundaries."
+title: "CompTech AIOps - superseded local RAG runtime"
+sidebar_label: "Superseded local RAG"
+description: "Historical note for the first Open WebUI/Ollama RAG experiment, now superseded by the custom AIOps platform architecture."
 last_reviewed: 2026-05-22
 draft: false
 ---
 
-The first runtime target is a local RAG workspace. It combines Ollama on the host with Open WebUI in Docker.
+This page is historical. The first runtime experiment combined Ollama on the host with Open WebUI in Docker. That decision has been superseded.
 
-## Runtime Shape
+The current target architecture uses:
+
+- a custom portal from day 1;
+- direct model serving through vLLM or TGI-class runtimes;
+- LiteLLM as the model gateway;
+- Qdrant, Postgres, and MinIO for RAG state and objects;
+- LangGraph, Temporal, OPA, and MCP for governed agent execution.
+
+Open WebUI and Ollama are not target platform components.
+
+## Historical Runtime Shape
 
 | Component | Runtime | Role |
 | --- | --- | --- |
-| Ollama | Host service | Local model serving and embeddings. |
-| Open WebUI | Docker Compose | Browser UI, document upload, workspaces, and knowledge collections. |
+| Ollama | Host service | Historical local model serving and embeddings experiment. |
+| Open WebUI | Docker Compose | Historical browser UI and document-upload experiment. |
 | GitHub repo | Git | Desired state, ADRs, changelog, docs, templates, and future deployment definitions. |
 
-## Current Compose Intent
+## Historical Compose Intent
 
-The repository contains a Compose service for Open WebUI:
+The earlier experiment used an Open WebUI Compose service bound to localhost:
 
 ```yaml
 services:
@@ -43,39 +53,18 @@ services:
       - /srv/rag/import:/data/import:ro
 ```
 
-The important boundary is that Open WebUI is bound to localhost on the host. Remote access should go through SSH tunneling or a future controlled access layer, not an accidental public bind.
+The important boundary was that Open WebUI was bound to localhost on the host. It was never intended to become the production AIOps portal.
 
 ## Persistent Paths
 
 | Path | Purpose |
 | --- | --- |
-| `/srv/rag/compose.yaml` | Deployed Compose file. |
-| `/srv/rag/open-webui` | Open WebUI persistent data. |
-| `/srv/rag/import` | Source files for import into Open WebUI. |
+| `/srv/rag/compose.yaml` | Historical Compose file. |
+| `/srv/rag/open-webui` | Preserved legacy Open WebUI data path. |
+| `/srv/rag/import` | Preserved legacy import path. |
 
-## Access Pattern
+## Decommission Status
 
-The current safe access pattern is an SSH tunnel:
+The legacy `rag-open-webui` container was removed from `ze-tower` after the custom AIOps control plane was deployed and verified. The old data paths were preserved for recoverability pending a separate archive or deletion decision.
 
-```bash
-ssh -L 3000:127.0.0.1:3000 ze-tower
-```
-
-Then open:
-
-```text
-http://127.0.0.1:3000
-```
-
-## Declarative Direction
-
-The Compose file is the first declarative runtime artifact. The next steps should make more of the host state declarative:
-
-- systemd unit drop-ins.
-- environment file schema.
-- restore workflow.
-- runtime secret materialization.
-- backup and recovery checks.
-- deployment validation commands.
-
-Manual steps should be converted into checked-in desired state or documented break-glass procedures.
+The current runtime is documented in [Current AIOps architecture](/docs/comptech-aiops/current-aiops-architecture/) and [ze-tower deployment](/docs/comptech-aiops/ze-tower-deployment/).
