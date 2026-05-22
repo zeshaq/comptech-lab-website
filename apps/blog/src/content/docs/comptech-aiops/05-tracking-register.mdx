@@ -40,6 +40,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) | Implement contract-shaped service stubs and tests. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) | Add shared service contract helpers. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) | Add Postgres-backed operational tables. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) | Wire portal API to internal service stubs. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -50,6 +51,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#8](https://github.com/zeshaq/comptech-lab/issues/8) | Publish public contract-shaped service stub implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#9](https://github.com/zeshaq/comptech-lab/issues/9) | Publish public shared service contract helper implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#10](https://github.com/zeshaq/comptech-lab/issues/10) | Publish public Postgres operational store implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#11](https://github.com/zeshaq/comptech-lab/issues/11) | Publish public portal internal client wiring status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -105,11 +107,13 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-lab#9` | Refreshed this public-safe shared helper implementation status. |
 | 2026-05-22 | `comptech-aiops#28` | Added Postgres-backed operational tables. |
 | 2026-05-22 | `comptech-lab#10` | Refreshed this public-safe operational store implementation status. |
+| 2026-05-22 | `comptech-aiops#29` | Wired portal API to internal service stubs. |
+| 2026-05-22 | `comptech-lab#11` | Refreshed this public-safe internal client wiring status. |
 
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
-- Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.
+- Replace internal service stub responses with contract-compliant service behavior.
 - Implement approval and evidence API behavior on top of the table baseline.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
 - Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.

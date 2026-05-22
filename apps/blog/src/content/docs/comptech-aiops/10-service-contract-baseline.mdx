@@ -26,6 +26,7 @@ This page is the public-safe summary. It describes boundaries and API shapes, bu
 Canonical issue [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) implemented the first contract-shaped service stubs and tests.
 Canonical issue [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) implemented shared service contract helpers for those stubs.
 Canonical issue [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) implemented the first Postgres-backed operational store for portal-owned task state and task audit events.
+Canonical issue [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) wired the portal API to the internal orchestrator, MCP gateway, and RAG service stubs.
 
 Public-safe status:
 
@@ -38,6 +39,7 @@ Public-safe status:
 | Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
 | Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
 | Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
+| Internal client wiring | Portal API readiness, task enqueue/cancel, inventory targets, and knowledge query now call internal service stubs. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -46,6 +48,8 @@ Deployment verification corrected the ingress health route so `/healthz`, `/read
 The helper implementation does not add production-changing authority. It only makes the first-party services use consistent contract shapes before database state and real tool execution are added.
 
 The operational store implementation does not add production-changing authority. It persists task create/list/read/cancel behavior and task audit events so future orchestrator, approval, evidence, and RAG work can rely on durable state.
+
+The internal client wiring does not add production-changing authority. It connects the portal API to existing contract stubs and preserves request/task headers across the service boundary.
 
 ## Shared Helpers
 
@@ -169,5 +173,5 @@ Readiness failures should return safe dependency status without secret values.
 
 ## Next Implementation Steps
 
-- Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.
+- Replace internal service stub responses with contract-compliant service behavior.
 - Implement approval and evidence API behavior on top of the table baseline.
