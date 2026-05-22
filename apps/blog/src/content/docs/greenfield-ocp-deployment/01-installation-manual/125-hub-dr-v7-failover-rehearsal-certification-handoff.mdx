@@ -285,6 +285,74 @@ retain hub-dr-v7 authority
 
 No split-brain condition remained at closeout.
 
+## Initial Post-Takeover Soak Watch
+
+The first post-takeover watch was recorded under issue `#462`
+`OP-GF-HUBDRV7-16: post-takeover soak watch and health validation`.
+
+Watch window:
+
+```text
+2026-05-22T06:12:00Z through 2026-05-22T06:18:27Z
+```
+
+Six read-only samples were captured about one minute apart. Every sample kept
+the failover-specific signals clean:
+
+| Signal | Result |
+| --- | --- |
+| `hub-dc-v7` ClusterVersion | `4.20.18`, Available=True, Progressing=False, Failing=False |
+| `hub-dr-v7` ClusterVersion | `4.20.18`, Available=True, Progressing=False, Failing=False |
+| `spoke-dc-v7` ClusterVersion | `4.20.18`, Available=True, Progressing=False, Failing=False |
+| NotReady nodes | `0` on all three clusters |
+| Unhealthy ClusterOperators | `0` on all three clusters |
+| `hub-dc-v7` managed clusters | `local-cluster` only |
+| `hub-dr-v7` managed clusters | `local-cluster`, `spoke-dc-v7` |
+| Residual `hub-dc-v7` spoke namespace | absent |
+| Residual `hub-dc-v7` spoke ApplicationSet | absent |
+| Residual `hub-dc-v7` spoke GitOpsCluster | absent |
+| `hub-dr-v7-bootstrap` | Synced, Healthy, Succeeded |
+| `hub-dc-v7-bootstrap` | Synced, Healthy, Succeeded |
+| `spoke-dc-v7` Klusterlet | Available=True, Applied=True |
+| hub-dr-v7 spoke addons unavailable/degraded | none |
+| hub-dr-v7 ManifestWorks not Applied/Available | none |
+
+The generated `Application/spoke-dc-v7-cluster-config` on `hub-dr-v7`
+remained:
+
+```text
+OutOfSync Healthy skip-reconcile=true
+```
+
+That is expected for this OCM pull model. ManifestWork and Klusterlet status
+remain the authoritative validation signals.
+
+The first watch loop counted completed job pods as non-running, so the pod
+phase output was classified separately:
+
+| Cluster | Running | Completed | Problematic phases |
+| --- | ---: | ---: | ---: |
+| `hub-dc-v7` | 352 | 10 | 0 |
+| `hub-dr-v7` | 355 | 35 | 0 |
+| `spoke-dc-v7` | 373 | 13 | 0 |
+
+Backup and policy surfaces were also checked:
+
+- `DataProtectionApplication/openshift-adp/hub-dr-v7` was Reconciled=True.
+- `BackupStorageLocation/openshift-adp/hub-dr-v7` was Available.
+- `Schedule/openshift-adp/platform-resource-daily` was Enabled, with the
+  latest backup about `4h2m` old during the observation.
+- `DataProtectionApplication/openshift-adp/spoke-dc-v7` was Reconciled=True.
+- `BackupStorageLocation/openshift-adp/spoke-dc-v7` was Available.
+- No `hub-dr-v7` policies outside `Compliant` were listed.
+- `Placement/openshift-gitops/gitops-managed` selected one cluster.
+
+Result:
+
+```text
+initial post-takeover soak clean
+```
+
 ## Failover Runbook
 
 The failover runbook now records:
