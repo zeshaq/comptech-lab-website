@@ -74,6 +74,22 @@ Public-safe boundaries:
 
 The baseline does not grant production-changing authority. It defines the API shape that later implementation work must follow.
 
+## Implementation Status
+
+The canonical repository now includes contract-shaped HTTP stubs and tests for the first service boundaries.
+
+Public-safe status:
+
+| Service | Current status |
+| --- | --- |
+| Portal API | `/api/v1` route stubs, liveness, readiness, metrics, and container healthcheck mode. |
+| Agent orchestrator | Internal `/internal/v1/orchestrator` route stubs, liveness, readiness, and metrics. |
+| MCP gateway | Internal `/internal/v1/mcp` route stubs, liveness, readiness, and metrics. |
+| RAG ingestion | Internal `/internal/v1/rag` route stubs, liveness, readiness, and metrics. |
+| Deployment | Compose health checks added for first-party service containers. |
+
+These are executable stubs only. They do not implement real infrastructure actions.
+
 ## Knowledge Base Direction
 
 The knowledge base should be built from reviewed source notes, not random chat memory.

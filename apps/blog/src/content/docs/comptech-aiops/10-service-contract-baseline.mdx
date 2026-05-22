@@ -21,6 +21,22 @@ This page is the public-safe summary. It describes boundaries and API shapes, bu
 - Evidence references must not expose secret values.
 - Every first-party service needs liveness and readiness checks.
 
+## Implementation Status
+
+Canonical issue [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) implemented the first contract-shaped service stubs and tests.
+
+Public-safe status:
+
+| Service | Status |
+| --- | --- |
+| Portal API | Exposes `/api/v1` stubs, `/healthz`, `/readyz`, `/metrics`, and a container healthcheck mode. |
+| Agent orchestrator | Exposes `/internal/v1/orchestrator` stubs, `/healthz`, `/readyz`, and `/metrics`. |
+| MCP gateway | Exposes `/internal/v1/mcp` stubs, `/healthz`, `/readyz`, and `/metrics`. |
+| RAG ingestion | Exposes `/internal/v1/rag` stubs, `/healthz`, `/readyz`, and `/metrics`. |
+| Compose | Adds first-party service health checks. |
+
+The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
+
 ## Service Boundaries
 
 | Service | Public-safe contract role |
@@ -120,6 +136,8 @@ Every first-party service must expose:
 
 Readiness failures should return safe dependency status without secret values.
 
-## Next Implementation Step
+## Next Implementation Steps
 
-The next implementation step is to replace placeholder services with contract-shaped endpoint stubs and tests before adding production behavior.
+- Add shared request ID, task ID, error-envelope, and health/readiness helpers.
+- Add Postgres-backed task, approval, evidence, and audit tables.
+- Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.
