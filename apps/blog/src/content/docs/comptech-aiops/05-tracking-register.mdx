@@ -39,6 +39,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#25](https://github.com/comptech-lab/comptech-aiops/issues/25) | Define real service contracts for the AIOps platform. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) | Implement contract-shaped service stubs and tests. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) | Add shared service contract helpers. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) | Add Postgres-backed operational tables. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -48,6 +49,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#7](https://github.com/zeshaq/comptech-lab/issues/7) | Publish public AIOps service contract baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#8](https://github.com/zeshaq/comptech-lab/issues/8) | Publish public contract-shaped service stub implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#9](https://github.com/zeshaq/comptech-lab/issues/9) | Publish public shared service contract helper implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#10](https://github.com/zeshaq/comptech-lab/issues/10) | Publish public Postgres operational store implementation. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -73,6 +75,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0018 - Restic Retention And Prune Policy` | Keep a conservative Phase 1 snapshot set and require explicit apply mode for prune operations. |
 | `0019 - Office MinIO Backup And Replication Strategy` | Protect AIOps MinIO buckets by replication or export to an independent target outside the primary MinIO failure domain. |
 | `0020 - AIOps Service Contract Baseline` | Define portal, orchestrator, MCP, RAG, evidence, event, and health/readiness contracts. |
+| `0021 - Postgres Operational Store` | Use Postgres as the first operational store for tasks, approvals, evidence metadata, and audit records. |
 
 ## Changelog Entries
 
@@ -100,10 +103,13 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-22 | `comptech-lab#8` | Refreshed this public-safe service stub implementation and deployment verification status. |
 | 2026-05-22 | `comptech-aiops#27` | Added shared service contract helpers. |
 | 2026-05-22 | `comptech-lab#9` | Refreshed this public-safe shared helper implementation status. |
+| 2026-05-22 | `comptech-aiops#28` | Added Postgres-backed operational tables. |
+| 2026-05-22 | `comptech-lab#10` | Refreshed this public-safe operational store implementation status. |
 
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
-- Add Postgres-backed task, approval, evidence, and audit tables.
+- Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.
+- Implement approval and evidence API behavior on top of the table baseline.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
 - Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.

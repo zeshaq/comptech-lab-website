@@ -25,6 +25,7 @@ This page is the public-safe summary. It describes boundaries and API shapes, bu
 
 Canonical issue [#26](https://github.com/comptech-lab/comptech-aiops/issues/26) implemented the first contract-shaped service stubs and tests.
 Canonical issue [#27](https://github.com/comptech-lab/comptech-aiops/issues/27) implemented shared service contract helpers for those stubs.
+Canonical issue [#28](https://github.com/comptech-lab/comptech-aiops/issues/28) implemented the first Postgres-backed operational store for portal-owned task state and task audit events.
 
 Public-safe status:
 
@@ -36,12 +37,15 @@ Public-safe status:
 | RAG ingestion | Exposes `/internal/v1/rag` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
 | Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
+| Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
 Deployment verification corrected the ingress health route so `/healthz`, `/readyz`, and `/api/*` are served by the portal API rather than the portal web container. The corrected deployment passed remote health checks on `ze-tower`.
 
 The helper implementation does not add production-changing authority. It only makes the first-party services use consistent contract shapes before database state and real tool execution are added.
+
+The operational store implementation does not add production-changing authority. It persists task create/list/read/cancel behavior and task audit events so future orchestrator, approval, evidence, and RAG work can rely on durable state.
 
 ## Shared Helpers
 
@@ -94,6 +98,15 @@ The orchestrator, MCP gateway, and RAG service are internal boundaries. They are
 | RAG service | `/internal/v1/rag` | Own ingestion jobs, source metadata, chunk metadata, and retrieval for planning. |
 
 ## State Models
+
+Initial durable state tables:
+
+| Table | Public-safe purpose |
+| --- | --- |
+| `tasks` | Operator task requests and task lifecycle state. |
+| `approvals` | Human approval requests and decisions. |
+| `evidence_items` | Evidence metadata and safe object references. |
+| `audit_events` | Request-scoped and task-scoped audit history. |
 
 Initial task states:
 
@@ -156,5 +169,5 @@ Readiness failures should return safe dependency status without secret values.
 
 ## Next Implementation Steps
 
-- Add Postgres-backed task, approval, evidence, and audit tables.
 - Wire portal API clients to orchestrator, MCP gateway, and RAG stubs.
+- Implement approval and evidence API behavior on top of the table baseline.
