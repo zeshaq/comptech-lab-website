@@ -37,7 +37,7 @@ Public-safe status:
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
-Deployment verification also corrected the ingress health route so `/healthz`, `/readyz`, and `/api/*` are served by the portal API rather than the portal web container.
+Deployment verification corrected the ingress health route so `/healthz`, `/readyz`, and `/api/*` are served by the portal API rather than the portal web container. The corrected deployment passed remote health checks on `ze-tower`.
 
 ## Service Boundaries
 
