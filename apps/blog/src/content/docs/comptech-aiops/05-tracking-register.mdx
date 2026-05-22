@@ -129,6 +129,13 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-23 | `comptech-aiops#33` | Implemented durable RAG metadata and source object storage. |
 | 2026-05-23 | `comptech-lab#15` | Refreshed this public-safe durable RAG storage status. |
 
+## Current Deployment Evidence
+
+- Canonical commit `8893e8d` implemented durable RAG storage; public mirror commit `96ce79d` published the public-safe status.
+- Canonical Validate run `26306911760`, blog Deploy run `26306911894`, and final `ze-tower` Deploy run `26307228961` passed.
+- `ze-tower` smoke verified an `s3://` RAG source object reference, Postgres-backed job and chunk reads after restarting `rag-ingestion`, direct RAG query citations, portal `/api/v1/knowledge/query` citations, and a final health check on `127.0.0.1:8080`.
+- The active `ze-tower` GitHub environment MinIO endpoint secret was corrected to the reachable HTTPS API endpoint through GitHub Actions secret custody. No secret values are published here.
+
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
