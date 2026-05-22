@@ -13,6 +13,7 @@ The operator portal MVP decision is `comptech-aiops` ADR 0025.
 The trusted-LAN portal ingress decision is `comptech-aiops` ADR 0026.
 The RAG embedding and Qdrant indexing baseline is `comptech-aiops` ADR 0027.
 The reviewed knowledge pack and retrieval evaluation baseline is `comptech-aiops` ADR 0028.
+The operator chat console decision is `comptech-aiops` ADR 0029.
 
 This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
 
@@ -41,6 +42,7 @@ Canonical issue [#34](https://github.com/comptech-lab/comptech-aiops/issues/34) 
 Canonical issue [#35](https://github.com/comptech-lab/comptech-aiops/issues/35) exposes only the portal ingress gateway on the trusted LAN path.
 Canonical issue [#36](https://github.com/comptech-lab/comptech-aiops/issues/36) adds deterministic RAG embeddings and Qdrant indexing.
 Canonical issue [#37](https://github.com/comptech-lab/comptech-aiops/issues/37) adds the first reviewed RAG knowledge pack and retrieval evaluation fixture.
+Canonical issue [#38](https://github.com/comptech-lab/comptech-aiops/issues/38) adds the first operator chat console.
 
 Public-safe status:
 
@@ -59,6 +61,7 @@ Public-safe status:
 | RAG ingestion skeleton | Reviewed markdown/plain-text source content can be ingested into in-process source, job, and chunk records; query returns public-safe citations. |
 | Durable RAG storage | RAG source, job, and chunk metadata is stored in Postgres, with reviewed source object copies in MinIO when configured. |
 | Operator portal MVP | Browser UI exposes readiness, tasks, approvals, knowledge citations, inventory targets, evidence lookup, and task events through the portal API only; deployed smoke checks passed on `ze-tower`. |
+| Operator chat console | Browser UI and portal API endpoint for chat-driven task creation, RAG citations, planning envelopes, task state, and approval/risk state. |
 | LAN portal ingress | The existing portal ingress is reachable from trusted LAN clients; internal services remain Docker-internal. |
 | RAG semantic indexing | Reviewed chunks receive deterministic local embeddings and are indexed into Qdrant when available; Qdrant remains rebuildable from durable metadata. |
 | RAG retrieval evaluation | Public-safe reviewed source pack and fixture check that representative operator questions return expected citations before deployment. |
@@ -96,6 +99,8 @@ Deployment verification passed on `ze-tower` with a public-safe reviewed fixture
 The retrieval evaluation baseline does not add production-changing authority. It adds a reviewed control-plane knowledge pack plus a local fixture that verifies expected citations through the RAG service contract before deployment.
 
 Deployment verification passed through GitHub Actions. The public-safe smoke scope confirmed the retrieval fixture and evaluator script were synced to `ze-tower`, the portal readiness endpoint stayed healthy, and the standard remote health script passed.
+
+The operator chat console does not add production-changing authority. Chat messages enter through the portal API, create tracked task records, query reviewed RAG, and return proposed planning steps, citations, task state, approval state, risk state, and an authority note. Execution-seeking work remains approval-gated and real target changes still require later orchestrator, OPA, MCP, and evidence controls.
 
 The operator portal MVP does not add production-changing authority. It lets operators use existing safe Phase 1 portal API workflows from a browser while preserving the rule that internal services and target infrastructure are not called directly from the frontend.
 
@@ -138,6 +143,7 @@ Initial public-safe resource groups:
 | --- | --- |
 | Actor profile | Current user, roles, and autonomy limits. |
 | Chat sessions | Operator chat sessions and messages. |
+| Chat messages | Planning-only chat requests that create tracked tasks, query RAG, and return proposed plans with citations. |
 | Tasks | Task creation, task state, cancellation, event history, and evidence references. |
 | Approvals | Pending and historical approval decisions. |
 | Evidence | Evidence metadata and safe previews. |

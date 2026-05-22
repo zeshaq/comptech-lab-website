@@ -49,6 +49,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#35](https://github.com/comptech-lab/comptech-aiops/issues/35) | Expose the operator portal on the trusted `ze-tower` LAN ingress path. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#36](https://github.com/comptech-lab/comptech-aiops/issues/36) | Add deterministic RAG embeddings and Qdrant indexing. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#37](https://github.com/comptech-lab/comptech-aiops/issues/37) | Add reviewed RAG knowledge pack and retrieval evaluation fixtures. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#38](https://github.com/comptech-lab/comptech-aiops/issues/38) | Build the first operator chat console. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -68,6 +69,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#17](https://github.com/zeshaq/comptech-lab/issues/17) | Publish public LAN portal exposure status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#18](https://github.com/zeshaq/comptech-lab/issues/18) | Publish public RAG semantic indexing status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#19](https://github.com/zeshaq/comptech-lab/issues/19) | Publish public RAG knowledge pack and retrieval evaluation status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#20](https://github.com/zeshaq/comptech-lab/issues/20) | Publish public operator chat console status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -101,6 +103,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0026 - LAN Operator Portal Ingress` | Expose only the operator portal ingress gateway on the trusted `ze-tower` LAN path while keeping internal services hidden. |
 | `0027 - RAG Embedding And Qdrant Indexing Baseline` | Use deterministic local embeddings and Qdrant as the first rebuildable semantic retrieval baseline. |
 | `0028 - Reviewed Knowledge Pack And Retrieval Evaluation Baseline` | Track reviewed RAG knowledge packs and retrieval evaluation fixtures in GitHub before broad knowledge ingestion. |
+| `0029 - Operator Chat Console` | Add a planning-only portal chat console that creates tracked tasks, queries RAG, and shows proposed plans with citations. |
 
 ## Changelog Entries
 
@@ -148,6 +151,8 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-23 | `comptech-lab#18` | Refreshed this public-safe RAG semantic indexing status. |
 | 2026-05-23 | `comptech-aiops#37` | Added the first reviewed RAG knowledge pack and retrieval evaluation fixture. |
 | 2026-05-23 | `comptech-lab#19` | Refreshed this public-safe RAG knowledge pack and retrieval evaluation status. |
+| 2026-05-23 | `comptech-aiops#38` | Added the first operator chat console with tracked tasks, RAG citations, and planning-only proposed plans. |
+| 2026-05-23 | `comptech-lab#20` | Refreshed this public-safe operator chat console status. |
 
 ## Current Deployment Evidence
 
@@ -169,6 +174,7 @@ This page is the public-safe tracking register for the current work. It names is
 - Canonical commit `0f5b57f` added the first reviewed `phase1-control-plane` knowledge pack and local retrieval evaluation fixture. Public mirror commit `9bf636e` published this public-safe status.
 - Canonical Validate run `26311183879`, `ze-tower` Deploy run `26311226062`, and blog Deploy run `26311184138` passed.
 - Public-safe smoke verified LAN readiness, confirmed the synced `ze-tower` worktree contains the retrieval fixture and evaluator script, and ran the standard remote health script successfully.
+- Canonical issue #38 is adding the first operator chat console. Deployment evidence is pending until the canonical change is validated, deployed, and smoke-tested.
 
 ## Open Follow-Ups
 
@@ -176,6 +182,7 @@ This page is the public-safe tracking register for the current work. It names is
 - Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
 - Add target-infrastructure knowledge packs, then compare deterministic local embeddings with a model-backed embedding service after more evaluated packs exist.
 - Add evidence list/search API support for the operator portal.
+- Persist standalone chat session history after the planning-only chat console is deployed and validated.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
 - Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.

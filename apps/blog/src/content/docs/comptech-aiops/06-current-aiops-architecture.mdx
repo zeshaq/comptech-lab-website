@@ -29,7 +29,7 @@ Target infrastructure remains outside `ze-tower`. The AIOps control plane reache
 | Layer | Current decision |
 | --- | --- |
 | Portal | Custom portal from day 1 |
-| Frontend | React, Vite, TypeScript, TanStack, Tailwind; first operator portal MVP deployed |
+| Frontend | React, Vite, TypeScript, TanStack, Tailwind; first operator portal MVP and chat console implemented |
 | Backend API | Go with Gin |
 | Agent runtime | LangGraph supervisor and specialist agents |
 | Durable workflows | Temporal |
@@ -92,6 +92,7 @@ Public-safe status:
 | Internal clients | Portal API calls orchestrator, MCP gateway, and RAG service routes for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
 | Operator portal MVP | Browser UI for readiness, task creation/list/detail, approval decisions, knowledge search citations, inventory targets, evidence lookup, and task events through the Go/Gin portal API; deployed smoke checks passed on `ze-tower`. |
+| Operator chat console | Browser UI for chat-driven task initiation, RAG citations, proposed plan steps, task state, and approval/risk state through the portal API only. |
 | LAN portal ingress | Single trusted-LAN ingress path for the operator portal; internal services remain Docker-internal. |
 | RAG retrieval evaluation | First reviewed `phase1-control-plane` knowledge pack and local fixture verify expected citations before deployment. |
 
@@ -102,6 +103,8 @@ The first retrieval fixture does not call private infrastructure. It ingests rev
 These service increments do not implement real infrastructure actions.
 
 The operator portal MVP does not add production-changing authority. It gives operators a browser surface for already-governed Phase 1 API workflows while preserving the rule that the frontend only talks to the portal API.
+
+The operator chat console does not add production-changing authority. It creates tracked tasks, queries reviewed RAG, and returns planning envelopes with citations and authority notes. Execution-seeking work remains approval-gated and still requires later orchestrator, policy, MCP, and evidence controls before real target changes are possible.
 
 The LAN ingress change does not expose internal services or target infrastructure. It only makes the existing portal ingress reachable from trusted LAN clients.
 

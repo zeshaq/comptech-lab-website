@@ -55,6 +55,8 @@ The RAG service now generates deterministic local embeddings for reviewed chunks
 
 The first reviewed RAG knowledge pack and retrieval evaluation fixture are now defined in the canonical repo. The fixture uses public-safe control-plane knowledge and checks that representative operator questions return expected citations before deployment.
 
+The first operator chat console is now implemented in the portal. Chat messages create tracked tasks, query reviewed RAG through the portal API, show citations and proposed plan steps, and keep execution-seeking work approval-gated. This is a planning-only console; it does not execute tools or mutate target infrastructure.
+
 ## Non-Negotiables
 
 - No secrets in Git.
