@@ -1,0 +1,205 @@
+---
+title: "Installation Manual - 128 spoke-dc-v7 parity baseline and workload inventory"
+sidebar_label: "128 spoke-dc-v7 parity baseline and workload inventory"
+description: "Read-only spoke-dc-v7 platform and workload baseline for the future spoke-dr-v7 hot standby cluster."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This chapter records `#466 / OP-GF-SPOKEDRV7-2`, the read-only
+`spoke-dc-v7` parity baseline for the future `spoke-dr-v7` hot standby
+cluster.
+
+The result is a platform baseline, not a deployment start. No `spoke-dr-v7`
+VMs, DNS records, HAProxy changes, install inputs, GitOps desired state, ACM
+imports, storage resources, CNPG objects, routes, or application resources
+were created.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-SPOKEDRV7` |
+| Milestone | `#37` / `spoke-dr-v7 Hot Standby Workload Cluster` |
+| Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
+| Baseline gate | `#466` / `OP-GF-SPOKEDRV7-2` |
+| Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
+| Next issue | `#467` / `OP-GF-SPOKEDRV7-3` |
+
+## Read-Only Access Path
+
+The baseline was collected through the standard v7 path:
+
+```text
+local coordinator -> dl385-2 -> gf-ocp-bootstrap-01
+```
+
+The checks used existing kubeconfigs on `gf-ocp-bootstrap-01`:
+
+```text
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/spoke-dc-v7/auth/kubeconfig
+/home/ze/ocp-greenfield-deployment/artifacts/openshift/hub-dr-v7/auth/kubeconfig
+```
+
+Only summary fields, object names, status, and non-secret configuration were
+recorded.
+
+## Cluster Baseline
+
+`spoke-dc-v7` is healthy at the time of this gate:
+
+- OpenShift `4.20.18`;
+- six Ready nodes;
+- ClusterVersion Available=True, Progressing=False, Failing=False;
+- master and worker MachineConfigPools updated and not degraded;
+- no non-steady ClusterOperators;
+- no pods outside Running or Completed.
+
+The active topology is intentionally larger than the future DR topology:
+
+| Node group | Shape |
+| --- | --- |
+| Control plane | three VM nodes, each 32 CPU and about 64 GiB RAM |
+| Workers | three physical workers, two about 128 CPU / 512 GiB RAM and one about 96 CPU / 1 TiB RAM |
+
+`spoke-dr-v7` should mirror this cluster logically, not physically. ADR 0030
+approves a compact three-node VM-only DR cluster.
+
+## Platform Parity Inputs
+
+The following platform capabilities are present on `spoke-dc-v7` and should
+drive the `spoke-dr-v7` parity plan:
+
+- disconnected catalog and image mirror model;
+- pull GitOps management from `hub-dr-v7`;
+- cert-manager;
+- External Secrets with Vault-backed stores;
+- OADP;
+- Compliance Operator;
+- File Integrity Operator;
+- Gatekeeper;
+- Local Storage Operator;
+- ODF;
+- logging and Loki;
+- cluster observability and network observability;
+- OpenTelemetry, Tempo, Service Mesh, and Kiali;
+- OpenShift Pipelines;
+- RHACS SecuredCluster.
+
+Observed subscriptions were `AtLatestKnown`.
+
+## Storage Baseline
+
+`ocs-storagecluster-ceph-rbd` is the default StorageClass.
+
+Other available storage classes are:
+
+- `ocs-storagecluster-cephfs`;
+- `ocs-storagecluster-ceph-rgw`;
+- `openshift-storage.noobaa.io`;
+- `localblock`;
+- `localfs`.
+
+ODF is Ready:
+
+- `StorageCluster/ocs-storagecluster` Ready;
+- `CephCluster/ocs-storagecluster-cephcluster` Ready;
+- `NooBaa/noobaa` Ready;
+- `LocalVolume/odf-localblock` and `LocalVolume/odf-localfs` present;
+- ODF device set count `2`, replica `3`, with `1500Gi` data PVC requests.
+
+For `spoke-dr-v7`, storage should be sized for compact-node platform overhead
+and the intended stateful app standby. Database continuity remains
+CNPG/database-layer replication, not default ODF block-level replication.
+
+## Management And GitOps Baseline
+
+`hub-dr-v7` remains the active management authority for `spoke-dc-v7`.
+
+`ManagedCluster/spoke-dc-v7` on `hub-dr-v7` is imported, joined, accepted,
+available, clock-synced, and certificate-rotated.
+
+The active platform GitOps clone on `gf-ocp-bootstrap-01` was at:
+
+```text
+0c7293ce7f6169bfcdaebb64f2e9f17061d5151f
+```
+
+The spoke GitOps tree contains the platform overlays for bootstrap,
+compliance, file integrity, node hardening, operators, logging, backup,
+catalogs, image mirrors, Vault-backed secret sync, Gatekeeper, RHACS, ODF,
+and local storage.
+
+## Backup, Security, And Compliance Baseline
+
+Observed state:
+
+- `DataProtectionApplication/spoke-dc-v7` exists;
+- `BackupStorageLocation/spoke-dc-v7` is Available;
+- RHACS `SecuredCluster/stackrox-secured-cluster-services` is Available=True;
+- CIS scans are DONE/COMPLIANT;
+- PCI DSS 4 scans are DONE/COMPLIANT;
+- Gatekeeper dry-run privileged-container constraint has zero violations;
+- ExternalSecret objects for OADP, logging, RHACS TLS material, and ESO smoke
+  are Ready=True.
+
+NIST High and older PCI DSS 3.2 scan families still include non-compliant
+results and are not represented as external attestation.
+
+## Workload Inventory Finding
+
+No live Open Liberty insurance application deployment, route, namespace, or
+PVC was found on `spoke-dc-v7` during this baseline.
+
+No live user CloudNativePG cluster, backup, scheduled backup, or pooler was
+found. The only CNPG-related live component found was the ODF/NooBaa
+CloudNativePG API and controller in the storage stack.
+
+This matters for DR planning:
+
+- `spoke-dr-v7` can mirror the platform baseline from live evidence;
+- the Open Liberty and CNPG standby overlay cannot be copied from live app
+  objects in this gate;
+- later app gates must source the desired state from the correct application
+  GitOps repository or re-baseline after the app exists on `spoke-dc-v7`.
+
+## Mandatory DR Interpretation
+
+Mirror:
+
+- release family and disconnected catalog model;
+- `hub-dr-v7` pull GitOps management;
+- ODF/local storage, OADP, RHACS, External Secrets, Compliance, File Integrity,
+  Gatekeeper, logging, observability, pipelines, and security policy posture.
+
+Adapt:
+
+- physical topology from six mixed nodes to compact three VM-only nodes;
+- storage sizing for compact capacity;
+- application and CNPG standby from desired state rather than live object copy;
+- route exposure to remain passive until a failover gate.
+
+Exclude:
+
+- cluster identity and runtime secrets;
+- kubeconfigs, pull secrets, import payloads, private keys, PATs, Vault
+  tokens, and full Secret manifests;
+- ODF block-level database replication as the default DR mechanism;
+- traffic cutover before a governed failover drill.
+
+## Result
+
+`#466` is complete. It produced the required platform parity baseline and a
+clear workload gap: the current active spoke does not contain live insurance
+app or user CNPG objects to mirror.
+
+## Next Gate
+
+`#467 / OP-GF-SPOKEDRV7-3` should allocate:
+
+- compact VM CPU and memory;
+- disk layout for boot, ODF/local storage, and platform overhead;
+- candidate IPs and MACs;
+- DNS records;
+- HAProxy change or explicit no-op;
+- validation and rollback checks before any VM creation.

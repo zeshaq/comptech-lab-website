@@ -9,8 +9,10 @@ draft: false
 This chapter records the architecture decision for `spoke-dr-v7`.
 
 The design gate is now accepted. `spoke-dr-v7` is approved as a compact
-three-node VM-only hot standby workload cluster for `spoke-dc-v7`. The next
-work is the parity baseline and workload inventory in `#466`.
+three-node VM-only hot standby workload cluster for `spoke-dc-v7`.
+
+Update: the parity baseline and workload inventory in `#466` was completed on
+2026-05-22T19:24:59Z. The next active gate is `#467`.
 
 ## Governance
 
@@ -21,7 +23,7 @@ work is the parity baseline and workload inventory in `#466`.
 | Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
 | Design gate | `#465` / `OP-GF-SPOKEDRV7-1` |
 | Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
-| Next issue | `#466` / `OP-GF-SPOKEDRV7-2` |
+| Next issue | `#467` / `OP-GF-SPOKEDRV7-3` |
 
 ## Decision Summary
 
@@ -50,9 +52,10 @@ drill promotes `spoke-dr-v7`.
 
 - Accepted ADR exists at `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md`.
 - Issue `#465` is the design gate for this decision.
-- The design gate is closed and the next work item is `#466`.
+- The design gate is closed.
+- The parity baseline gate `#466` is also closed.
 
 ## Next Gate
 
-`#466 / OP-GF-SPOKEDRV7-2` will capture the `spoke-dc-v7` parity baseline and
-workload inventory that the later build phases will consume.
+`#467 / OP-GF-SPOKEDRV7-3` will allocate compact VM capacity, IPAM, DNS,
+HAProxy/no-op handling, MAC addresses, and disk layout.
