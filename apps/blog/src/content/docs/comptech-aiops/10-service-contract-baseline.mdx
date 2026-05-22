@@ -8,6 +8,7 @@ draft: false
 
 The canonical service contract decision is `comptech-aiops` ADR 0020.
 The current RAG ingestion baseline is `comptech-aiops` ADR 0023.
+The durable RAG storage baseline is `comptech-aiops` ADR 0024.
 
 This page is the public-safe summary. It describes boundaries and API shapes, but does not publish credentials, private infrastructure evidence, or sensitive runtime details.
 
@@ -31,6 +32,7 @@ Canonical issue [#29](https://github.com/comptech-lab/comptech-aiops/issues/29) 
 Canonical issue [#30](https://github.com/comptech-lab/comptech-aiops/issues/30) implemented the first approval decision and evidence metadata API behavior.
 Canonical issue [#31](https://github.com/comptech-lab/comptech-aiops/issues/31) implemented the first orchestrator approval-wait workflow.
 Canonical issue [#32](https://github.com/comptech-lab/comptech-aiops/issues/32) implemented the first RAG ingestion pipeline skeleton.
+Canonical issue [#33](https://github.com/comptech-lab/comptech-aiops/issues/33) implemented durable RAG metadata and source object storage.
 
 Public-safe status:
 
@@ -39,7 +41,7 @@ Public-safe status:
 | Portal API | Exposes `/api/v1` stubs, `/healthz`, `/readyz`, `/metrics`, and a container healthcheck mode. |
 | Agent orchestrator | Exposes `/internal/v1/orchestrator` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | MCP gateway | Exposes `/internal/v1/mcp` stubs, `/healthz`, `/readyz`, and `/metrics`. |
-| RAG ingestion | Exposes reviewed source ingestion, source/job/chunk reads, keyword query citations, `/healthz`, `/readyz`, and `/metrics`. |
+| RAG ingestion | Exposes reviewed source ingestion, durable source/job/chunk reads, keyword query citations, `/healthz`, `/readyz`, and `/metrics`. |
 | Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
 | Shared helpers | Standardizes request IDs, task IDs, error envelopes, list envelopes, and health/readiness response shapes. |
 | Operational store | Adds durable Postgres tables for tasks, approvals, evidence metadata, and audit events. |
@@ -47,6 +49,7 @@ Public-safe status:
 | Approval and evidence API | Portal API lists/reads approvals, records approval decisions as audit events, and reads evidence metadata. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied. |
 | RAG ingestion skeleton | Reviewed markdown/plain-text source content can be ingested into in-process source, job, and chunk records; query returns public-safe citations. |
+| Durable RAG storage | RAG source, job, and chunk metadata is stored in Postgres, with reviewed source object copies in MinIO when configured. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
 
@@ -68,9 +71,11 @@ The approval-wait workflow implementation does not add production-changing autho
 
 Deployment verification passed on `ze-tower` with a public-safe smoke task. The smoke check confirmed an execution task entered `awaiting_approval`, a durable approval request was created, approval through the portal API returned the task to `queued`, task events contained the expected approval request and decision events, and the standard health script passed.
 
-The RAG ingestion skeleton does not add production-changing authority. It creates contract-valid source, job, chunk, and keyword query behavior for reviewed non-secret fixtures only. Runtime RAG state is currently in process; durable Postgres metadata, MinIO source object handling, embedding generation, and Qdrant indexing remain follow-up work.
+The RAG ingestion skeleton does not add production-changing authority. It creates contract-valid source, job, chunk, and keyword query behavior for reviewed non-secret fixtures only. Issue #33 makes that metadata durable in Postgres and stores reviewed source object copies in MinIO when configured.
 
 Deployment verification passed on `ze-tower` with a public-safe RAG fixture. The smoke check confirmed source ingestion, job completion, source and chunk reads, direct RAG query citations, portal-mediated knowledge query citations, and the standard health script.
+
+The durable RAG storage implementation does not add production-changing authority. It makes reviewed RAG source, job, and chunk metadata survive service restarts and copies reviewed source content to the approved object store when configured. Embedding generation and Qdrant indexing remain follow-up work.
 
 ## Shared Helpers
 
@@ -196,4 +201,4 @@ Readiness failures should return safe dependency status without secret values.
 
 - Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
-- Wire the RAG ingestion service to durable Postgres metadata, MinIO source objects, embedding generation, and Qdrant indexing.
+- Add embedding generation and Qdrant indexing for durable RAG chunks.

@@ -85,14 +85,14 @@ Public-safe status:
 | Portal API | `/api/v1` route stubs, liveness, readiness, metrics, and container healthcheck mode. |
 | Agent orchestrator | Internal `/internal/v1/orchestrator` route stubs, liveness, readiness, and metrics. |
 | MCP gateway | Internal `/internal/v1/mcp` route stubs, liveness, readiness, and metrics. |
-| RAG ingestion | Internal `/internal/v1/rag` ingestion skeleton with reviewed source ingestion, deterministic chunking, keyword query citations, liveness, readiness, and metrics. |
+| RAG ingestion | Internal `/internal/v1/rag` ingestion service with durable Postgres metadata, reviewed source object storage in MinIO, deterministic chunking, keyword query citations, liveness, readiness, and metrics. |
 | Deployment | Compose health checks added for first-party service containers. |
 | Shared contracts | Request ID, task ID, error envelope, list envelope, and health/readiness helpers added for first-party service stubs. |
 | Operational store | Postgres-backed task records, approval requests and decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
 | Internal clients | Portal API calls orchestrator, MCP gateway, and RAG service routes for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
 
-The RAG ingestion skeleton is suitable for contract validation with reviewed, non-secret fixtures. Durable Postgres metadata, MinIO source object handling, embedding generation, and Qdrant indexing remain follow-up work.
+The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. Embedding generation and Qdrant indexing remain follow-up work before retrieval quality should be treated as semantic.
 
 These service increments do not implement real infrastructure actions.
 

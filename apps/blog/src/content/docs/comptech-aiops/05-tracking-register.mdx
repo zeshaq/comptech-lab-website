@@ -44,6 +44,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `comptech-lab/comptech-aiops` | [#30](https://github.com/comptech-lab/comptech-aiops/issues/30) | Implement approval and evidence API behavior. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#31](https://github.com/comptech-lab/comptech-aiops/issues/31) | Implement orchestrator approval-wait workflow. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `comptech-lab/comptech-aiops` | [#32](https://github.com/comptech-lab/comptech-aiops/issues/32) | Implement RAG ingestion pipeline skeleton. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
+| `comptech-lab/comptech-aiops` | [#33](https://github.com/comptech-lab/comptech-aiops/issues/33) | Implement durable RAG metadata and source object storage. | Phase 1 - Full Platform Foundation | `phase:1-platform-foundation` |
 | `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#2](https://github.com/zeshaq/comptech-lab/issues/2) | Refresh this public-safe docs mirror from the canonical repo. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#3](https://github.com/zeshaq/comptech-lab/issues/3) | Publish public backup and restore baseline. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
@@ -58,6 +59,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `zeshaq/comptech-lab` | [#12](https://github.com/zeshaq/comptech-lab/issues/12) | Publish public approval and evidence API status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#13](https://github.com/zeshaq/comptech-lab/issues/13) | Publish public orchestrator approval-wait workflow status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 | `zeshaq/comptech-lab` | [#14](https://github.com/zeshaq/comptech-lab/issues/14) | Publish public RAG ingestion pipeline status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+| `zeshaq/comptech-lab` | [#15](https://github.com/zeshaq/comptech-lab/issues/15) | Publish public durable RAG storage status. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
 
 ## ADRs
 
@@ -86,6 +88,7 @@ This page is the public-safe tracking register for the current work. It names is
 | `0021 - Postgres Operational Store` | Use Postgres as the first operational store for tasks, approvals, evidence metadata, and audit records. |
 | `0022 - Orchestrator Approval-Wait Workflow` | Link task enqueue, approval request, operator decision, task transition, and orchestrator resume/stop notifications. |
 | `0023 - RAG Ingestion Pipeline Baseline` | Establish deterministic source ingestion, chunking, query, and citation behavior before durable RAG storage is wired. |
+| `0024 - Durable RAG Storage Baseline` | Store RAG source, job, and chunk metadata in Postgres and reviewed source object copies in MinIO. |
 
 ## Changelog Entries
 
@@ -123,12 +126,14 @@ This page is the public-safe tracking register for the current work. It names is
 | 2026-05-23 | `comptech-lab#13` | Refreshed this public-safe approval-wait workflow deployment status. |
 | 2026-05-23 | `comptech-aiops#32` | Implemented and deployed the first RAG ingestion pipeline skeleton. |
 | 2026-05-23 | `comptech-lab#14` | Refreshed this public-safe RAG ingestion pipeline status. |
+| 2026-05-23 | `comptech-aiops#33` | Implemented durable RAG metadata and source object storage. |
+| 2026-05-23 | `comptech-lab#15` | Refreshed this public-safe durable RAG storage status. |
 
 ## Open Follow-Ups
 
 - Choose and implement the independent MinIO replication or export target from ADR 0019.
 - Replace remaining internal service stub responses with contract-compliant orchestrator and MCP gateway behavior.
-- Wire the RAG ingestion service to durable Postgres metadata, MinIO source objects, embedding generation, and Qdrant indexing.
+- Add embedding generation and Qdrant indexing for durable RAG chunks.
 - Implement Temporal-backed durable orchestrator runtime behind the approval-wait contract.
 - Decide whether to archive or delete preserved legacy `/srv/rag` data.
 - Keep this docs section updated, reviewed without change, or explicitly skipped whenever a governed change lands.
