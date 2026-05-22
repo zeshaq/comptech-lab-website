@@ -1,0 +1,74 @@
+---
+title: "CompTech AIOps - operating governance"
+sidebar_label: "Operating governance"
+description: "The issue, milestone, phase, ADR, and changelog discipline used for comptech-aiops work."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The project now treats GitHub as the audit trail for every meaningful execution. Chat is useful for coordination, but GitHub and markdown files are the durable record.
+
+## Required Execution Metadata
+
+Every repository-changing execution should be able to answer this block before implementation starts:
+
+```text
+Issue:
+Milestone:
+Phase:
+ADR:
+Changelog entry:
+Scope:
+Verification:
+```
+
+Read-only discovery can happen first. That means checking repo status, inspecting files, or listing GitHub metadata is allowed before the tracking record exists. Mutating work starts only after the tracking path is known.
+
+## Current Governance Artifacts
+
+| Artifact | Role |
+| --- | --- |
+| `AGENTS.md` | Agent operating notes and expected change flow. |
+| `CHANGELOG.md` | Strict change history with issue, milestone, phase, ADR, verification, and follow-ups. |
+| `docs/adr/` | Decision records for durable choices. |
+| `docs/operations/change-control.md` | Execution gate and required workflow. |
+| `docs/operations/phases.md` | Phase register. |
+| `.github/ISSUE_TEMPLATE/change.md` | Issue template requiring governance metadata. |
+| `.github/pull_request_template.md` | PR template requiring issue, milestone, phase, ADR, and changelog. |
+
+## Active Phase
+
+| Field | Value |
+| --- | --- |
+| Milestone | `Phase 0 - Governance Foundation` |
+| Phase label | `phase:0-foundation` |
+| Purpose | Establish memory, ADRs, strict changelog, GitHub governance, secret custody, and the first declarative operating model. |
+
+## ADR Discipline
+
+The ADR rule is intentionally strict. If a change affects architecture, governance, security, deployment, operations, or future maintainability, it should be governed by an ADR.
+
+There are two valid paths:
+
+1. Reference an existing accepted ADR.
+2. Create or update an ADR in the same change set.
+
+This prevents the common failure mode where an agent changes files but the reason for the change disappears with the chat session.
+
+## Changelog Discipline
+
+The changelog is not a release-note afterthought. It is the operational ledger.
+
+Each entry records:
+
+- Date.
+- GitHub issue.
+- Milestone.
+- Phase.
+- ADR.
+- Summary.
+- Changed files or areas.
+- Verification.
+- Follow-ups.
+
+Secret values never appear in the changelog.

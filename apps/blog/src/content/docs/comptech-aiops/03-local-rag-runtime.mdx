@@ -1,0 +1,81 @@
+---
+title: "CompTech AIOps - local RAG runtime"
+sidebar_label: "Local RAG runtime"
+description: "The current local-first RAG runtime shape: Open WebUI, Ollama, Docker Compose, and host boundaries."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The first runtime target is a local RAG workspace. It combines Ollama on the host with Open WebUI in Docker.
+
+## Runtime Shape
+
+| Component | Runtime | Role |
+| --- | --- | --- |
+| Ollama | Host service | Local model serving and embeddings. |
+| Open WebUI | Docker Compose | Browser UI, document upload, workspaces, and knowledge collections. |
+| GitHub repo | Git | Desired state, ADRs, changelog, docs, templates, and future deployment definitions. |
+
+## Current Compose Intent
+
+The repository contains a Compose service for Open WebUI:
+
+```yaml
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: rag-open-webui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      WEBUI_NAME: "ZE Tower RAG"
+      WEBUI_AUTH: "true"
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+      RAG_EMBEDDING_ENGINE: "ollama"
+      RAG_EMBEDDING_MODEL: "nomic-embed-text"
+      RAG_TOP_K: "5"
+      RAG_EMBEDDING_BATCH_SIZE: "4"
+    volumes:
+      - /srv/rag/open-webui:/app/backend/data
+      - /srv/rag/import:/data/import:ro
+```
+
+The important boundary is that Open WebUI is bound to localhost on the host. Remote access should go through SSH tunneling or a future controlled access layer, not an accidental public bind.
+
+## Persistent Paths
+
+| Path | Purpose |
+| --- | --- |
+| `/srv/rag/compose.yaml` | Deployed Compose file. |
+| `/srv/rag/open-webui` | Open WebUI persistent data. |
+| `/srv/rag/import` | Source files for import into Open WebUI. |
+
+## Access Pattern
+
+The current safe access pattern is an SSH tunnel:
+
+```bash
+ssh -L 3000:127.0.0.1:3000 ze-tower
+```
+
+Then open:
+
+```text
+http://127.0.0.1:3000
+```
+
+## Declarative Direction
+
+The Compose file is the first declarative runtime artifact. The next steps should make more of the host state declarative:
+
+- systemd unit drop-ins.
+- environment file schema.
+- restore workflow.
+- runtime secret materialization.
+- backup and recovery checks.
+- deployment validation commands.
+
+Manual steps should be converted into checked-in desired state or documented break-glass procedures.

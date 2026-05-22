@@ -1,0 +1,92 @@
+---
+title: "CompTech AIOps - monorepo and GitOps direction"
+sidebar_label: "Monorepo and GitOps direction"
+description: "The platform-neutral GitOps direction for comptech-aiops as the future monorepo."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+The intended direction is for `comptech-aiops` to become the monorepo control plane for future AIOps and operations work.
+
+The project should be GitOps-oriented, but not locked to one platform. Docker Compose, systemd, VM provisioning, Cloudflare configuration, Kubernetes manifests, Terraform/OpenTofu, Ansible, and future controllers can all live under the same operating model if the repository keeps a clean boundary between desired state, secrets, runtime state, and generated artifacts.
+
+## Core Principles
+
+| Principle | Meaning here |
+| --- | --- |
+| Declarative desired state | The repo describes what should exist, not only how an operator manually created it. |
+| Versioned change history | Changes flow through GitHub issues, PRs, ADRs, and changelog entries. |
+| Controlled automation | GitHub Actions validates and orchestrates with least privilege. |
+| Reconciliation where practical | Long-running platforms should pull or reconcile from Git instead of relying only on ad hoc pushes. |
+| Secret separation | GitHub secrets hold values; Git holds references and inventory metadata. |
+
+## Proposed Future Shape
+
+```text
+comptech-aiops/
+  .github/
+    workflows/
+    ISSUE_TEMPLATE/
+    pull_request_template.md
+  docs/
+    adr/
+    infra/
+    memory/
+    operations/
+    tools/
+  governance/
+    github/
+    policies/
+  environments/
+    dev/
+    stage/
+    prod/
+  services/
+    rag/
+    future-services/
+  deployments/
+    compose/
+    systemd/
+    vm/
+    cloudflare/
+    kubernetes/
+  templates/
+  scripts/
+```
+
+This is a direction, not yet a completed implementation.
+
+## GitHub Governance Track
+
+The GitHub side should become declarative too:
+
+- Labels.
+- Milestones.
+- Issue templates.
+- PR templates.
+- Branch rulesets.
+- CODEOWNERS.
+- Required status checks.
+- Security checks.
+- Secret inventory metadata.
+
+Not every GitHub setting can be perfectly managed from the same repo without a bootstrap credential, but the desired state should still be documented and eventually automated where practical.
+
+## Deployment Track
+
+Deployments should move in stages:
+
+1. Document the current manual/runtime state.
+2. Convert runtime files into declarative source.
+3. Add validation workflows.
+4. Add restore workflows.
+5. Add environment approval gates.
+6. Move repetitive deployment into pull or reconcile patterns where practical.
+
+GitHub Actions can be used during the transitional phase, but it should not become a dumping ground for hidden imperative deployment logic.
+
+## What This Is Not
+
+This is not an OpenShift-only plan.
+
+If Kubernetes or OpenShift becomes a deployment target later, it should be represented as one deployment backend under the monorepo. The operating model remains broader than any single platform.

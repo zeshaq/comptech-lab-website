@@ -19,6 +19,7 @@ export const MODULE_TITLES: Record<string, string> = {
   "brac-poc": "BRAC Bank POC",
   "greenfield-ocp-deployment": "Greenfield OCP Deployment",
   "security-lab": "Security Lab",
+  "comptech-aiops": "CompTech AIOps",
 };
 
 export const MODULE_TAGLINES: Record<string, string> = {
@@ -30,6 +31,8 @@ export const MODULE_TAGLINES: Record<string, string> = {
     "A source-of-truth guide for building a greenfield OpenShift platform with GitOps, automated VM provisioning, DNS, edge, registry, CI, observability, and operational documentation from day one.",
   "security-lab":
     "Operating notes for the private security and networking lab — Kali, purple-team tooling, SIEM, vulnerability management, EVE-NG, and the Cisco NX-OS fabric learning track.",
+  "comptech-aiops":
+    "Public-safe operating notes for the comptech-aiops repository — GitHub governance, ADR-driven work, secret custody, local RAG runtime, and the platform-neutral GitOps direction.",
 };
 
 export function moduleTitle(id: string): string {

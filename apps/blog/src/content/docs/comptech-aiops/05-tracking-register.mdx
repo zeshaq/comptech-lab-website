@@ -1,0 +1,42 @@
+---
+title: "CompTech AIOps - tracking register"
+sidebar_label: "Tracking register"
+description: "Current issues, milestones, phases, ADRs, and documentation records for the comptech-aiops effort."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+This page is the public-safe tracking register for the current work. It names issues, decisions, and artifacts, but does not include secret values.
+
+## GitHub Issues
+
+| Repo | Issue | Purpose | Milestone | Phase |
+| --- | --- | --- | --- | --- |
+| `comptech-lab/comptech-aiops` | [#1](https://github.com/comptech-lab/comptech-aiops/issues/1) | Establish ADR-driven change control and strict changelog. | Phase 0 - Governance Foundation | `phase:0-foundation` |
+| `comptech-lab/comptech-aiops` | [#2](https://github.com/comptech-lab/comptech-aiops/issues/2) | Register Cloudflare token in GitHub secrets. | Phase 0 - Governance Foundation | `phase:0-foundation` |
+| `zeshaq/comptech-lab` | [#1](https://github.com/zeshaq/comptech-lab/issues/1) | Add this `comptech-aiops` docs section to the blog. | CompTech AIOps Documentation | `phase:comptech-aiops-docs` |
+
+## ADRs
+
+| ADR | Decision |
+| --- | --- |
+| `0001 - GitHub Repo As Operational Memory` | Use the `comptech-aiops` GitHub repo as durable project memory. |
+| `0002 - Local-First RAG On ZE Tower` | Run the first RAG stack locally with Ollama on the host and Open WebUI in Docker. |
+| `0003 - ADR-Driven Change Control` | Require issue, milestone, phase, ADR, and changelog linkage for mutating work. |
+| `0004 - GitHub Secrets As Secret Custody` | Use GitHub secrets as the project secret custody system until superseded. |
+
+## Changelog Entries
+
+| Date | Issue | Summary |
+| --- | --- | --- |
+| 2026-05-22 | `comptech-aiops#1` | Created strict governance docs, ADR process, issue/PR templates, and changelog. |
+| 2026-05-22 | `comptech-aiops#2` | Registered `CLOUDFLARE_API_TOKEN` in GitHub secrets and documented the custody decision. |
+| 2026-05-22 | `comptech-lab#1` | Created the public docs section for `comptech-aiops`. |
+
+## Open Follow-Ups
+
+- Commit and push the initial `comptech-aiops` governance documentation.
+- Decide whether GitHub secrets should be repository-level or environment-level per target.
+- Add a restore workflow that materializes GitHub secrets onto a replacement machine without printing values.
+- Convert remaining host setup steps into declarative source and validation commands.
+- Keep this docs section updated whenever a new ADR, issue, phase, or runtime decision is added.

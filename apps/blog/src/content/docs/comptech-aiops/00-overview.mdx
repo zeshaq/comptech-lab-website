@@ -1,0 +1,56 @@
+---
+title: "CompTech AIOps - overview"
+sidebar_label: "Overview"
+description: "What the comptech-aiops repository is for, what it is not, and how the work is being tracked."
+last_reviewed: 2026-05-22
+draft: false
+---
+
+`comptech-aiops` is the operating repository for CompTech's AIOps, local RAG, GitHub governance, secret custody, and future declarative deployment work.
+
+The important point is scope: this is not an OpenShift-specific project. Some earlier seed templates mentioned OpenShift because they came from platform documentation habits, but the project direction is broader and platform-neutral. The repository should be able to hold Docker Compose, systemd, VM automation, GitHub configuration, future Kubernetes manifests, GitOps controllers, and operational source notes without assuming one runtime.
+
+## Source Repositories
+
+| Repository | Purpose |
+| --- | --- |
+| `comptech-lab/comptech-aiops` | Durable operating memory, ADRs, changelog, RAG runtime config, GitOps direction, and future deployment source of truth. |
+| `zeshaq/comptech-lab` | Blog and documentation site that publishes this public documentation section. |
+
+## Current Work
+
+The first pass established the operating memory model:
+
+- A root `AGENTS.md` in `comptech-aiops` so future agents know how to work.
+- `docs/memory/` for stable project context.
+- `docs/adr/` for architecture decisions.
+- `docs/infra/` for host and runtime facts.
+- `docs/tools/` for tool inventory.
+- `docs/operations/` for change control and phases.
+- `CHANGELOG.md` for strict history.
+
+The second pass tightened governance:
+
+- Every repository-changing execution needs a GitHub issue.
+- Every issue needs a milestone.
+- Every execution needs a phase.
+- Every material change needs an ADR reference.
+- Every change set updates the changelog.
+
+The third pass defined GitHub secrets as the current secret custody system and registered the Cloudflare token in GitHub without exposing the value.
+
+## Non-Negotiables
+
+- No secrets in Git.
+- No secret values in issues, PRs, changelogs, docs, or logs.
+- GitHub is the collaboration and custody control plane for now.
+- Runtime desired state should be declarative wherever practical.
+- GitHub Actions should validate and orchestrate; long-term deployments should move toward pull or reconcile patterns.
+
+## Current Public Documentation Pages
+
+- [Operating governance](/docs/comptech-aiops/operating-governance/)
+- [GitHub secret custody](/docs/comptech-aiops/github-secret-custody/)
+- [Local RAG runtime](/docs/comptech-aiops/local-rag-runtime/)
+- [Monorepo and GitOps direction](/docs/comptech-aiops/monorepo-and-gitops-direction/)
+- [Tracking register](/docs/comptech-aiops/tracking-register/)
