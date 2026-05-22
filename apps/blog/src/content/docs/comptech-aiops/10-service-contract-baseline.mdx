@@ -33,9 +33,11 @@ Public-safe status:
 | Agent orchestrator | Exposes `/internal/v1/orchestrator` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | MCP gateway | Exposes `/internal/v1/mcp` stubs, `/healthz`, `/readyz`, and `/metrics`. |
 | RAG ingestion | Exposes `/internal/v1/rag` stubs, `/healthz`, `/readyz`, and `/metrics`. |
-| Compose | Adds first-party service health checks. |
+| Compose | Adds first-party service health checks and force-recreates the ingress gateway when the Caddyfile changes. |
 
 The stubs prove route shape, status codes, and deployment readiness semantics. They do not enable production-changing authority.
+
+Deployment verification also corrected the ingress health route so `/healthz`, `/readyz`, and `/api/*` are served by the portal API rather than the portal web container.
 
 ## Service Boundaries
 
