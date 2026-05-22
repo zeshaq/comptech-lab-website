@@ -90,7 +90,7 @@ Public-safe status:
 | Shared contracts | Request ID, task ID, error envelope, list envelope, and health/readiness helpers added for first-party service stubs. |
 | Operational store | Postgres-backed task records, approval requests and decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
 | Internal clients | Portal API calls orchestrator, MCP gateway, and RAG stubs for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
-| Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority. |
+| Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
 
 These are executable stubs only. They do not implement real infrastructure actions.
 

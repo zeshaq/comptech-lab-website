@@ -63,6 +63,8 @@ Deployment verification passed on `ze-tower` using public-safe smoke fixtures. T
 
 The approval-wait workflow implementation does not add production-changing authority. It links task enqueue, durable approval request creation, operator decision, task state transition, and orchestrator resume or stop notification behind the existing service contract.
 
+Deployment verification passed on `ze-tower` with a public-safe smoke task. The smoke check confirmed an execution task entered `awaiting_approval`, a durable approval request was created, approval through the portal API returned the task to `queued`, task events contained the expected approval request and decision events, and the standard health script passed.
+
 ## Shared Helpers
 
 Public-safe helper scope:
