@@ -19,7 +19,7 @@ The canonical decision is ADR 0017 in the `comptech-aiops` repository. This page
 | Runtime env files | Re-rendered from GitHub Secrets |
 | Stateful databases and service data | Encrypted backups |
 | Rebuildable retrieval indexes | Restore if available, otherwise rebuild from source notes |
-| Object storage | Covered by a separate MinIO backup or replication decision |
+| Object storage | Covered by MinIO replication or export to an independent target |
 
 ## Backup Tooling
 
@@ -103,6 +103,23 @@ Apply mode is explicit. It runs the policy and prunes unreferenced encrypted dat
 
 The first retention dry-run and apply-mode run completed successfully. The current public-safe outcome is that the proven restore snapshot remains retained.
 
+## MinIO Protection Boundary
+
+The canonical MinIO protection decision is `comptech-aiops` ADR 0019.
+
+The encrypted `ze-tower` backups live in the AIOps MinIO backup bucket, so the backup workflow is not a complete disaster recovery plan for MinIO itself. Critical AIOps object buckets need replication or export to a separate target outside the primary MinIO server and outside the same physical failure domain.
+
+Initial public-safe priority:
+
+| Priority | Bucket roles |
+| --- | --- |
+| Critical | backup payloads, operational evidence, generated artifacts |
+| Medium | RAG objects, model-adjacent artifacts |
+
+Acceptable future implementation paths are bucket replication to another S3-compatible target, scheduled object mirroring to independent storage, or offline encrypted object export when online replication is unavailable.
+
+The implementation target is still pending. The next step is to choose the independent target, configure replication or export, and run a restore drill from that copy.
+
 ## Open Follow-Ups
 
-- Add a separate MinIO server backup or replication decision.
+- Choose and implement the independent MinIO replication or export target from ADR 0019.
