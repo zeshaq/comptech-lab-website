@@ -2,7 +2,7 @@
 title: "CompTech AIOps - overview"
 sidebar_label: "Overview"
 description: "What the comptech-aiops repository is for, what it is not, and how the work is being tracked."
-last_reviewed: 2026-05-22
+last_reviewed: 2026-05-23
 draft: false
 ---
 
@@ -39,13 +39,15 @@ Governance requires:
 - Every material change needs an ADR reference.
 - Every change set updates the changelog.
 
-The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The deployed baseline includes a custom portal skeleton, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, placeholder agent/MCP processes, and a RAG ingestion service with durable metadata.
+The current Phase 1 control plane is deployed to `ze-tower` through a manual GitHub Actions workflow and Docker Compose. The baseline includes a custom operator portal MVP, Go/Gin API, React/Vite frontend, Temporal, OPA, LiteLLM, Qdrant, Postgres, Keycloak, NetBox, observability services, placeholder agent/MCP processes, and a RAG ingestion service with durable metadata.
 
 The old `rag-open-webui` container from the superseded local RAG experiment has been removed from the active host state. Legacy data paths were preserved for recoverability.
 
 The first encrypted `ze-tower` control-plane backup and restore drill has completed. A conservative Restic retention policy is also defined with dry-run by default and explicit apply mode. The public record only names the toolchain and validation outcome; private endpoint values, credentials, and raw evidence remain out of the blog.
 
 The first service contract baseline is now defined for the portal API, agent orchestrator, MCP gateway, RAG service, evidence records, event stream, and health/readiness checks. The baseline keeps operator traffic at the portal API and infrastructure tool execution behind internal service, policy, approval, and evidence boundaries.
+
+The first operator portal MVP is deployed. It exposes existing safe Phase 1 workflows for readiness, task tracking, approval decisions, knowledge search with citations, inventory targets, evidence lookup, and task event history through the portal API only.
 
 ## Non-Negotiables
 

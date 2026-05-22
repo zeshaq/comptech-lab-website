@@ -29,7 +29,7 @@ Target infrastructure remains outside `ze-tower`. The AIOps control plane reache
 | Layer | Current decision |
 | --- | --- |
 | Portal | Custom portal from day 1 |
-| Frontend | React, Vite, TypeScript, TanStack, Tailwind |
+| Frontend | React, Vite, TypeScript, TanStack, Tailwind; first operator portal MVP deployed |
 | Backend API | Go with Gin |
 | Agent runtime | LangGraph supervisor and specialist agents |
 | Durable workflows | Temporal |
@@ -91,10 +91,13 @@ Public-safe status:
 | Operational store | Postgres-backed task records, approval requests and decisions, evidence metadata reads, and task audit events; deployed smoke checks passed on `ze-tower`. |
 | Internal clients | Portal API calls orchestrator, MCP gateway, and RAG service routes for readiness, task enqueue/resume/cancel, inventory targets, and knowledge query; deployed smoke checks passed on `ze-tower`. |
 | Approval-wait workflow | Execution-seeking tasks can enter `awaiting_approval`, create durable approval requests, resume when approved, and block when denied without enabling production-changing authority; deployed smoke checks passed on `ze-tower`. |
+| Operator portal MVP | Browser UI for readiness, task creation/list/detail, approval decisions, knowledge search citations, inventory targets, evidence lookup, and task events through the Go/Gin portal API; deployed smoke checks passed on `ze-tower`. |
 
 The RAG ingestion path is suitable for reviewed, non-secret fixtures and early knowledge packs. Embedding generation and Qdrant indexing remain follow-up work before retrieval quality should be treated as semantic.
 
 These service increments do not implement real infrastructure actions.
+
+The operator portal MVP does not add production-changing authority. It gives operators a browser surface for already-governed Phase 1 API workflows while preserving the rule that the frontend only talks to the portal API.
 
 ## Knowledge Base Direction
 
