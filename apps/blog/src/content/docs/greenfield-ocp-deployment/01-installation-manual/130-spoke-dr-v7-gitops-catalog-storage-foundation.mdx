@@ -1,0 +1,93 @@
+---
+title: "Installation Manual - 130 spoke-dr-v7 GitOps catalog storage foundation"
+sidebar_label: "130 spoke-dr-v7 GitOps catalog storage foundation"
+description: "The accepted GitOps, catalog, image mirror, and LVMS storage foundation for the spoke-dr-v7 compact hot standby workload cluster."
+last_reviewed: 2026-05-23
+draft: false
+---
+
+This chapter records `#471 / OP-GF-SPOKEDRV7-7`, the GitOps, catalog,
+mirror, and storage foundation gate for `spoke-dr-v7`.
+
+The result is a foundation gate, not an ACM import or application-parity
+start. No `spoke-dr-v7` hub import, application overlay, CNPG workload,
+Open Liberty route, failover drill, or failback change was created here.
+
+## Governance
+
+| Field | Value |
+| --- | --- |
+| Workstream | `OP-GF-SPOKEDRV7` |
+| Milestone | `#37` / `spoke-dr-v7 Hot Standby Workload Cluster` |
+| Parent issue | `#464` / `OP-GF-SPOKEDRV7-0` |
+| Foundation gate | `#471` / `OP-GF-SPOKEDRV7-7` |
+| Accepted ADR | `adr/0030-spoke-dr-v7-hot-standby-workload-cluster.md` |
+| Next issue | `#472` / `OP-GF-SPOKEDRV7-8` |
+
+## Decision
+
+Bring up the same foundation pieces on `spoke-dr-v7` that the active v7
+clusters use for platform bootstrap:
+
+- disconnected catalog and image mirror bootstrap;
+- OpenShift GitOps operator and `openshift-gitops`;
+- ArgoCD extension RBAC for the foundation app path;
+- LVMS for the default storage class `lvms-vg1`.
+
+This gate is still below full hub import and below full workload parity. The
+cluster is now ready for the next ACM import gate, but it is not yet imported
+into a hub cluster.
+
+## Live Execution Path
+
+The live path was:
+
+```text
+local coordinator -> dl385-2 -> gf-ocp-bootstrap-01
+```
+
+The foundation bootstrap was run from the active `openshift-platform-gitops`
+clone on `gf-ocp-bootstrap-01` against the spoke kubeconfig.
+
+## Live Changes
+
+- Applied the bootstrap namespace scaffold for the spoke foundation.
+- Applied the disconnected image mirror resources.
+- Applied the operator catalog bootstrap.
+- Installed the OpenShift GitOps operator and the `openshift-gitops`
+  instance.
+- Applied the ArgoCD extension RBAC needed by the foundation app path.
+- Installed LVMS and established `StorageClass/lvms-vg1` as the default
+  storage class.
+
+The first pass exposed a bootstrap ordering issue: `ResourceQuota` was being
+applied before the baseline ConfigMap in the bootstrap namespace. That was
+corrected and the script was rerun successfully.
+
+## Validation
+
+- `openshift-gitops-operator` CSV:
+  `openshift-gitops-operator.v1.20.3` succeeded.
+- `openshift-gitops` namespace exists.
+- `ArgoCD/openshift-gitops` exists.
+- `openshift-lvm-storage` namespace exists.
+- `lvms-operator.v4.20.0` CSV succeeded.
+- `LVMCluster/lvmcluster` is `Ready`.
+- `StorageClass/lvms-vg1` exists and is the default storage class.
+
+The foundation checks were read-only; no hub import, app overlay, or route
+promotion was performed.
+
+## Residual Risks
+
+- `spoke-dr-v7` is still not ACM-imported into any hub cluster.
+- Operator/security parity still needs to be completed in later gates.
+- ODF/local storage parity, CNPG replication, Open Liberty standby, failover,
+  failback, and final backup/compliance evidence are still pending.
+- The bootstrap script must preserve the baseline ConfigMap before
+  `ResourceQuota` ordering in the bootstrap namespace.
+
+## Next Gate
+
+`#472 / OP-GF-SPOKEDRV7-8` will import `spoke-dr-v7` into `hub-dr-v7` and
+enable pull GitOps for the standby cluster.
